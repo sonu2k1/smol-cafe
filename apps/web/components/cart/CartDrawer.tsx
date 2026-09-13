@@ -211,24 +211,24 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
     >
       {/* Mobile-first Phone Modal / Drawer Frame matching user mockup */}
       <div
-        className="relative flex h-[92vh] sm:h-[88vh] w-full max-w-lg sm:max-w-[425px] flex-col rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-[#D8CCBD] bg-[#F4ECE1] text-[#1C1917] shadow-2xl overflow-hidden animate-fade-in-up"
+        className="relative flex h-[92vh] sm:h-[88vh] w-full max-w-lg sm:max-w-[425px] flex-col rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-[#C9AE8B] bg-[#F3E7D3] text-[#241F1C] shadow-2xl overflow-hidden animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Navigation Bar */}
-        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3.5 pb-2 bg-[#F4ECE1] border-b border-[#E8DFD3]/40">
+        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3.5 pb-2 bg-[#F3E7D3] border-b border-[#C9AE8B]/40">
           {activeView === "bill" ? (
             <button
               type="button"
               onClick={() => setActiveView("table_order")}
               aria-label="Back to table order"
-              className="p-1 -ml-1 text-[#1C1917] hover:opacity-75 active:scale-95 transition cursor-pointer"
+              className="p-1 -ml-1 text-[#241F1C] hover:opacity-75 active:scale-95 transition cursor-pointer"
             >
               <svg
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#1C1917"
+                stroke="#241F1C"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -241,14 +241,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
               type="button"
               onClick={closeCart}
               aria-label="Close cart"
-              className="p-1 -ml-1 text-[#1C1917] hover:opacity-75 transition active:scale-95 cursor-pointer"
+              className="p-1 -ml-1 text-[#241F1C] hover:opacity-75 transition active:scale-95 cursor-pointer"
             >
               <svg
                 width="24"
                 height="20"
                 viewBox="0 0 24 20"
                 fill="none"
-                stroke="#1C1917"
+                stroke="#241F1C"
                 strokeWidth="2.2"
                 strokeLinecap="round"
               >
@@ -259,7 +259,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
             </button>
           )}
 
-          <h2 className="font-serif text-[24px] font-bold tracking-tight text-[#1C1917] text-center">
+          <h2 className="font-serif text-[24px] font-bold tracking-tight text-[#241F1C] text-center">
             {activeView === "bill" ? "Settle Up" : "Your Table"}
           </h2>
 
@@ -269,7 +269,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
             <button
               type="button"
               onClick={closeCart}
-              className="font-serif text-[15px] font-medium text-[#8C292E] hover:opacity-85 transition active:scale-95 cursor-pointer"
+              className="font-serif text-[15px] font-medium text-[#B72E35] hover:opacity-85 transition active:scale-95 cursor-pointer"
             >
               Add more
             </button>
@@ -334,9 +334,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
             /* Settle Up / Bill View inside same popup matching user design */
             <div className="p-4 sm:p-5 space-y-4 animate-fade-in">
               {/* Arched Roman Dome Bill Card */}
-              <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#D8CCBD] bg-[#FAF5EE] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] select-none">
+              <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#C9AE8B] bg-[#FAF4EB] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] select-none">
                 {/* Inner Decorative Inset Border */}
-                <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#E5D9CC] px-5 pt-4 pb-5 text-center">
+                <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#C9AE8B]/40 px-5 pt-4 pb-5 text-center">
                   {/* Coffee Cup + Pen + Smol Cafe Notepad Illustration */}
                   <div className="relative w-[260px] h-[140px] mx-auto mt-2">
                     <Image
@@ -348,42 +348,42 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                     />
                   </div>
 
-                  {/* Poetic Headline */}
-                  <h2 className="font-serif font-bold text-[24px] sm:text-[26px] text-[#1C1917] leading-[1.18] mt-3">
+                  {/* Poetic Headline in Espresso Ink */}
+                  <h2 className="font-serif font-bold text-[24px] sm:text-[26px] text-[#241F1C] leading-[1.18] mt-3">
                     Good things
                     <br />
                     deserve good pauses.
                   </h2>
 
-                  {/* Subtitle */}
-                  <p className="font-serif italic text-[15px] sm:text-[16px] text-[#2C2420] mt-1.5 mb-3">
+                  {/* Subtitle in Walnut */}
+                  <p className="font-serif italic text-[15px] sm:text-[16px] text-[#725039] mt-1.5 mb-3">
                     Here&apos;s your bill.
                   </p>
 
-                  {/* Dashed Horizontal Line Divider */}
-                  <div className="border-t border-dashed border-[#D8CCBD] my-3.5" />
+                  {/* Dashed Horizontal Line Divider in Biscuit */}
+                  <div className="border-t border-dashed border-[#C9AE8B]/60 my-3.5" />
 
                   {/* Itemized Summary in Typewriter / Mono Font */}
-                  <div className="space-y-1.5 font-mono text-[13.5px] text-[#2A231E]">
+                  <div className="space-y-1.5 font-mono text-[13.5px] text-[#241F1C]">
                     <div className="flex items-center justify-between">
-                      <span>Items Total</span>
+                      <span className="text-[#725039]">Items Total</span>
                       <span>₹{itemsTotal}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Taxes &amp; Charges</span>
+                      <span className="text-[#725039]">Taxes &amp; Charges</span>
                       <span>₹{taxesAndCharges}</span>
                     </div>
                   </div>
 
-                  {/* Solid Horizontal Line Divider */}
-                  <div className="border-t border-[#D8CCBD] mt-3.5 mb-3" />
+                  {/* Solid Horizontal Line Divider in Biscuit */}
+                  <div className="border-t border-[#C9AE8B]/60 mt-3.5 mb-3" />
 
-                  {/* Grand Total */}
+                  {/* Grand Total in Smol Cherry */}
                   <div className="flex items-baseline justify-between pt-0.5">
-                    <span className="font-serif font-bold text-[19px] sm:text-[20px] text-[#8C292E]">
+                    <span className="font-serif font-bold text-[19px] sm:text-[20px] text-[#B72E35]">
                       Grand Total
                     </span>
-                    <span className="font-serif font-bold text-[30px] sm:text-[34px] text-[#8C292E] leading-none">
+                    <span className="font-serif font-bold text-[30px] sm:text-[34px] text-[#B72E35] leading-none">
                       ₹{grandTotal}
                     </span>
                   </div>
@@ -392,8 +392,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
               {/* Status / Request Notification Message */}
               {requestMessage && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3 text-center text-xs font-serif font-semibold text-emerald-900 shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                <div className="rounded-2xl border border-[#C9AE8B] bg-[#FAF4EB] p-3 text-center text-xs font-serif font-semibold text-[#241F1C] shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#B72E35]" />
                   <span>{requestMessage}</span>
                 </div>
               )}
@@ -404,7 +404,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                 <button
                   type="button"
                   onClick={() => setIsUpiDrawerOpen(true)}
-                  className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-3.5">
                     <div className="w-10 h-10 flex items-center justify-center shrink-0">
@@ -417,7 +417,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                       />
                     </div>
                     <div>
-                      <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                      <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
                         UPI
                       </h3>
                       <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
@@ -425,7 +425,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
+                  <ChevronRight className="w-5 h-5 text-[#725039]" />
                 </button>
 
                 {/* Card Option */}
@@ -435,7 +435,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                     setRequestMessage("Staff notified for Card payment at table.");
                     setTimeout(() => setRequestMessage(null), 4000);
                   }}
-                  className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-3.5">
                     <div className="w-10 h-10 flex items-center justify-center shrink-0">
@@ -448,7 +448,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                       />
                     </div>
                     <div>
-                      <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                      <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
                         Card
                       </h3>
                       <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
@@ -456,7 +456,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
+                  <ChevronRight className="w-5 h-5 text-[#725039]" />
                 </button>
 
                 {/* Wallets Option */}
@@ -466,7 +466,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                     setRequestMessage("Staff notified for Wallet payment.");
                     setTimeout(() => setRequestMessage(null), 4000);
                   }}
-                  className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-3.5">
                     <div className="w-10 h-10 flex items-center justify-center shrink-0">
@@ -479,7 +479,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                       />
                     </div>
                     <div>
-                      <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                      <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
                         Wallets
                       </h3>
                       <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
@@ -487,14 +487,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
+                  <ChevronRight className="w-5 h-5 text-[#725039]" />
                 </button>
               </div>
 
               {/* 100% Secure Payments Assurance */}
               <div className="pt-2 pb-2 text-center">
-                <div className="inline-flex items-center gap-1.5 font-mono text-[11px] text-[#8C7E72]">
-                  <Lock className="w-3.5 h-3.5 text-[#8C7E72]" />
+                <div className="inline-flex items-center gap-1.5 font-mono text-[11px] text-[#725039]">
+                  <Lock className="w-3.5 h-3.5 text-[#725039]" />
                   <span>100% Secure Payments</span>
                 </div>
               </div>
@@ -512,7 +512,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
               <button
                 type="button"
                 onClick={closeCart}
-                className="mt-3 inline-flex rounded-full bg-[#963336] px-6 py-2.5 font-serif text-sm font-semibold text-white shadow-xs cursor-pointer"
+                className="mt-3 inline-flex rounded-full bg-[#B72E35] hover:bg-[#9E252C] px-6 py-2.5 font-serif text-sm font-semibold text-[#F3E7D3] shadow-xs cursor-pointer"
               >
                 Browse Menu
               </button>
@@ -528,34 +528,34 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                 <div className="w-full">
                   {groupedItems.map(({ key, items: categoryItems }, groupIdx) => (
                     <div key={key} className="w-full">
-                      {/* Category Header Bar */}
-                      <div className={`px-4 py-1.5 bg-[#FAF5EE] ${groupIdx > 0 ? "border-t" : ""} border-b border-[#E8DFD3]`}>
-                        <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-[#382E28]">
+                      {/* Category Header Bar in Café Crème & Walnut */}
+                      <div className={`px-4 py-1.5 bg-[#F3E7D3] ${groupIdx > 0 ? "border-t" : ""} border-b border-[#C9AE8B]/40`}>
+                        <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-[#725039]">
                           {key}
                         </span>
                       </div>
 
-                      {/* Items in this Category */}
-                      <div className="divide-y divide-[#EBE3D7]">
+                      {/* Items in this Category with Biscuit Dividers */}
+                      <div className="divide-y divide-[#C9AE8B]/30">
                         {categoryItems.map(({ item, qty }) => {
                           const unitRupees = Math.round(item.pricePaise / 100);
                           const note = getCustomizationNote({ item, qty });
                           const isActionOpen = activeActionItemId === item.id;
 
                           return (
-                            <div key={item.id} className="transition-colors hover:bg-[#F5EDE1]/60">
+                            <div key={item.id} className="transition-colors hover:bg-[#EAE0D2]/50">
                               <div className="px-4 py-2 flex items-start justify-between gap-2">
                                 {/* Left: Quantity + Details */}
                                 <div className="flex items-start gap-2.5 min-w-0 pr-2">
-                                  <span className="font-serif font-bold text-[16px] text-[#1C1917] w-4 shrink-0 text-left pt-0.5">
+                                  <span className="font-serif font-bold text-[16px] text-[#241F1C] w-4 shrink-0 text-left pt-0.5">
                                     {qty}
                                   </span>
                                   <div className="min-w-0">
-                                    <h4 className="font-serif font-bold text-[15.5px] text-[#1C1917] leading-tight whitespace-pre-line">
+                                    <h4 className="font-serif font-bold text-[15.5px] text-[#241F1C] leading-tight whitespace-pre-line">
                                       {item.name.replace(/\s*\([^)]*\)/, "")}
                                     </h4>
                                     {note && (
-                                      <p className="font-mono text-[11.5px] text-[#332A24] mt-0.5 tracking-tight">
+                                      <p className="font-mono text-[11.5px] text-[#725039] mt-0.5 tracking-tight">
                                         • {note}
                                       </p>
                                     )}
@@ -564,7 +564,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
                                 {/* Right: Price + "•••" Options Button */}
                                 <div className="flex items-center gap-3 shrink-0 pt-0.5">
-                                  <span className="font-serif font-medium text-[15.5px] text-[#1C1917] tracking-tight">
+                                  <span className="font-serif font-medium text-[15.5px] text-[#241F1C] tracking-tight">
                                     ₹{unitRupees * qty}
                                   </span>
                                   <button
@@ -573,7 +573,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                                       setActiveActionItemId(isActionOpen ? null : item.id)
                                     }
                                     aria-label="Item options"
-                                    className="text-[#1C1917] text-[18px] font-bold tracking-widest px-1 py-0.5 hover:opacity-60 active:scale-90 transition cursor-pointer"
+                                    className="text-[#241F1C] text-[18px] font-bold tracking-widest px-1 py-0.5 hover:opacity-60 active:scale-90 transition cursor-pointer"
                                   >
                                     •••
                                   </button>
@@ -582,30 +582,30 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
                               {/* Expandable Stepper Controls when user taps '•••' */}
                               {isActionOpen && (
-                                <div className="flex items-center justify-between bg-[#F5EDE1] px-4 py-2 border-t border-[#E8DFD3]">
+                                <div className="flex items-center justify-between bg-[#FAF4EB] px-4 py-2 border-t border-[#C9AE8B]/40">
                                   <span className="text-xs font-mono text-[#725039]">Adjust quantity:</span>
                                   <div className="flex items-center gap-2.5">
                                     <button
                                       type="button"
                                       onClick={() => updateQty(item.id, -1)}
-                                      className="h-6 w-6 rounded-full border border-[#D8CCBD] bg-white font-mono text-xs font-bold text-[#1C1917] flex items-center justify-center hover:bg-stone-50"
+                                      className="h-6 w-6 rounded-full border border-[#C9AE8B] bg-[#F3E7D3] font-mono text-xs font-bold text-[#241F1C] flex items-center justify-center hover:bg-[#FAF4EB]"
                                     >
                                       −
                                     </button>
-                                    <span className="font-mono text-xs font-bold text-[#1C1917] min-w-4 text-center">
+                                    <span className="font-mono text-xs font-bold text-[#241F1C] min-w-4 text-center">
                                       {qty}
                                     </span>
                                     <button
                                       type="button"
                                       onClick={() => updateQty(item.id, 1)}
-                                      className="h-6 w-6 rounded-full border border-[#D8CCBD] bg-white font-mono text-xs font-bold text-[#1C1917] flex items-center justify-center hover:bg-stone-50"
+                                      className="h-6 w-6 rounded-full border border-[#C9AE8B] bg-[#F3E7D3] font-mono text-xs font-bold text-[#241F1C] flex items-center justify-center hover:bg-[#FAF4EB]"
                                     >
                                       +
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => removeItem(item.id)}
-                                      className="p-1 text-[#963336] hover:bg-red-50 rounded-full transition ml-1"
+                                      className="p-1 text-[#B72E35] hover:bg-[#B72E35]/10 rounded-full transition ml-1"
                                       aria-label="Remove item"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
@@ -621,10 +621,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                   ))}
                 </div>
 
-                {/* Upsell Card: "Make it a moment?" matching Image 1 */}
+                {/* Upsell Card: "Make it a moment?" with Dusty Pool accent & Butter Taxi button */}
                 <div className="p-3">
-                  <div className="rounded-[1.4rem] border border-[#BCC9BD] bg-gradient-to-br from-[#DFE5DE] via-[#D7E1D6] to-[#CCD7CB] p-3 shadow-xs transition-all">
-                    <h3 className="font-serif font-semibold text-[16px] text-[#1C1917] mb-1.5">
+                  <div className="rounded-[1.4rem] border border-[#75AFA7]/50 bg-gradient-to-br from-[#E2EBE8] via-[#DAE6E2] to-[#CEDDD8] p-3 shadow-xs transition-all">
+                    <h3 className="font-serif font-semibold text-[16px] text-[#241F1C] mb-1.5">
                       Make it a moment?
                     </h3>
 
@@ -642,7 +642,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
                       {/* Center: Title & Description */}
                       <div className="flex-1 min-w-0 pr-1">
-                        <h4 className="font-serif font-bold text-[13.5px] text-[#1C1917] leading-snug truncate">
+                        <h4 className="font-serif font-bold text-[13.5px] text-[#241F1C] leading-snug truncate">
                           Conversation Board
                         </h4>
                         <p className="font-mono text-[10.5px] text-[#374438] leading-tight mt-0.5">
@@ -650,13 +650,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                         </p>
                       </div>
 
-                      {/* Right: Price & Golden Button */}
+                      {/* Right: Price & Butter Taxi Button */}
                       <div className="flex flex-col items-end gap-1.5 shrink-0 pl-1">
                         <div className="flex items-center gap-1 font-serif text-right">
-                          <span className="line-through font-mono text-[11px] text-[#617062]">
+                          <span className="line-through font-mono text-[11px] text-[#725039]/70">
                             ₹350
                           </span>
-                          <span className="font-serif font-bold text-[13.5px] text-[#1C1917]">
+                          <span className="font-serif font-bold text-[13.5px] text-[#241F1C]">
                             ₹260
                           </span>
                         </div>
@@ -664,10 +664,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                         <button
                           type="button"
                           onClick={handleAddConversationBoard}
-                          className={`w-9 h-9 rounded-full border border-[#231F1D] flex items-center justify-center transition-all duration-200 active:scale-90 shadow-xs cursor-pointer ${
+                          className={`w-9 h-9 rounded-full border border-[#241F1C] flex items-center justify-center transition-all duration-200 active:scale-90 shadow-xs cursor-pointer ${
                             boardAdded || items.some((i) => i.item.id === "conversation_board")
-                              ? "bg-emerald-700 text-white border-emerald-900"
-                              : "bg-[#EBB974] text-[#1C1917] hover:bg-[#DEAB65]"
+                              ? "bg-[#2E5550] text-[#F3E7D3] border-[#241F1C]"
+                              : "bg-[#F2C84B] text-[#241F1C] hover:bg-[#DEB63E]"
                           }`}
                           aria-label="Add Conversation Board"
                         >
@@ -686,17 +686,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
           )}
         </div>
 
-        {/* Sticky Bottom Summary & "View Bill" CTA Button matching Image 1 */}
+        {/* Sticky Bottom Summary & "View Bill" CTA Button in Smol Cherry */}
         {!orderSuccess && activeView === "table_order" && items.length > 0 && (
-          <div className="sticky bottom-0 left-0 right-0 z-30 px-5 pt-2 pb-5 bg-gradient-to-t from-[#F4ECE1] via-[#F4ECE1]/95 to-transparent">
-            <p className="font-serif text-[15px] font-medium text-[#1C1917] text-center mb-2 tracking-wide">
+          <div className="sticky bottom-0 left-0 right-0 z-30 px-5 pt-2 pb-5 bg-gradient-to-t from-[#F3E7D3] via-[#F3E7D3]/95 to-transparent">
+            <p className="font-serif text-[15px] font-medium text-[#241F1C] text-center mb-2 tracking-wide">
               {totalCount} {totalCount === 1 ? "item" : "items"} &nbsp;•&nbsp; Total ₹{totalRupees}
             </p>
 
             <button
               type="button"
               onClick={() => setActiveView("bill")}
-              className="w-full rounded-full bg-[#963336] hover:bg-[#832B2E] text-white font-serif text-[17.5px] font-medium py-3.5 shadow-sm active:scale-[0.99] transition duration-150 cursor-pointer text-center block"
+              className="w-full rounded-full bg-[#B72E35] hover:bg-[#9E252C] text-[#F3E7D3] font-serif text-[17.5px] font-medium py-3.5 shadow-sm active:scale-[0.99] transition duration-150 cursor-pointer text-center block"
             >
               View Bill
             </button>

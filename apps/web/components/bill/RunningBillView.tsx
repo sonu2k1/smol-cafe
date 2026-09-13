@@ -83,7 +83,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
   const grandTotal = itemsTotal + taxesAndCharges;
 
   return (
-    <div className="min-h-screen bg-[#F5EDE2] text-[#1C1917] font-sans antialiased flex flex-col justify-between selection:bg-[#963336]/20 selection:text-[#963336]">
+    <div className="min-h-screen bg-[#F3E7D3] text-[#241F1C] font-sans antialiased flex flex-col justify-between selection:bg-[#B72E35]/20 selection:text-[#B72E35]">
       {/* Mobile-Proportioned Container */}
       <div className="w-full max-w-[420px] mx-auto px-4 pt-3 pb-6 flex-1 flex flex-col justify-between">
         {/* Top Header Bar */}
@@ -93,14 +93,14 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
             type="button"
             onClick={() => router.back()}
             aria-label="Go Back"
-            className="p-1 -ml-1 text-[#1C1917] hover:opacity-75 active:scale-95 transition cursor-pointer"
+            className="p-1 -ml-1 text-[#241F1C] hover:opacity-75 active:scale-95 transition cursor-pointer"
           >
             <svg
               width="24"
               height="24"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#1C1917"
+              stroke="#241F1C"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -110,7 +110,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
           </button>
 
           {/* Centered Title "Settle Up" */}
-          <h1 className="font-serif font-bold text-[24px] tracking-tight text-[#1C1917] text-center">
+          <h1 className="font-serif font-bold text-[24px] tracking-tight text-[#241F1C] text-center">
             Settle Up
           </h1>
 
@@ -120,10 +120,10 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
 
         {/* Main Content Area */}
         <main className="space-y-4">
-          {/* Arched Roman Dome Bill Card */}
-          <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#D8CCBD] bg-[#FAF5EE] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] select-none">
+          {/* Arched Roman Dome Bill Card in Biscuit & Café Card */}
+          <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#C9AE8B] bg-[#FAF4EB] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] select-none">
             {/* Inner Decorative Inset Border */}
-            <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#E5D9CC] px-6 pt-5 pb-6 text-center">
+            <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#C9AE8B]/40 px-6 pt-5 pb-6 text-center">
               {/* Coffee Cup + Pen + Smol Cafe Notepad Illustration */}
               <div className="relative w-[280px] h-[150px] mx-auto mt-2">
                 <Image
@@ -135,42 +135,42 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
                 />
               </div>
 
-              {/* Poetic Headline */}
-              <h2 className="font-serif font-bold text-[25px] sm:text-[27px] text-[#1C1917] leading-[1.18] mt-3">
+              {/* Poetic Headline in Espresso Ink */}
+              <h2 className="font-serif font-bold text-[25px] sm:text-[27px] text-[#241F1C] leading-[1.18] mt-3">
                 Good things
                 <br />
                 deserve good pauses.
               </h2>
 
-              {/* Subtitle */}
-              <p className="font-serif italic text-[16px] sm:text-[17px] text-[#2C2420] mt-1.5 mb-3">
+              {/* Subtitle in Walnut */}
+              <p className="font-serif italic text-[16px] sm:text-[17px] text-[#725039] mt-1.5 mb-3">
                 Here&apos;s your bill.
               </p>
 
-              {/* Dashed Horizontal Line Divider */}
-              <div className="border-t border-dashed border-[#D8CCBD] my-3.5" />
+              {/* Dashed Horizontal Line Divider in Biscuit */}
+              <div className="border-t border-dashed border-[#C9AE8B]/60 my-3.5" />
 
               {/* Itemized Summary in Typewriter / Mono Font */}
-              <div className="space-y-1.5 font-mono text-[13.5px] text-[#2A231E]">
+              <div className="space-y-1.5 font-mono text-[13.5px] text-[#241F1C]">
                 <div className="flex items-center justify-between">
-                  <span>Items Total</span>
+                  <span className="text-[#725039]">Items Total</span>
                   <span>₹{itemsTotal}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Taxes &amp; Charges</span>
+                  <span className="text-[#725039]">Taxes &amp; Charges</span>
                   <span>₹{taxesAndCharges}</span>
                 </div>
               </div>
 
-              {/* Solid Horizontal Line Divider */}
-              <div className="border-t border-[#D8CCBD] mt-3.5 mb-3" />
+              {/* Solid Horizontal Line Divider in Biscuit */}
+              <div className="border-t border-[#C9AE8B]/60 mt-3.5 mb-3" />
 
-              {/* Grand Total */}
+              {/* Grand Total in Smol Cherry */}
               <div className="flex items-baseline justify-between pt-0.5">
-                <span className="font-serif font-bold text-[20px] sm:text-[21px] text-[#8C292E]">
+                <span className="font-serif font-bold text-[20px] sm:text-[21px] text-[#B72E35]">
                   Grand Total
                 </span>
-                <span className="font-serif font-bold text-[32px] sm:text-[36px] text-[#8C292E] leading-none">
+                <span className="font-serif font-bold text-[32px] sm:text-[36px] text-[#B72E35] leading-none">
                   ₹{grandTotal}
                 </span>
               </div>
@@ -179,8 +179,8 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
 
           {/* Status / Request Notification Message */}
           {requestMessage && (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3 text-center text-xs font-serif font-semibold text-emerald-900 shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+            <div className="rounded-2xl border border-[#C9AE8B] bg-[#FAF4EB] p-3 text-center text-xs font-serif font-semibold text-[#241F1C] shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-[#B72E35]" />
               <span>{requestMessage}</span>
             </div>
           )}
@@ -192,7 +192,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               type="button"
               onClick={() => handlePaymentClick("UPI")}
               disabled={isRequesting}
-              className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+              className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 flex items-center justify-center shrink-0">
@@ -205,7 +205,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
                   />
                 </div>
                 <div>
-                  <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                  <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
                     UPI
                   </h3>
                   <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
@@ -213,7 +213,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
+              <ChevronRight className="w-5 h-5 text-[#725039]" />
             </button>
 
             {/* Card Option */}
@@ -221,7 +221,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               type="button"
               onClick={() => handlePaymentClick("Card")}
               disabled={isRequesting}
-              className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+              className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 flex items-center justify-center shrink-0">
@@ -234,7 +234,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
                   />
                 </div>
                 <div>
-                  <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                  <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
                     Card
                   </h3>
                   <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
@@ -242,7 +242,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
+              <ChevronRight className="w-5 h-5 text-[#725039]" />
             </button>
 
             {/* Wallets Option */}
@@ -250,7 +250,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               type="button"
               onClick={() => handlePaymentClick("Wallets")}
               disabled={isRequesting}
-              className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+              className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 flex items-center justify-center shrink-0">
@@ -263,7 +263,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
                   />
                 </div>
                 <div>
-                  <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                  <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
                     Wallets
                   </h3>
                   <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
@@ -271,7 +271,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
+              <ChevronRight className="w-5 h-5 text-[#725039]" />
             </button>
           </div>
         </main>
@@ -285,7 +285,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
 
           {/* iPhone Home Indicator Bar */}
           <div className="pt-3">
-            <div className="w-32 h-1 bg-[#1C1917] rounded-full mx-auto opacity-75" />
+            <div className="w-32 h-1 bg-[#241F1C] rounded-full mx-auto opacity-75" />
           </div>
         </footer>
       </div>
