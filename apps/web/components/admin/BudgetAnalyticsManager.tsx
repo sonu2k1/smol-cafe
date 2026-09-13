@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import type { BudgetAnalyticsOverview, CategoryBudgetVsActual } from "@/app/admin/budgets/actions";
 import { fetchBudgetVsActualAction, upsertBudgetAction } from "@/app/admin/budgets/actions";
+import { BarChart2, Building2, TrendingUp, TrendingDown, Pencil } from "lucide-react";
 
 interface BudgetAnalyticsManagerProps {
   initialData: BudgetAnalyticsOverview;
@@ -189,33 +190,36 @@ export const BudgetAnalyticsManager: React.FC<BudgetAnalyticsManagerProps> = ({ 
         <div className="flex items-center gap-2 border-b border-stone-200 dark:border-stone-800">
           <button
             onClick={() => setActiveTab("budget")}
-            className={`px-4 py-2 text-xs font-bold transition border-b-2 ${
+            className={`px-4 py-2 text-xs font-bold transition border-b-2 flex items-center gap-1.5 ${
               activeTab === "budget"
                 ? "border-[#9B2C2C] text-[#9B2C2C] dark:border-[#F6AD55] dark:text-[#F6AD55]"
                 : "border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
             }`}
           >
-            📊 Budget vs Actual ({data.categories.length} Categories)
+            <BarChart2 className="h-3.5 w-3.5" />
+            Budget vs Actual ({data.categories.length} Categories)
           </button>
           <button
             onClick={() => setActiveTab("vendors")}
-            className={`px-4 py-2 text-xs font-bold transition border-b-2 ${
+            className={`px-4 py-2 text-xs font-bold transition border-b-2 flex items-center gap-1.5 ${
               activeTab === "vendors"
                 ? "border-[#9B2C2C] text-[#9B2C2C] dark:border-[#F6AD55] dark:text-[#F6AD55]"
                 : "border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
             }`}
           >
-            🏢 Vendor Spend Summary ({data.vendorSpend.length})
+            <Building2 className="h-3.5 w-3.5" />
+            Vendor Spend Summary ({data.vendorSpend.length})
           </button>
           <button
             onClick={() => setActiveTab("prices")}
-            className={`px-4 py-2 text-xs font-bold transition border-b-2 ${
+            className={`px-4 py-2 text-xs font-bold transition border-b-2 flex items-center gap-1.5 ${
               activeTab === "prices"
                 ? "border-[#9B2C2C] text-[#9B2C2C] dark:border-[#F6AD55] dark:text-[#F6AD55]"
                 : "border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
             }`}
           >
-            📈 Price Changes & Top Ingredients ({data.priceTrends.length})
+            <TrendingUp className="h-3.5 w-3.5" />
+            Price Changes & Top Ingredients ({data.priceTrends.length})
           </button>
         </div>
 
@@ -257,9 +261,9 @@ export const BudgetAnalyticsManager: React.FC<BudgetAnalyticsManagerProps> = ({ 
 
                       <button
                         onClick={() => handleOpenEditBudget(cat)}
-                        className="rounded-xl border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-bold text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300"
+                        className="rounded-xl border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-bold text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300 flex items-center gap-1"
                       >
-                        Edit Budget ✏️
+                        Edit Budget <Pencil className="h-3 w-3" />
                       </button>
                     </div>
                   </div>
@@ -465,7 +469,7 @@ export const BudgetAnalyticsManager: React.FC<BudgetAnalyticsManagerProps> = ({ 
 
                         {pt.percentageChange !== null && (
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-mono font-bold ${
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-mono font-bold flex items-center gap-1 ${
                               pt.percentageChange > 0
                                 ? "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300"
                                 : pt.percentageChange < 0
@@ -473,11 +477,15 @@ export const BudgetAnalyticsManager: React.FC<BudgetAnalyticsManagerProps> = ({ 
                                   : "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300"
                             }`}
                           >
-                            {pt.percentageChange > 0
-                              ? "🔺 +"
-                              : pt.percentageChange < 0
-                                ? "🔻 "
-                                : "— "}
+                            {pt.percentageChange > 0 ? (
+                              <>
+                                <TrendingUp className="h-3 w-3" /> +
+                              </>
+                            ) : pt.percentageChange < 0 ? (
+                              <TrendingDown className="h-3 w-3" />
+                            ) : (
+                              "— "
+                            )}
                             {Math.abs(pt.percentageChange)}%
                           </span>
                         )}

@@ -59,6 +59,24 @@ body {
   border: 4px solid #2A211B;
 }
 
+/* Blinking Red Status Dot (Smol Cherry #B72E35) */
+@keyframes redDotBlink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 10px #B72E35, 0 0 18px #B72E35;
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(0.8);
+    box-shadow: 0 0 2px #B72E35;
+  }
+}
+
+.animate-red-dot {
+  animation: redDotBlink 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 /* Smooth hide scrollbar */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -234,4 +252,202 @@ body {
   transform: scale(0.98);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ROLE SELECTION GATEWAY ANIMATIONS
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(183, 46, 53, 0.4);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 16px rgba(183, 46, 53, 0.6);
+  }
+}
+
+@keyframes glowPulseSlow {
+  0%, 100% {
+    box-shadow: 0 4px 24px rgba(183, 46, 53, 0.25);
+  }
+  50% {
+    box-shadow: 0 4px 32px rgba(183, 46, 53, 0.45);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+.animate-glow-pulse-slow {
+  animation: glowPulseSlow 3s ease-in-out infinite;
+}
+
+@keyframes laserScanUpAndDown {
+  0% {
+    top: 86%;
+    opacity: 0.7;
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+  50% {
+    top: 14%;
+    opacity: 1;
+    filter: drop-shadow(0 0 10px currentColor);
+  }
+  100% {
+    top: 86%;
+    opacity: 0.7;
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+}
+
+.animate-laser-scan {
+  animation: laserScanUpAndDown 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3D TACTILE & EYE-PLEASING DEPTH STYLES (BRAND COMPLIANT)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Ambient Radial Backgrounds */
+.ambient-bg-day {
+  background: radial-gradient(circle at 50% 32%, rgba(242, 200, 75, 0.16) 0%, rgba(243, 231, 211, 0.7) 45%, #F3E7D3 100%);
+}
+
+.ambient-bg-night {
+  background: radial-gradient(circle at 50% 32%, rgba(117, 76, 255, 0.14) 0%, rgba(183, 46, 53, 0.08) 35%, #241F1C 90%);
+}
+
+/* 3D Tactile Card (Letterpress Arch Plaque) */
+.card-3d-arch-day {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAF4EB 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -2px 6px rgba(114, 80, 57, 0.04) inset,
+    0 4px 6px -1px rgba(114, 80, 57, 0.06),
+    0 16px 32px -4px rgba(114, 80, 57, 0.14),
+    0 32px 64px -12px rgba(36, 31, 28, 0.12);
+  border: 1px solid rgba(183, 46, 53, 0.22);
+}
+
+.card-3d-arch-night {
+  background: linear-gradient(180deg, #2A221E 0%, #1F1916 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 4px 10px rgba(0, 0, 0, 0.5),
+    0 20px 40px -8px rgba(0, 0, 0, 0.8),
+    0 0 32px rgba(117, 76, 255, 0.14);
+  border: 1px solid rgba(117, 76, 255, 0.35);
+}
+
+/* 3D Tactile Pressable CTA Button */
+.btn-3d-cherry {
+  background: linear-gradient(180deg, #C5343B 0%, #A6242B 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.38),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+    0 5px 0 #7A171D,
+    0 12px 20px rgba(183, 46, 53, 0.35);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-3d-cherry:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.45),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+    0 6px 0 #7A171D,
+    0 16px 26px rgba(183, 46, 53, 0.42);
+}
+
+.btn-3d-cherry:active {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.3),
+    0 1px 0 #7A171D,
+    0 4px 8px rgba(183, 46, 53, 0.2);
+}
+
+/* In Night Mode: 3D Button glow */
+.btn-3d-cherry-night {
+  background: linear-gradient(180deg, #C5343B 0%, #A6242B 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+    0 5px 0 #610E14,
+    0 0 24px rgba(183, 46, 53, 0.55),
+    0 14px 28px rgba(0, 0, 0, 0.7);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-3d-cherry-night:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    0 6px 0 #610E14,
+    0 0 30px rgba(183, 46, 53, 0.7),
+    0 18px 32px rgba(0, 0, 0, 0.8);
+}
+
+.btn-3d-cherry-night:active {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.4),
+    0 1px 0 #610E14,
+    0 0 14px rgba(183, 46, 53, 0.4);
+}
+
+/* 3D Embossed Medallion Seal for QR Icon */
+.seal-3d-day {
+  background: radial-gradient(circle at 35% 35%, #FAF4EB 0%, #EFE2CE 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(255, 255, 255, 0.9),
+    inset 0 -2px 4px rgba(114, 80, 57, 0.15),
+    0 4px 10px rgba(114, 80, 57, 0.12),
+    0 1px 2px rgba(36, 31, 28, 0.08);
+  border: 1.5px solid rgba(183, 46, 53, 0.28);
+}
+
+.seal-3d-night {
+  background: radial-gradient(circle at 35% 35%, #2D2420 0%, #171311 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(255, 255, 255, 0.12),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+    0 4px 14px rgba(0, 0, 0, 0.6),
+    0 0 16px rgba(117, 76, 255, 0.2);
+  border: 1.5px solid rgba(117, 76, 255, 0.4);
+}
+
+/* Tactile Header Pills & Locks */
+.pill-3d-day {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F5EDE0 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 2px 5px rgba(36, 31, 28, 0.08),
+    0 1px 2px rgba(36, 31, 28, 0.05);
+  border: 1px solid rgba(201, 174, 139, 0.7);
+}
+
+.pill-3d-day:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 1px 2px rgba(36, 31, 28, 0.1),
+    0 1px 2px rgba(36, 31, 28, 0.04);
+}
+
+.pill-3d-night {
+  background: linear-gradient(180deg, #2D2521 0%, #201A17 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 3px 8px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(117, 76, 255, 0.35);
+}
+
+.pill-3d-night:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
 

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { fetchUpcomingEventsAction, registerEventRsvpAction, type CustomerEventView } from "@/app/events/actions";
 import { BottomNavBar } from "@/components/navigation/BottomNavBar";
+import { Coffee, Calendar } from "lucide-react";
 
 interface EventsClientViewProps {
   initialEvents: CustomerEventView[];
@@ -55,7 +56,7 @@ export const EventsClientView: React.FC<EventsClientViewProps> = ({ initialEvent
   };
 
   return (
-    <div className="min-h-screen bg-[#F5EFEB] text-[#1C1917] pb-28 font-sans">
+    <div className="min-h-screen bg-[#F3E7D3] text-[#241F1C] pb-28 font-sans">
       {/* Top Header */}
       <header className="sticky top-0 z-40 border-b border-[#E8DFD3]/80 bg-[#F5EFEB]/90 px-4 py-3.5 backdrop-blur-md">
         <div className="mx-auto flex max-w-md items-center justify-between">
@@ -96,7 +97,7 @@ export const EventsClientView: React.FC<EventsClientViewProps> = ({ initialEvent
         <div className="space-y-3.5">
           {events.length === 0 ? (
             <div className="rounded-2xl border border-[#E2D7C7] bg-[#FCF8F2] p-8 text-center">
-              <span className="text-3xl">☕</span>
+              <Coffee className="h-7 w-7 text-[#786F66] mx-auto" />
               <p className="font-serif text-sm font-bold text-[#1C1917] mt-2">
                 No upcoming events this week
               </p>
@@ -124,8 +125,8 @@ export const EventsClientView: React.FC<EventsClientViewProps> = ({ initialEvent
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <span className="inline-block rounded-full bg-[#EBF3F4] border border-[#D0E2E5] px-2.5 py-0.5 text-[10px] font-bold text-[#2A5258]">
-                        📅 {dateStr} • {timeStr}
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#EBF3F4] border border-[#D0E2E5] px-2.5 py-0.5 text-[10px] font-bold text-[#2A5258]">
+                        <Calendar className="h-3 w-3" /> {dateStr} • {timeStr}
                       </span>
                       <h3 className="font-serif text-base font-bold text-[#1C1917] mt-1.5">
                         {ev.title}

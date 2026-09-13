@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import { staffLoginAction } from "@/app/kitchen/actions";
+import { ChefHat } from "lucide-react";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 
 interface StaffLoginGateProps {
   onSuccess?: () => void;
@@ -38,14 +40,21 @@ export const StaffLoginGate: React.FC<StaffLoginGateProps> = ({ onSuccess }) => 
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#141211] p-4 text-[#FDFBF7]">
-      <div className="w-full max-w-sm rounded-3xl border border-stone-800 bg-[#1C1917] p-8 shadow-2xl">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-[#F3E7D3] dark:bg-[#241F1C] p-4 text-[#241F1C] dark:text-[#F3E7D3] font-sans transition-colors duration-200">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      <div className="w-full max-w-sm rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1D1815] p-8 shadow-2xl transition-colors duration-200">
         <div className="text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#9B2C2C] text-2xl text-white">
-            🍳
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#B72E35] text-white shadow-md">
+            <ChefHat className="h-7 w-7" />
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-white">smol café • kitchen KDS</h2>
-          <p className="mt-1 text-xs text-stone-400">Enter staff PIN to access the kitchen board</p>
+          <h2 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3] lowercase">
+            kitchen gds
+          </h2>
+          <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] mt-1">
+            enter staff pin to access order preparation
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -56,13 +65,13 @@ export const StaffLoginGate: React.FC<StaffLoginGateProps> = ({ onSuccess }) => 
               placeholder="Staff PIN (e.g. 1234)"
               value={pin}
               onChange={(e) => setPin(e.target.value)}
-              className="w-full rounded-2xl border border-stone-700 bg-stone-900/80 px-4 py-3.5 text-center font-mono text-lg tracking-widest text-white placeholder:text-xs placeholder:tracking-normal placeholder:text-stone-500 focus:border-[#9B2C2C] focus:outline-none"
+              className="w-full rounded-2xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#F3E7D3] dark:bg-[#241F1C] px-4 py-3.5 text-center font-mono text-lg tracking-widest text-[#241F1C] dark:text-[#F3E7D3] placeholder:text-xs placeholder:tracking-normal placeholder:text-[#725039]/50 dark:placeholder:text-[#C9AE8B]/50 focus:border-[#B72E35] focus:outline-none"
               autoFocus
             />
           </div>
 
           {error && (
-            <p className="rounded-xl border border-red-900/60 bg-red-950/40 p-2.5 text-center text-xs font-semibold text-red-300">
+            <p className="rounded-xl border border-[#B72E35]/60 bg-[#B72E35]/20 p-2.5 text-center text-xs font-semibold text-[#F2C84B]">
               {error}
             </p>
           )}
@@ -70,14 +79,14 @@ export const StaffLoginGate: React.FC<StaffLoginGateProps> = ({ onSuccess }) => 
           <button
             type="submit"
             disabled={isLoading || !pin}
-            className="flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-[#9B2C2C] py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#822424] active:scale-[0.98] disabled:opacity-50"
+            className="flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-[#B72E35] py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#9B242A] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
           >
-            {isLoading ? "Unlocking..." : "Enter Kitchen Display"}
+            {isLoading ? "unlocking..." : "enter kitchen gds"}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <span className="text-[11px] text-stone-500 font-mono">Demo staff PIN: 1234</span>
+          <span className="text-[11px] text-[#C9AE8B]/70 font-mono">demo staff pin: 1234</span>
         </div>
       </div>
     </div>

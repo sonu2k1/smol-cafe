@@ -74,12 +74,12 @@ export interface BudgetAnalyticsOverview {
 }
 
 const CATEGORY_NAMES: Record<string, string> = {
-  DAIRY: "🥛 Dairy (Milk, Butter, Cream)",
-  COFFEE_BEANS: "☕ Coffee Beans & Roasts",
-  BAKERY_RAW: "🥐 Bakery Raw (Flour, Yeast, Cocoa)",
-  SPICES_TEA: "🌿 Spices & Chai Blends",
-  PACKAGING: "📦 Packaging & Takeaway",
-  MISC: "🧹 Operational & Misc",
+  DAIRY: "Dairy (Milk, Butter, Cream)",
+  COFFEE_BEANS: "Coffee Beans & Roasts",
+  BAKERY_RAW: "Bakery Raw (Flour, Yeast, Cocoa)",
+  SPICES_TEA: "Spices & Chai Blends",
+  PACKAGING: "Packaging & Takeaway",
+  MISC: "Operational & Misc",
 };
 
 /**

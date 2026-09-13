@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { MenuItemWithDetails } from "@/lib/queries/menu";
 import { getFoodImage } from "@/lib/food-images";
+import { Coffee, Flame } from "lucide-react";
 
 interface MenuItemCardProps {
   item: MenuItemWithDetails;
@@ -40,8 +41,8 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-2xl">
-            ☕
+          <div className="flex h-full w-full items-center justify-center text-[#725039]">
+            <Coffee className="h-6 w-6" />
           </div>
         )}
       </div>
@@ -64,7 +65,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
         {/* Spice Level Indicator */}
         {spiceLevel && (
           <p className="mt-0.5 flex items-center gap-1 font-serif italic text-[11px] text-[#725039]">
-            <span>🌶</span>
+            <Flame className="h-3 w-3 text-red-500 fill-current" />
             <span>{spiceLevel}</span>
           </p>
         )}

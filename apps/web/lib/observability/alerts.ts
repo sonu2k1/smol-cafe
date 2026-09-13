@@ -123,7 +123,7 @@ export async function triggerAlert(alert: SystemAlert): Promise<void> {
   activeAlerts.unshift(alert);
   if (activeAlerts.length > 20) activeAlerts.pop();
 
-  logger.error(`🚨 [SYSTEM ALERT TRIGGERED] ${alert.title} - ${alert.message}`, {
+  logger.error(`[SYSTEM ALERT TRIGGERED] ${alert.title} - ${alert.message}`, {
     data: { alert },
   });
 
@@ -135,7 +135,7 @@ export async function triggerAlert(alert: SystemAlert): Promise<void> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: `🚨 *[Smol Café Alert: ${alert.severity}]* ${alert.title}\n>${alert.message}\n_Time: ${alert.triggeredAt}_`,
+          text: `*[Smol Café Alert: ${alert.severity}]* ${alert.title}\n>${alert.message}\n_Time: ${alert.triggeredAt}_`,
           alert,
         }),
       });

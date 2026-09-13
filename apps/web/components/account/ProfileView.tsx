@@ -7,6 +7,7 @@ import type { CustomerHistoricalOrder } from "@/app/account/actions";
 import { claimCurrentSessionOrdersAction } from "@/app/account/actions";
 import { redeemLoyaltyRewardAction, type LoyaltyAccountDetails } from "@/app/account/loyalty-actions";
 import { AuthModal } from "./AuthModal";
+import { Coffee, UtensilsCrossed, Award, ChefHat, CreditCard, Zap, Coins } from "lucide-react";
 
 import { BottomNavBar } from "@/components/navigation/BottomNavBar";
 
@@ -56,9 +57,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [redeemFeedback, setRedeemFeedback] = useState<string | null>(null);
 
   const rewardCoupons = [
-    { id: "rew_pour_over", title: "Free Pour Over Coffee", cost: 150, icon: "☕" },
-    { id: "rew_bun_makkhan", title: "Free Bun Makkhan", cost: 100, icon: "🧈" },
-    { id: "rew_board", title: "Table Conversation Board", cost: 200, icon: "🧀" },
+    { id: "rew_pour_over", title: "Free Pour Over Coffee", cost: 150, icon: Coffee },
+    { id: "rew_bun_makkhan", title: "Free Bun Makkhan", cost: 100, icon: UtensilsCrossed },
+    { id: "rew_board", title: "Table Conversation Board", cost: 200, icon: Award },
   ];
 
   const handleRedeemCoupon = async (rewardId: string, title: string, cost: number) => {
@@ -71,7 +72,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       const res = await redeemLoyaltyRewardAction(rewardId);
       if (res.success) {
         setCurrentBalance(res.newBalance || (currentBalance - cost));
-        setRedeemFeedback(`🎉 Successfully redeemed: ${title}! Use code at checkout.`);
+        setRedeemFeedback(`Successfully redeemed: ${title}! Use code at checkout.`);
       } else {
         setRedeemFeedback(res.message || "Failed to redeem reward.");
       }
@@ -123,8 +124,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <span className="block font-mono text-[9px] font-bold uppercase text-[#725039] tracking-wider">
                 POINTS
               </span>
-              <span className="font-mono text-xl font-extrabold text-[#241F1C]">
-                🪙 {currentBalance}
+              <span className="font-mono text-xl font-extrabold text-[#241F1C] flex items-center justify-end gap-1">
+                <Coins className="h-4 w-4 text-[#B72E35]" /> {currentBalance}
               </span>
             </div>
           </div>
@@ -167,7 +168,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 key={coupon.title}
                 className="rounded-2xl border border-[#C9AE8B]/40 bg-[#FAF4EB] p-3 text-center shadow-xs flex flex-col justify-between"
               >
-                <div className="text-2xl">{coupon.icon}</div>
+                <div className="flex justify-center text-[#B72E35]">
+                  <coupon.icon className="h-6 w-6" />
+                </div>
                 <p className="font-serif text-[11px] font-bold text-[#1C1917] line-clamp-2 my-1">
                   {coupon.title}
                 </p>
@@ -183,43 +186,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </div>
 
-        {/* Staff & Admin Quick Portals */}
-        <div className="rounded-2xl border border-[#E2D7C7] bg-[#FAF5ED] p-3.5 space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <span className="block font-serif text-xs font-bold text-[#8C7E72] uppercase tracking-wider">
-              Staff &amp; Role Portals
-            </span>
-            <Link
-              href="/smol-backdoor"
-              className="font-mono text-[10px] font-bold text-[#B72E35] hover:underline"
-            >
-              Backdoor →
-            </Link>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Link
-              href="/smol-backdoor/kitchen"
-              className="rounded-xl border border-[#D8CEBF] bg-[#FCF8F2] p-2 text-center hover:bg-[#EFE7DC] transition"
-            >
-              <span className="block text-base">👨‍🍳</span>
-              <span className="font-serif text-[11px] font-bold text-[#1C1917]">Kitchen KDS</span>
-            </Link>
-            <Link
-              href="/smol-backdoor/cashier"
-              className="rounded-xl border border-[#D8CEBF] bg-[#FCF8F2] p-2 text-center hover:bg-[#EFE7DC] transition"
-            >
-              <span className="block text-base">💳</span>
-              <span className="font-serif text-[11px] font-bold text-[#1C1917]">Cashier POS</span>
-            </Link>
-            <Link
-              href="/smol-backdoor/admin"
-              className="rounded-xl border border-[#D8CEBF] bg-[#FCF8F2] p-2 text-center hover:bg-[#EFE7DC] transition"
-            >
-              <span className="block text-base">⚡</span>
-              <span className="font-serif text-[11px] font-bold text-[#1C1917]">Admin Tower</span>
-            </Link>
-          </div>
-        </div>
 
         {/* Active Session Claim Card (if seated) */}
         {activeSession && (

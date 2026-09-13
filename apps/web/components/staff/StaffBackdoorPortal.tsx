@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { staffBackdoorLoginAction } from "@/app/smol-backdoor/actions";
+import { ChefHat, CreditCard, Zap, AlertTriangle } from "lucide-react";
 
 export const StaffBackdoorPortal: React.FC = () => {
   const router = useRouter();
@@ -16,7 +17,7 @@ export const StaffBackdoorPortal: React.FC = () => {
     {
       id: "kitchen" as const,
       name: "Kitchen KDS",
-      icon: "🍳",
+      icon: ChefHat,
       tagline: "Live confirmed ticket queue & brewing timer",
       defaultPin: "7711",
       accent: "#F2C84B",
@@ -25,7 +26,7 @@ export const StaffBackdoorPortal: React.FC = () => {
     {
       id: "cashier" as const,
       name: "Cashier Desk",
-      icon: "💳",
+      icon: CreditCard,
       tagline: "Order verification queue & table cash settlement",
       defaultPin: "4422",
       accent: "#B72E35",
@@ -34,8 +35,8 @@ export const StaffBackdoorPortal: React.FC = () => {
     {
       id: "admin" as const,
       name: "Admin Control",
-      icon: "⚡",
-      tagline: "Master café management, blackboard & observability",
+      icon: Zap,
+      tagline: "Master café management, chalkboard & observability",
       defaultPin: "9900",
       accent: "#754CFF",
       destination: "/smol-backdoor/admin",
@@ -101,6 +102,7 @@ export const StaffBackdoorPortal: React.FC = () => {
         <div className="grid grid-cols-3 gap-2 rounded-2xl border border-[#3D3530] bg-[#1A1715] p-1.5">
           {roles.map((r) => {
             const isSelected = selectedRole === r.id;
+            const IconComp = r.icon;
             return (
               <button
                 key={r.id}
@@ -116,7 +118,7 @@ export const StaffBackdoorPortal: React.FC = () => {
                     : "opacity-60 hover:opacity-100"
                 }`}
               >
-                <span className="text-2xl mb-1">{r.icon}</span>
+                <IconComp className="h-6 w-6 mb-1 text-[#F2C84B]" />
                 <span className="font-serif text-xs font-bold text-white line-clamp-1">{r.name}</span>
               </button>
             );
@@ -137,12 +139,13 @@ export const StaffBackdoorPortal: React.FC = () => {
                 {currentRoleConfig.tagline}
               </p>
             </div>
-            <span className="text-3xl">{currentRoleConfig.icon}</span>
+            <currentRoleConfig.icon className="h-8 w-8 text-[#C9AE8B]" />
           </div>
 
           {errorMessage && (
-            <div className="rounded-2xl border border-rose-900/60 bg-rose-950/40 p-3 text-xs text-rose-300 font-serif">
-              ⚠️ {errorMessage}
+            <div className="flex items-center gap-2 rounded-2xl border border-rose-900/60 bg-rose-950/40 p-3 text-xs text-rose-300 font-serif">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>{errorMessage}</span>
             </div>
           )}
 
@@ -182,7 +185,7 @@ export const StaffBackdoorPortal: React.FC = () => {
               onClick={() => handleQuickLogin(selectedRole, currentRoleConfig.defaultPin)}
               className="rounded-lg bg-[#2E2824] px-3 py-1.5 font-mono text-xs font-bold text-[#F2C84B] hover:bg-[#3D3530] transition active:scale-95"
             >
-              ⚡ Instant Enter ({currentRoleConfig.name})
+              Instant Enter ({currentRoleConfig.name})
             </button>
           </div>
         </div>
@@ -191,21 +194,21 @@ export const StaffBackdoorPortal: React.FC = () => {
         <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono text-[#C9AE8B]">
           <Link
             href="/smol-backdoor/kitchen"
-            className="rounded-xl border border-[#3D3530] bg-[#1A1715] p-3 hover:bg-[#2E2824] transition"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#3D3530] bg-[#1A1715] p-3 hover:bg-[#2E2824] transition"
           >
-            🍳 Kitchen KDS
+            <ChefHat className="h-4 w-4" /> Kitchen KDS
           </Link>
           <Link
             href="/smol-backdoor/cashier"
-            className="rounded-xl border border-[#3D3530] bg-[#1A1715] p-3 hover:bg-[#2E2824] transition"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#3D3530] bg-[#1A1715] p-3 hover:bg-[#2E2824] transition"
           >
-            💳 Cashier POS
+            <CreditCard className="h-4 w-4" /> Cashier POS
           </Link>
           <Link
             href="/smol-backdoor/admin"
-            className="rounded-xl border border-[#3D3530] bg-[#1A1715] p-3 hover:bg-[#2E2824] transition"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#3D3530] bg-[#1A1715] p-3 hover:bg-[#2E2824] transition"
           >
-            ⚡ Admin Tower
+            <Zap className="h-4 w-4" /> Admin Tower
           </Link>
         </div>
       </main>

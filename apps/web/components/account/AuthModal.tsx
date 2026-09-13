@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { sendOtpAction, verifyOtpAction } from "@/app/account/actions";
+import { Smartphone, Mail } from "lucide-react";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -118,24 +119,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="button"
                 onClick={() => setAuthMode("phone")}
-                className={`flex-1 rounded-lg py-1.5 transition ${
+                className={`flex-1 rounded-lg py-1.5 transition flex items-center justify-center gap-1.5 ${
                   authMode === "phone"
                     ? "bg-white text-stone-900 shadow-sm dark:bg-stone-700 dark:text-stone-100"
                     : "text-stone-500"
                 }`}
               >
-                📱 Mobile OTP
+                <Smartphone className="h-3.5 w-3.5" /> Mobile OTP
               </button>
               <button
                 type="button"
                 onClick={() => setAuthMode("email")}
-                className={`flex-1 rounded-lg py-1.5 transition ${
+                className={`flex-1 rounded-lg py-1.5 transition flex items-center justify-center gap-1.5 ${
                   authMode === "email"
                     ? "bg-white text-stone-900 shadow-sm dark:bg-stone-700 dark:text-stone-100"
                     : "text-stone-500"
                 }`}
               >
-                ✉️ Email Link
+                <Mail className="h-3.5 w-3.5" /> Email Link
               </button>
             </div>
 

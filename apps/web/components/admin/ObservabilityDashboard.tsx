@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import type { ObservabilityDashboardData } from "@/app/admin/observability/actions";
 import { fetchObservabilityDataAction } from "@/app/admin/observability/actions";
+import { Radio, RotateCw, AlertOctagon } from "lucide-react";
 import Link from "next/link";
 
 export const ObservabilityDashboard: React.FC = () => {
@@ -57,7 +58,7 @@ export const ObservabilityDashboard: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 pb-5 dark:border-stone-800">
           <div>
             <div className="flex items-center gap-3">
-              <span className="text-2xl">📡</span>
+              <Radio className="h-6 w-6 text-[#9B2C2C] dark:text-[#F6AD55]" />
               <h1 className="text-xl font-black uppercase tracking-tight text-stone-900 dark:text-stone-100">
                 Smol Observability & System Health
               </h1>
@@ -86,9 +87,10 @@ export const ObservabilityDashboard: React.FC = () => {
             <button
               onClick={loadData}
               disabled={isRefreshing}
-              className="rounded-xl bg-[#9B2C2C] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#822424] dark:bg-[#C53030]"
+              className="flex items-center gap-1 rounded-xl bg-[#9B2C2C] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#822424] dark:bg-[#C53030]"
             >
-              {isRefreshing ? "Refreshing..." : "🔄 Refresh"}
+              <RotateCw className="h-3.5 w-3.5" />
+              <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
             </button>
           </div>
         </div>
@@ -96,8 +98,8 @@ export const ObservabilityDashboard: React.FC = () => {
         {/* Active Alert Banners */}
         {data.alerts.length > 0 && (
           <div className="space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
-              🚨 Active System Alerts ({data.alerts.length})
+            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
+              <AlertOctagon className="h-3.5 w-3.5" /> Active System Alerts ({data.alerts.length})
             </span>
             {data.alerts.map((alert) => (
               <div

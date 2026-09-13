@@ -5,7 +5,7 @@
  */
 
 export const FOOD_IMAGE_CATALOG: Record<string, string> = {
-  // 🥐 Breakfast & Buns
+  // Breakfast & Buns
   "bun makkhan, kanpur se":
     "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80",
   "oats, fruit & yoghurt bowl":
@@ -15,11 +15,13 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "creamy cheese mushroom omelette":
     "https://images.unsplash.com/photo-1584776296944-ab6fb57b0bdd?auto=format&fit=crop&w=600&q=80",
   "egg bhurji pav":
-    "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=600&q=80",
+    "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=85",
   "paneer bhurji pav":
     "https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=600&q=80",
 
-  // 🥪 Sandwiches & Deckers
+  // Sandwiches & Deckers
+  "triple decker":
+    "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=80",
   "the smol triple decker":
     "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=80",
   "creamy cheese mushroom decker":
@@ -29,7 +31,7 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "bombay toastie":
     "https://images.unsplash.com/photo-1619860860774-1e2e17343432?auto=format&fit=crop&w=600&q=80",
 
-  // 🍲 Bowls & Comfort
+  // Bowls & Comfort
   "ghar wali dal khichdi":
     "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600&q=80",
   "dal chawal bowl":
@@ -43,13 +45,13 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "creamy mushroom & herb rice":
     "https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?auto=format&fit=crop&w=600&q=80",
 
-  // 🥗 Salads
+  // Salads
   "crunchy chana salad":
     "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80",
   "warm mushroom & roast veg salad":
     "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80",
 
-  // 🍝 Pasta & Pizza
+  // Pasta & Pizza
   "smol pink pasta":
     "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80",
   "garlic chilli aglio olio":
@@ -64,7 +66,7 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "pizza lab – rotating":
     "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80",
 
-  // 🍟 Munchies & Snacks
+  // Munchies & Snacks
   "vada pav":
     "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=600&q=80",
   "timur crispy potatoes":
@@ -78,13 +80,17 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "conversation board":
     "https://images.unsplash.com/photo-1541544741938-0af808871cc0?auto=format&fit=crop&w=600&q=80",
 
-  // 🍨 Desserts
+  // Desserts
   "affogato":
     "https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?auto=format&fit=crop&w=600&q=80",
   "warm chocolate brownie":
     "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80",
 
-  // ☕ Coffee, Cold Brews & Signature Drinks
+  // Coffee, Cold Brews & Signature Drinks
+  "tapovan pour over":
+    "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=85",
+  "pour over":
+    "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=85",
   "espresso":
     "https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?auto=format&fit=crop&w=600&q=80",
   "americano":
@@ -106,7 +112,7 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "seasonal experiment 02":
     "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=600&q=80",
 
-  // 🍹 Cold Drinks & Shakes
+  // Cold Drinks & Shakes
   "fresh lime soda":
     "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80",
   "cucumber mint lemonade":
@@ -122,7 +128,7 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "seasonal fruit & yoghurt shake":
     "https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=600&q=80",
 
-  // 🫖 Chai, Chaas & Hot Brews
+  // Chai, Chaas & Hot Brews
   "smol chai":
     "https://images.unsplash.com/photo-1561336313-0bd5e0b27ec8?auto=format&fit=crop&w=600&q=80",
   "adrak chai":
@@ -134,7 +140,7 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "smoked jeera chaas":
     "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=600&q=80",
 
-  // ☕ Combos
+  // Combos
   "chai + bun makkhan":
     "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80",
   "chai + vada pav":

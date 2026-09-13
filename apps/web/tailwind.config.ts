@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -12,6 +13,7 @@ const config: Config = {
         serif: ["var(--font-serif)", "EB Garamond", "Georgia", "serif"],
         sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "Noto Sans Mono", "monospace"],
+        chalk: ["var(--font-chalk)", "Caveat", "cursive"],
       },
       colors: {
         background: "var(--background)",

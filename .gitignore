@@ -19,6 +19,9 @@ dist
 # misc
 .DS_Store
 *.pem
+*.qlpreview/
+test_*.png
+apps/web/public/test_*.png
 
 # debug
 npm-debug.log*

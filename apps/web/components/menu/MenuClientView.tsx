@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { CategoryWithItems, MenuItemWithDetails } from "@/lib/queries/menu";
 import { CartProvider } from "@/context/CartContext";
 import { MenuItemCard } from "./MenuItemCard";
@@ -10,34 +11,65 @@ import { FloatingCartBar } from "@/components/cart/FloatingCartBar";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { BottomNavBar } from "@/components/navigation/BottomNavBar";
 
-
-
 interface MenuClientViewProps {
   categories: CategoryWithItems[];
   tableLabel?: string;
   locationName?: string;
 }
 
-const MenuContent: React.FC<MenuClientViewProps> = ({
+const MenuContentInner: React.FC<MenuClientViewProps> = ({
   categories,
   tableLabel,
   locationName = "Smol Café",
 }) => {
-  const [activeCategoryId, setActiveCategoryId] = useState<string>(categories[0]?.id || "");
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams ? searchParams.get("category") : null;
+
+  const [activeCategoryId, setActiveCategoryId] = useState<string>("");
   const [selectedItem, setSelectedItem] = useState<MenuItemWithDetails | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterVegOnly, setFilterVegOnly] = useState(false);
 
+  useEffect(() => {
+    if (!categoryParam) return;
+    const lowerParam = categoryParam.toLowerCase();
+
+    const match = categories.find((c) => {
+      if (c.id.toLowerCase() === lowerParam) return true;
+      const lowerName = c.name.toLowerCase();
+      if (lowerParam.includes("chai") && lowerName.includes("chai")) return true;
+      if (lowerParam.includes("coffee") && lowerName.includes("coffee")) return true;
+      if (lowerParam.includes("sandwich") && lowerName.includes("sandwich")) return true;
+      if (lowerParam.includes("bowl") && lowerName.includes("bowl")) return true;
+      if (lowerParam.includes("munchies") && lowerName.includes("munchies")) return true;
+      if (lowerParam.includes("morning") && lowerName.includes("morning")) return true;
+      return lowerName.includes(lowerParam);
+    });
+
+    if (match) {
+      setActiveCategoryId(match.id);
+      setTimeout(() => {
+        const element = document.getElementById(`category-${match.id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 150);
+    }
+  }, [categoryParam, categories]);
+
   const handleSelectCategory = (categoryId: string) => {
     setActiveCategoryId(categoryId);
-    const element = document.getElementById(`category-${categoryId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (categoryId !== "") {
+      const element = document.getElementById(`category-${categoryId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
   };
 
-  // Filter items based on search and veg toggle
+  // Filter items based on active category, search, and veg toggle
   const filteredCategories = categories
+    .filter((cat) => activeCategoryId === "" || cat.id === activeCategoryId)
     .map((category) => {
       const filteredItems = category.items.filter((item) => {
         const matchesSearch =
@@ -174,7 +206,7 @@ const MenuContent: React.FC<MenuClientViewProps> = ({
         {/* Quick Table Switcher Bar for guests */}
         {!tableLabel && (
           <div className="mx-auto mt-2.5 flex max-w-md items-center justify-between rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-1.5 text-xs text-amber-900">
-            <span className="text-[11px] font-medium">📍 Seated at:</span>
+            <span className="text-[11px] font-medium">Seated at:</span>
             <div className="flex items-center gap-1.5 overflow-x-auto">
               {[1, 2, 3, 4, 5, 6].map((num) => {
                 const label = num.toString().padStart(2, "0");
@@ -247,7 +279,11 @@ const MenuContent: React.FC<MenuClientViewProps> = ({
 
       {/* Item Detail Modal */}
       {selectedItem && (
-        <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+        <ItemDetailModal
+          item={selectedItem}
+          categories={categories}
+          onClose={() => setSelectedItem(null)}
+        />
       )}
 
       {/* Bottom Sticky Navigation */}
@@ -259,7 +295,9 @@ const MenuContent: React.FC<MenuClientViewProps> = ({
 export const MenuClientView: React.FC<MenuClientViewProps> = (props) => {
   return (
     <CartProvider>
-      <MenuContent {...props} />
+      <Suspense fallback={<div className="min-h-screen bg-[#F3E7D3] p-8 text-center font-serif">Loading smol menu...</div>}>
+        <MenuContentInner {...props} />
+      </Suspense>
     </CartProvider>
   );
 };

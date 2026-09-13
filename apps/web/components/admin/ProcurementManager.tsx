@@ -16,6 +16,7 @@ import {
   createVendorAction,
   fetchProcurementDataAction,
 } from "@/app/admin/procurement/actions";
+import { Send, PackageCheck } from "lucide-react";
 
 interface ProcurementManagerProps {
   initialData: ProcurementData;
@@ -257,7 +258,7 @@ export const ProcurementManager: React.FC<ProcurementManagerProps> = ({ initialD
                 : "border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
             }`}
           >
-            📋 Purchase Orders ({data.purchaseOrders.length})
+            Purchase Orders ({data.purchaseOrders.length})
           </button>
           <button
             onClick={() => setActiveTab("grns")}
@@ -267,7 +268,7 @@ export const ProcurementManager: React.FC<ProcurementManagerProps> = ({ initialD
                 : "border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
             }`}
           >
-            📦 Goods Receipts / Stock Ingested ({data.goodsReceipts.length})
+            Goods Receipts / Stock Ingested ({data.goodsReceipts.length})
           </button>
           <button
             onClick={() => setActiveTab("vendors")}
@@ -277,7 +278,7 @@ export const ProcurementManager: React.FC<ProcurementManagerProps> = ({ initialD
                 : "border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
             }`}
           >
-            🏢 Vendors & Directory ({data.vendors.length})
+            Vendors & Directory ({data.vendors.length})
           </button>
         </div>
 
@@ -362,9 +363,9 @@ export const ProcurementManager: React.FC<ProcurementManagerProps> = ({ initialD
                         {po.status === "DRAFT" && (
                           <button
                             onClick={() => handleStatusChange(po.id, "SENT")}
-                            className="rounded-xl border border-stone-300 bg-stone-50 px-3 py-1.5 font-bold hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-800"
+                            className="rounded-xl border border-stone-300 bg-stone-50 px-3 py-1.5 font-bold hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-800 flex items-center gap-1.5"
                           >
-                            Mark as Sent ✉️
+                            Mark as Sent <Send className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>
@@ -372,9 +373,9 @@ export const ProcurementManager: React.FC<ProcurementManagerProps> = ({ initialD
                       {po.status !== "RECEIVED" && po.status !== "CLOSED" && (
                         <button
                           onClick={() => handleOpenReceiveModal(po)}
-                          className="rounded-xl bg-[#9B2C2C] px-4 py-1.5 font-bold text-white shadow-sm hover:bg-[#822424] active:scale-95 dark:bg-[#C53030]"
+                          className="rounded-xl bg-[#9B2C2C] px-4 py-1.5 font-bold text-white shadow-sm hover:bg-[#822424] active:scale-95 dark:bg-[#C53030] flex items-center gap-1.5"
                         >
-                          📦 Record Delivery (GRN)
+                          <PackageCheck className="h-4 w-4" /> Record Delivery (GRN)
                         </button>
                       )}
                     </div>

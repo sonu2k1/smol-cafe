@@ -11,8 +11,10 @@ export async function GET() {
   const supabase = createAdminClient();
 
   try {
+    const startTime = performance.now();
     // Quick query to check database connectivity
     const { error } = await supabase.from("locations").select("id").limit(1);
+    const dbLatencyMs = Math.round(performance.now() - startTime);
 
     if (error) {
       console.warn("Health check DB query error:", error);
@@ -20,6 +22,7 @@ export async function GET() {
         {
           status: "degraded",
           dbConnected: false,
+          dbLatencyMs,
           timestamp,
           message: "Database connection degraded.",
         },
@@ -31,6 +34,10 @@ export async function GET() {
       {
         status: "ok",
         dbConnected: true,
+        dbLatencyMs,
+        environment: process.env.NODE_ENV || "development",
+        paymentEngine: "direct_upi",
+        upiVpa: process.env.NEXT_PUBLIC_UPI_ID || "sanidhyadwivedi2004@okicici",
         timestamp,
         version: "0.1.0",
       },

@@ -25,6 +25,7 @@ export interface KitchenTicket {
   submittedAt: string | null;
   acceptedAt: string | null;
   readyAt: string | null;
+  instructions?: string | null;
   items: KitchenOrderItem[];
 }
 
@@ -148,6 +149,7 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
         submittedAt: o.submitted_at,
         acceptedAt: o.accepted_at,
         readyAt: o.ready_at,
+        instructions: (o as { instructions?: string | null }).instructions || null,
         items: itemsByOrder.get(o.id) || [],
       };
     });

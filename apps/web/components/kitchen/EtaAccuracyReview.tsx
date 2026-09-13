@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import type { EtaAccuracyReport } from "@/app/admin/kitchen/eta-actions";
 import { fetchEtaAccuracyReportAction } from "@/app/admin/kitchen/eta-actions";
+import { RotateCw, Target, Zap, Clock } from "lucide-react";
 
 export const EtaAccuracyReview: React.FC = () => {
   const [report, setReport] = useState<EtaAccuracyReport | null>(null);
@@ -51,9 +52,10 @@ export const EtaAccuracyReview: React.FC = () => {
 
         <button
           onClick={loadReport}
-          className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300"
+          className="flex items-center gap-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300"
         >
-          🔄 Refresh
+          <RotateCw className="h-3.5 w-3.5" />
+          <span>Refresh</span>
         </button>
       </div>
 
@@ -163,10 +165,10 @@ export const EtaAccuracyReview: React.FC = () => {
                       }`}
                     >
                       {rec.accuracyCategory === "ON_TIME"
-                        ? "🎯 On Target"
+                        ? "On Target"
                         : rec.accuracyCategory === "FASTER"
-                          ? "⚡ Faster"
-                          : "⏳ Slower"}
+                          ? "Faster"
+                          : "Slower"}
                     </span>
                   </div>
                 </div>

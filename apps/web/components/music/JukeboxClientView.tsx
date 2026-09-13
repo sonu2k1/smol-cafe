@@ -10,6 +10,7 @@ import {
 } from "@/app/music/actions";
 
 import { BottomNavBar } from "@/components/navigation/BottomNavBar";
+import { Music, Flame, Radio } from "lucide-react";
 
 interface JukeboxClientViewProps {
   initialData: CustomerJukeboxData;
@@ -156,8 +157,8 @@ export const JukeboxClientView: React.FC<JukeboxClientViewProps> = ({ initialDat
             <div className="flex items-center gap-4">
               {/* Spinning Vinyl Record Visual */}
               <div className="relative flex h-18 w-18 shrink-0 items-center justify-center rounded-full bg-[#171514] border-4 border-[#3D3530] shadow-inner animate-spin-vinyl">
-                <div className="h-6 w-6 rounded-full bg-[#B72E35] flex items-center justify-center text-[9px] text-white">
-                  ☕
+                <div className="h-6 w-6 rounded-full bg-[#B72E35] flex items-center justify-center text-white">
+                  <Music className="h-3 w-3" />
                 </div>
               </div>
 
@@ -169,15 +170,15 @@ export const JukeboxClientView: React.FC<JukeboxClientViewProps> = ({ initialDat
                   {data.playingTrack.artist}
                 </p>
                 <div className="pt-1 flex items-center gap-2">
-                  <span className="rounded-md bg-[#3D3530] px-2 py-0.5 font-mono text-[10px] text-[#F2C84B]">
-                    🔥 {data.playingTrack.vote_count} Upvotes
+                  <span className="rounded-md bg-[#3D3530] px-2 py-0.5 font-mono text-[10px] text-[#F2C84B] flex items-center gap-1">
+                    <Flame className="h-3 w-3 fill-current" /> {data.playingTrack.vote_count} Upvotes
                   </span>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="text-center py-4 space-y-1 text-[#C9AE8B] font-serif">
-              <span className="text-2xl">📻</span>
+            <div className="text-center py-4 space-y-1 text-[#C9AE8B] font-serif flex flex-col items-center">
+              <Radio className="h-7 w-7 text-[#F3E7D3] mb-1" />
               <p className="text-xs font-bold text-[#F3E7D3]">barista chill lo-fi mix playing</p>
               <p className="italic text-[11px] text-[#C9AE8B]">request a track below to start table voting!</p>
             </div>
@@ -196,8 +197,8 @@ export const JukeboxClientView: React.FC<JukeboxClientViewProps> = ({ initialDat
           </div>
 
           {data.queue.length === 0 ? (
-            <div className="rounded-2xl border border-[#E8DFD3] bg-[#FAF5ED] p-6 text-center shadow-xs animate-fade-in-up">
-              <span className="text-3xl">🎶</span>
+            <div className="rounded-2xl border border-[#E8DFD3] bg-[#FAF5ED] p-6 text-center shadow-xs animate-fade-in-up flex flex-col items-center">
+              <Music className="h-8 w-8 text-[#A62B34]" />
               <h4 className="font-serif text-sm font-bold text-[#1C1917] mt-2">
                 No songs in the queue yet
               </h4>

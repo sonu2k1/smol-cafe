@@ -9,127 +9,143 @@ export const BottomNavBar: React.FC = () => {
 
   const navItems = [
     {
+      label: "HOME",
+      href: "/home",
+      isActive: pathname === "/home" || pathname === "/",
+      icon: (active: boolean) => (
+        /* Home roof & doorway */
+        <svg
+          className={`h-[22px] w-[22px] transition-colors duration-200 ${
+            active ? "text-[#B72E35]" : "text-[#725039]"
+          }`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={active ? 2.2 : 1.9}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3 10.5 12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 20v-9.5Z" />
+          <polyline points="9 21 9 12 15 12 15 21" />
+        </svg>
+      ),
+    },
+    {
       label: "MENU",
       href: "/smol-menu",
       isActive: pathname.startsWith("/smol-menu") || pathname.startsWith("/menu"),
       icon: (active: boolean) => (
+        /* Open Book / Menu card icon */
         <svg
-          className={`h-5 w-5 ${active ? "text-[#B72E35]" : "text-[#725039]"}`}
+          className={`h-[22px] w-[22px] transition-colors duration-200 ${
+            active ? "text-[#B72E35]" : "text-[#725039]"
+          }`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={active ? 2.2 : 1.7}
+          strokeWidth={active ? 2.2 : 1.9}
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
-          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
-          <line x1="6" y1="2" x2="6" y2="4" />
-          <line x1="10" y1="2" x2="10" y2="4" />
-          <line x1="14" y1="2" x2="14" y2="4" />
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+          <path d="M6 6h10" />
+          <circle cx="10" cy="12" r="1.5" />
         </svg>
       ),
     },
     {
-      label: "STATUS",
+      label: "TABLE",
+      href: "/t/table-01",
+      isActive: pathname.startsWith("/t/"),
+      icon: (active: boolean) => (
+        /* Cafe Table with two chairs */
+        <svg
+          className={`h-[22px] w-[22px] transition-colors duration-200 ${
+            active ? "text-[#B72E35]" : "text-[#725039]"
+          }`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={active ? 2.2 : 1.9}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M7 10h10" />
+          <path d="M12 10v11" />
+          <path d="M9 21h6" />
+          <path d="M4 14h3v7H4z" />
+          <path d="M17 14h3v7h-3z" />
+          <path d="M5 6v4" />
+          <path d="M19 6v4" />
+        </svg>
+      ),
+    },
+    {
+      label: "ORDERS",
       href: "/orders",
       isActive: pathname.startsWith("/orders") || pathname.startsWith("/order-status"),
       icon: (active: boolean) => (
+        /* Takeaway Bag with clock / status indicator */
         <svg
-          className={`h-5 w-5 ${active ? "text-[#B72E35]" : "text-[#725039]"}`}
+          className={`h-[22px] w-[22px] transition-colors duration-200 ${
+            active ? "text-[#B72E35]" : "text-[#725039]"
+          }`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={active ? 2.2 : 1.7}
+          strokeWidth={active ? 2.2 : 1.9}
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <path d="M16 10a4 4 0 0 1-8 0" />
+          <path d="M5 9 7 4h10l2 5v12a1.5 1.5 0 0 1-1.5 1.5H6.5A1.5 1.5 0 0 1 5 21V9Z" />
+          <circle cx="12" cy="14" r="3" />
+          <path d="M12 13v1.5l1 .5" />
         </svg>
       ),
     },
     {
-      label: "BILL",
-      href: "/bill",
-      isActive: pathname.startsWith("/bill"),
-      icon: (active: boolean) => (
-        <svg
-          className={`h-5 w-5 ${active ? "text-[#B72E35]" : "text-[#725039]"}`}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={active ? 2.2 : 1.7}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="8" y1="13" x2="16" y2="13" />
-          <line x1="8" y1="17" x2="12" y2="17" />
-        </svg>
-      ),
-    },
-    {
-      label: "MUSIC",
-      href: "/music",
-      isActive: pathname.startsWith("/music"),
-      icon: (active: boolean) => (
-        <svg
-          className={`h-5 w-5 ${active ? "text-[#B72E35]" : "text-[#725039]"}`}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={active ? 2.2 : 1.7}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      ),
-    },
-    {
-      label: "REWARDS",
+      label: "PROFILE",
       href: "/profile",
       isActive: pathname.startsWith("/profile") || pathname.startsWith("/account"),
       icon: (active: boolean) => (
+        /* Clean minimal head & shoulders profile avatar */
         <svg
-          className={`h-5 w-5 ${active ? "text-[#B72E35]" : "text-[#725039]"}`}
+          className={`h-[22px] w-[22px] transition-colors duration-200 ${
+            active ? "text-[#B72E35]" : "text-[#725039]"
+          }`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={active ? 2.2 : 1.7}
+          strokeWidth={active ? 2.2 : 1.9}
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <circle cx="12" cy="8" r="5" />
-          <path d="M20 21a8 8 0 0 0-16 0" />
+          <circle cx="12" cy="7.5" r="4" />
+          <path d="M5.5 20.5c0-3.8 2.9-6.5 6.5-6.5s6.5 2.7 6.5 6.5" />
         </svg>
       ),
     },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#C9AE8B]/40 bg-[#FAF4EB]/95 backdrop-blur-lg shadow-[0_-4px_24px_rgba(36,31,28,0.06)] pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 select-none">
-      <div className="mx-auto flex max-w-md items-center justify-around px-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#C9AE8B]/40 bg-[#F3E7D3]/95 backdrop-blur-md shadow-[0_-2px_10px_rgba(36,31,28,0.04)] pb-[max(0.7rem,env(safe-area-inset-bottom))] pt-2.5 select-none">
+      <div className="mx-auto flex max-w-md items-center justify-between px-5">
         {navItems.map((item) => {
           const active = item.isActive;
           return (
             <Link
               key={item.label}
               href={item.href}
-              className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3.5 rounded-2xl transition-all duration-200 active:scale-90 touch-manipulation min-w-[56px] ${
-                active ? "text-[#B72E35]" : "text-[#725039] hover:text-[#241F1C]"
-              }`}
+              className="flex flex-col items-center justify-center gap-1 transition-transform duration-150 active:scale-95 touch-manipulation group"
             >
-              <div className={`flex items-center justify-center h-6 w-6 transition-transform duration-200 ${active ? "animate-pop scale-110" : ""}`}>
+              <div className="flex items-center justify-center h-6 w-6">
                 {item.icon(active)}
               </div>
               <span
-                className={`text-[9px] tracking-widest font-mono uppercase transition-colors duration-200 ${
-                  active ? "font-bold text-[#B72E35]" : "font-medium text-[#725039]/80"
+                className={`text-[9px] tracking-[0.14em] font-mono transition-colors duration-200 ${
+                  active
+                    ? "font-bold text-[#B72E35]"
+                    : "font-normal text-[#725039]"
                 }`}
               >
                 {item.label}

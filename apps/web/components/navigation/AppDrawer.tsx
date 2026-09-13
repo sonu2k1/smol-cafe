@@ -5,6 +5,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 
+import {
+  Home,
+  BookOpen,
+  Armchair,
+  Package,
+  Receipt,
+  Music,
+  Calendar,
+  Gift,
+  ChefHat,
+  CreditCard,
+  Zap,
+  Edit3,
+  DollarSign,
+  Ticket,
+  Trophy,
+  BarChart2,
+  X,
+  Coffee,
+} from "lucide-react";
+
 interface AppDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -22,36 +43,36 @@ export const AppDrawer: React.FC<AppDrawerProps> = ({
 
   const navSections = [
     {
-      title: "☕ Dine & Experience",
+      title: "Dine & Experience",
       items: [
-        { name: "Home", href: "/", icon: "🏠", desc: "Daily specials & bento cards" },
-        { name: "Smol Menu", href: "/menu", icon: "📜", desc: "All 59 artisanal items & pairings" },
-        { name: "Your Table", href: "/table", icon: "🪑", desc: `Table ${tableLabel || "01"} seated round` },
-        { name: "Live Order Status", href: "/orders", icon: "📦", desc: "Live kitchen brewing tracker" },
-        { name: "Settle Up / Bill", href: "/bill", icon: "🧾", desc: "UPI, Cards, Wallets & digital receipt" },
-        { name: "Café Jukebox", href: "/music", icon: "🎵", desc: "Now playing, song requests & votes" },
-        { name: "Community Events", href: "/events", icon: "📅", desc: "Jam sessions, chess & game nights" },
-        { name: "Smol Loyalty Pass", href: "/profile", icon: "🎁", desc: "Points, rewards & past receipts" },
+        { name: "Home", href: "/", icon: Home, desc: "Daily specials & bento cards" },
+        { name: "Smol Menu", href: "/menu", icon: BookOpen, desc: "All 59 artisanal items & pairings" },
+        { name: "Your Table", href: "/table", icon: Armchair, desc: `Table ${tableLabel || "01"} seated round` },
+        { name: "Live Order Status", href: "/orders", icon: Package, desc: "Live kitchen brewing tracker" },
+        { name: "Settle Up / Bill", href: "/bill", icon: Receipt, desc: "UPI, Cards, Wallets & digital receipt" },
+        { name: "Café Jukebox", href: "/music", icon: Music, desc: "Now playing, song requests & votes" },
+        { name: "Community Events", href: "/events", icon: Calendar, desc: "Jam sessions, chess & game nights" },
+        { name: "Smol Loyalty Pass", href: "/profile", icon: Gift, desc: "Points, rewards & past receipts" },
       ],
     },
     {
-      title: "👨‍🍳 Staff Floor Ops",
+      title: "Staff Floor Ops",
       items: [
-        { name: "Kitchen Display (KDS)", href: "/kitchen", icon: "🍳", desc: "Live order queue & ticket states" },
-        { name: "Cashier Desk", href: "/cashier", icon: "💳", desc: "Table map, cash billing & invoices" },
+        { name: "Kitchen Display (KDS)", href: "/kitchen", icon: ChefHat, desc: "Live order queue & ticket states" },
+        { name: "Cashier Desk", href: "/cashier", icon: CreditCard, desc: "Table map, cash billing & invoices" },
       ],
     },
     {
-      title: "⚙️ Admin Control Tower",
+      title: "Admin Control Tower",
       items: [
-        { name: "Admin Dashboard", href: "/admin", icon: "⚡", desc: "Master café management center" },
-        { name: "Blackboard Announcements", href: "/admin/blackboard", icon: "✍️", desc: "Daily chalkboard chits & specials" },
-        { name: "Procurement & Stock POs", href: "/admin/procurement", icon: "📦", desc: "Ingredient inventory & purchase orders" },
-        { name: "Category Budgets", href: "/admin/budgets", icon: "💰", desc: "Monthly expense limits & burn rates" },
-        { name: "Events Manager", href: "/admin/events", icon: "🎟️", desc: "Create events & attendee RSVPs" },
-        { name: "Loyalty Rewards Config", href: "/admin/rewards", icon: "🏆", desc: "Points multiplier & reward catalog" },
-        { name: "Jukebox Admin", href: "/admin/music", icon: "🎶", desc: "Manage music queue & requests" },
-        { name: "System Observability", href: "/admin/observability", icon: "📊", desc: "Webhooks, RPCs & server health" },
+        { name: "Admin Dashboard", href: "/admin", icon: Zap, desc: "Master café management center" },
+        { name: "Blackboard Announcements", href: "/admin/blackboard", icon: Edit3, desc: "Daily chalkboard chits & specials" },
+        { name: "Procurement & Stock POs", href: "/admin/procurement", icon: Package, desc: "Ingredient inventory & purchase orders" },
+        { name: "Category Budgets", href: "/admin/budgets", icon: DollarSign, desc: "Monthly expense limits & burn rates" },
+        { name: "Events Manager", href: "/admin/events", icon: Ticket, desc: "Create events & attendee RSVPs" },
+        { name: "Loyalty Rewards Config", href: "/admin/rewards", icon: Trophy, desc: "Points multiplier & reward catalog" },
+        { name: "Jukebox Admin", href: "/admin/music", icon: Music, desc: "Manage music queue & requests" },
+        { name: "System Observability", href: "/admin/observability", icon: BarChart2, desc: "Webhooks, RPCs & server health" },
       ],
     },
   ];
@@ -142,7 +163,7 @@ export const AppDrawer: React.FC<AppDrawerProps> = ({
                           : "text-[#241F1C] hover:bg-[#F3E7D3]"
                       }`}
                     >
-                      <span className="text-lg leading-none shrink-0 mt-0.5 transition-transform group-hover:scale-110">{item.icon}</span>
+                      <item.icon className="h-5 w-5 shrink-0 mt-0.5 transition-transform group-hover:scale-110 text-[#B72E35]" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between">
                           <p className={`font-serif text-sm font-bold ${isActive ? "text-white" : "text-[#1C1917]"}`}>

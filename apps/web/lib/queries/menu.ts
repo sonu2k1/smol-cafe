@@ -1,5 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { MenuCategory, MenuItem, MenuItemVersion, MenuPrice } from "@smol-cafe/db";
+import {
+  MOCK_CATEGORIES,
+  MOCK_MENU_ITEMS,
+  MOCK_MENU_VERSIONS,
+  MOCK_MENU_PRICES,
+} from "@/lib/mock-db/seedData";
 
 export interface MenuItemWithDetails {
   id: string;
@@ -32,9 +38,63 @@ export interface CategoryWithItems {
   items: MenuItemWithDetails[];
 }
 
+/**
+ * Fallback menu catalog builder from master seed data (59 artisanal items).
+ */
+function getFallbackCatalog(): CategoryWithItems[] {
+  const categoryMap = new Map<string, CategoryWithItems>();
+
+  for (const cat of MOCK_CATEGORIES) {
+    categoryMap.set(cat.id, {
+      id: cat.id,
+      name: cat.name,
+      sortOrder: cat.sort_order,
+      items: [],
+    });
+  }
+
+  const priceMap = new Map<string, number>();
+  for (const p of MOCK_MENU_PRICES) {
+    if (!priceMap.has(p.menu_item_id)) {
+      priceMap.set(p.menu_item_id, p.amount_paise);
+    }
+  }
+
+  const versionMap = new Map<string, (typeof MOCK_MENU_VERSIONS)[0]>();
+  for (const v of MOCK_MENU_VERSIONS) {
+    if (!versionMap.has(v.menu_item_id)) {
+      versionMap.set(v.menu_item_id, v);
+    }
+  }
+
+  for (const item of MOCK_MENU_ITEMS) {
+    const cat = categoryMap.get(item.category_id);
+    if (!cat) continue;
+
+    const ver = versionMap.get(item.id);
+    const pricePaise = priceMap.get(item.id) || 18000;
+    const metadata = (ver?.metadata || item.metadata || {}) as MenuItemWithDetails["metadata"];
+
+    cat.items.push({
+      id: item.id,
+      categoryId: item.category_id,
+      name: item.name,
+      status: item.status,
+      description: ver?.description || "",
+      pricePaise,
+      imageUrl: ver?.image_url || null,
+      metadata,
+    });
+  }
+
+  return Array.from(categoryMap.values())
+    .filter((cat) => cat.items.length > 0)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
 
 /**
- * Fetches active menu categories, items, and effective prices directly from the database.
+ * Fetches active menu categories, items, and effective prices directly from the database,
+ * falling back to the full 59-item master catalog if the database is offline or unseeded.
  */
 export async function getMenuCatalog(): Promise<CategoryWithItems[]> {
   try {
@@ -47,8 +107,7 @@ export async function getMenuCatalog(): Promise<CategoryWithItems[]> {
       .order("sort_order", { ascending: true });
 
     if (catErr || !categories || categories.length === 0) {
-      console.warn("No categories found in database or error:", catErr?.message);
-      return [];
+      return getFallbackCatalog();
     }
 
     // 2. Fetch Menu Items
@@ -58,13 +117,12 @@ export async function getMenuCatalog(): Promise<CategoryWithItems[]> {
       .in("status", ["ACTIVE", "AVAILABLE", "SCHEDULED"]);
 
     if (itemErr || !items || items.length === 0) {
-      console.warn("No menu items found in database or error:", itemErr?.message);
-      return [];
+      return getFallbackCatalog();
     }
 
     const itemIds = (items as MenuItem[]).map((i) => i.id);
 
-    // 3. Fetch Active Prices (effective_from <= now and effective_to is null/future)
+    // 3. Fetch Active Prices
     const nowIso = new Date().toISOString();
     const { data: prices } = await supabase
       .from("menu_prices")
@@ -81,7 +139,6 @@ export async function getMenuCatalog(): Promise<CategoryWithItems[]> {
       .in("menu_item_id", itemIds)
       .order("created_at", { ascending: false });
 
-    // Map prices by menuItemId (first matching is latest effective)
     const priceMap = new Map<string, number>();
     for (const p of (prices as unknown as MenuPrice[]) || []) {
       if (!priceMap.has(p.menu_item_id)) {
@@ -89,7 +146,6 @@ export async function getMenuCatalog(): Promise<CategoryWithItems[]> {
       }
     }
 
-    // Map versions by menuItemId
     const versionMap = new Map<string, MenuItemVersion>();
     for (const v of (versions as unknown as MenuItemVersion[]) || []) {
       if (!versionMap.has(v.menu_item_id)) {
@@ -129,12 +185,13 @@ export async function getMenuCatalog(): Promise<CategoryWithItems[]> {
       });
     }
 
-    // Filter out categories with no items and sort by sortOrder
-    return Array.from(categoryMap.values())
+    const result = Array.from(categoryMap.values())
       .filter((cat) => cat.items.length > 0)
       .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    return result.length > 0 ? result : getFallbackCatalog();
   } catch (error) {
-    console.error("Error fetching menu catalog:", error);
-    return [];
+    console.warn("Using fallback menu catalog due to error:", error);
+    return getFallbackCatalog();
   }
 }

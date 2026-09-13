@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>smol café — Complete Application Architecture & System Flow</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+    @page {
+      size: A4;
+      margin: 14mm 14mm 14mm 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #F8F3EA;
+      color: #241F1C;
+      font-size: 11.5pt;
+      line-height: 1.5;
+    }
+
+    .page {
+      page-break-after: always;
+      padding: 4mm 0;
+      position: relative;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
+    }
+
+    /* Header */
+    .brand-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #C9AE8B;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+
+    .brand-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 26pt;
+      font-weight: 800;
+      color: #B72E35;
+      margin: 0;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5pt;
+      color: #725039;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+
+    .brand-badge {
+      background: #FAF4EB;
+      border: 1px solid #C9AE8B;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5pt;
+      font-weight: 600;
+      color: #B72E35;
+    }
+
+    /* Section Titles */
+    h2 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 16pt;
+      font-weight: 700;
+      color: #241F1C;
+      margin: 20px 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px dashed #C9AE8B;
+      padding-bottom: 6px;
+    }
+
+    h3 {
+      font-family: 'Inter', sans-serif;
+      font-size: 12pt;
+      font-weight: 700;
+      color: #B72E35;
+      margin: 14px 0 6px 0;
+    }
+
+    p {
+      margin: 0 0 10px 0;
+      color: #3D352F;
+    }
+
+    /* Cards & Containers */
+    .card {
+      background: #FAF4EB;
+      border: 1px solid #D9C5AB;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 5px rgba(36, 31, 28, 0.04);
+    }
+
+    .card-highlight {
+      border-left: 4px solid #B72E35;
+    }
+
+    .card-dark {
+      background: #1C1917;
+      color: #FAF4EB;
+      border: 1px solid #332B25;
+    }
+    .card-dark p {
+      color: #D6C8B8;
+    }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .role-pill {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 8pt;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .role-customer { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+    .role-cashier { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+    .role-kitchen { background: #E0E7FF; color: #3730A3; border: 1px solid #A5B4FC; }
+    .role-admin { background: #D1FAE5; color: #065F46; border: 1px solid #6EE7B7; }
+
+    /* Flow Step Item */
+    .flow-step {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #B72E35;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10pt;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-title {
+      font-weight: 700;
+      color: #241F1C;
+      font-size: 11pt;
+      margin-bottom: 2px;
+    }
+
+    .step-desc {
+      font-size: 10pt;
+      color: #5C4533;
+      margin: 0;
+    }
+
+    .code-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9pt;
+      background: #EFE6D7;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #B72E35;
+      font-weight: 600;
+    }
+
+    /* Architecture Diagram Box */
+    .arch-diagram {
+      background: #FAF4EB;
+      border: 2px solid #C9AE8B;
+      border-radius: 16px;
+      padding: 16px;
+      margin: 14px 0 20px 0;
+      text-align: center;
+    }
+
+    .diagram-flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+    }
+
+    .diagram-box {
+      background: #FFF;
+      border: 1.5px solid #C9AE8B;
+      border-radius: 10px;
+      padding: 10px 14px;
+      width: 22%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .diagram-box.customer { border-color: #F59E0B; }
+    .diagram-box.cashier { border-color: #B72E35; }
+    .diagram-box.kitchen { border-color: #6366F1; }
+    .diagram-box.admin { border-color: #10B981; }
+
+    .diagram-box h4 {
+      margin: 0 0 4px 0;
+      font-size: 10pt;
+      font-weight: 700;
+    }
+
+    .diagram-box p {
+      margin: 0;
+      font-size: 7.5pt;
+      color: #725039;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .diagram-arrow {
+      font-size: 16pt;
+      color: #B72E35;
+      font-weight: bold;
+    }
+
+    /* Feature table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 9.5pt;
+    }
+
+    th {
+      background: #EFE6D7;
+      color: #725039;
+      text-align: left;
+      padding: 8px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5pt;
+      border-bottom: 2px solid #C9AE8B;
+    }
+
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #E5D5C1;
+      color: #241F1C;
+    }
+
+    tr:nth-child(even) td {
+      background: #FAF4EB;
+    }
+
+    .chalkboard-preview {
+      background: #171514;
+      border: 3px solid #8C6D53;
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: #FDFBF7;
+      font-family: 'Caveat', cursive;
+      font-size: 15pt;
+      line-height: 1.3;
+      margin-top: 8px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+
+    .chalkboard-preview .sub {
+      font-size: 11pt;
+      color: #F2C84B;
+    }
+
+    /* Footer */
+    .page-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid #D9C5AB;
+      padding-top: 8px;
+      font-size: 8pt;
+      font-family: 'JetBrains Mono', monospace;
+      color: #8C6D53;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PAGE 1: OVERVIEW & CORE ARCHITECTURE -->
+  <div class="page">
+    <div class="brand-header">
+      <div>
+        <h1 class="brand-title">smol café</h1>
+        <div class="brand-subtitle">Complete Application Architecture &amp; System Flow Guide</div>
+      </div>
+      <div class="brand-badge">Full-Stack v0.1 • 2026 Edition</div>
+    </div>
+
+    <h2>1. Executive Summary &amp; System Purpose</h2>
+    <p>
+      <strong>smol café</strong> is a state-of-the-art, real-time café operating system and customer dining application. Built with Next.js 15 (App Router), React 19, TypeScript, and Tailwind CSS, it bridges customer self-ordering, front-desk cashier settlement, chef/barista kitchen ticket routing, and owner analytics into a unified real-time synchronization loop.
+    </p>
+
+    <h2>2. System Architecture &amp; 4 Core Roles</h2>
+    <div class="arch-diagram">
+      <div class="diagram-flex">
+        <div class="diagram-box customer">
+          <span class="role-pill role-customer">ROLE 1</span>
+          <h4>Customer Guest</h4>
+          <p>QR Table Scan<br>/t/[table] • /menu</p>
+        </div>
+        <div class="diagram-arrow">➔</div>
+        <div class="diagram-box cashier">
+          <span class="role-pill role-cashier">ROLE 2</span>
+          <h4>Cashier Desk</h4>
+          <p>PIN Verify &amp; Settle<br>/cashier</p>
+        </div>
+        <div class="diagram-arrow">➔</div>
+        <div class="diagram-box kitchen">
+          <span class="role-pill role-kitchen">ROLE 3</span>
+          <h4>Kitchen KDS</h4>
+          <p>Kanban Dispatch<br>/kitchen</p>
+        </div>
+        <div class="diagram-arrow">➔</div>
+        <div class="diagram-box admin">
+          <span class="role-pill role-admin">ROLE 4</span>
+          <h4>Admin Tower</h4>
+          <p>Live Ops &amp; Catalog<br>/admin</p>
+        </div>
+      </div>
+    </div>
+
+    <h2>3. The 4 Operational Roles Matrix</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Portal URL</th>
+          <th>Primary Responsibilities</th>
+          <th>Access / Security</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Customer (Guest)</strong></td>
+          <td><span class="code-tag">/t/table-XX</span>, <span class="code-tag">/menu</span></td>
+          <td>Browse menu, customize drinks, submit orders, track live status, pay via UPI QR.</td>
+          <td>Public (Bound by Table QR token)</td>
+        </tr>
+        <tr>
+          <td><strong>Cashier / POS</strong></td>
+          <td><span class="code-tag">/cashier</span></td>
+          <td>Verify 4-digit Table PIN, accept orders, manage 12 dining tables, calculate cash change.</td>
+          <td>Front-Desk Counter Staff</td>
+        </tr>
+        <tr>
+          <td><strong>Kitchen (Chef/Barista)</strong></td>
+          <td><span class="code-tag">/kitchen</span></td>
+          <td>Large-screen KDS Kanban (New ➔ Prep ➔ Ready ➔ Served), acoustic chimes, order timers.</td>
+          <td>Kitchen Touchscreen Display</td>
+        </tr>
+        <tr>
+          <td><strong>Super Admin (Owner)</strong></td>
+          <td><span class="code-tag">/admin</span></td>
+          <td>Live revenue analytics, hourly demand curves, menu in-stock toggling, loyalty perks.</td>
+          <td>Secured Gate (PIN: <span class="code-tag">8888</span>)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="card card-highlight" style="margin-top: 14px;">
+      <h3 style="margin-top:0;">⚡ Real-Time Synchronous Engine (lib/sync-events.ts)</h3>
+      <p style="margin-bottom:0; font-size:10pt;">
+        Unlike traditional multi-page apps that require frequent polling or refreshes, smol café utilizes an event-driven broadcast channel architecture. Whenever an order is submitted, verified, pushed to kitchen, or marked ready, events trigger instant UI transitions across all active tabs and devices in under <strong>50ms</strong>.
+      </p>
+    </div>
+
+    <div class="page-footer">
+      <span>smol café • Complete System Flow Guide</span>
+      <span>Page 1 of 3</span>
+    </div>
+  </div>
+
+  <!-- PAGE 2: CUSTOMER JOURNEY & CASHIER DESK FLOW -->
+  <div class="page">
+    <div class="brand-header">
+      <div>
+        <h1 class="brand-title" style="font-size: 20pt;">smol café</h1>
+        <div class="brand-subtitle">Customer Dining Journey &amp; Cashier Desk Operations</div>
+      </div>
+      <div class="brand-badge">Flow Deep-Dive • Steps 1 to 5</div>
+    </div>
+
+    <h2>4. Customer Dining Journey Flow (Patron Dining)</h2>
+
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Table Discovery &amp; Session Binding (<span class="code-tag">/t/table-01</span> ... <span class="code-tag">table-12</span>)</div>
+        <p class="step-desc">
+          Guest arrives and scans the cryptographic QR code on their dining table. The URL binds the user's browser session directly to that specific table and seating zone (e.g. <em>Indoor Cozy, Courtyard Verandah, Garden Terrace, Brew Bar</em>).
+        </p>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Menu Browsing &amp; Pure-Code Daily Blackboard (<span class="code-tag">/home</span>, <span class="code-tag">/menu</span>)</div>
+        <p class="step-desc">
+          Customers browse curated specialty coffees, sourdough melts, fresh bakes, and teas. The homepage features a dynamic, pure-code chalkboard rendered with Caveat handwritten typography showing the daily single-origin roast and recommendation:
+        </p>
+        <div class="chalkboard-preview">
+          today's special: Ratnagiri Estate Pour Over with warm hazelnut notes ♡
+          <div class="sub">— fresh morning bake: cinnamon almond bun ready at 8:00 AM</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Item Customization &amp; Dietary Precision</div>
+        <p class="step-desc">
+          Clicking any item opens the Customization Drawer: Oat Milk vs Almond Milk vs Whole Milk, sweetness sliders (0%, 50%, 100%), temperature (Hot vs Iced), and barista notes.
+        </p>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Order Submission &amp; 4-Digit Table Verification PIN (<span class="code-tag">/cart</span>)</div>
+        <p class="step-desc">
+          When the customer submits their cart, the system assigns a unique Order ID and displays a <strong>4-digit Table Verification PIN</strong>. This prevents prank orders from going to the kitchen until verified by the cashier.
+        </p>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <div class="step-title">Live Status Bar &amp; Dynamic UPI Bill Payment (<span class="code-tag">/order/[id]</span>, <span class="code-tag">/bill</span>)</div>
+        <p class="step-desc">
+          Customers follow the live progress bar: <em>Order Placed ➔ PIN Verified ➔ Brewing/Cooking ➔ Ready to Serve</em>. Upon finishing dining, guest requests digital bill, generates a dynamic UPI deep-link QR (<span class="code-tag">upi://pay?pa=...</span>), and receives an itemized digital chit with 5% GST calculated.
+        </p>
+      </div>
+    </div>
+
+    <h2>5. Cashier Desk Front-Line Operations (<span class="code-tag">/cashier</span>)</h2>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">Tab 1: Verification Queue</h3>
+        <p style="font-size:9.5pt;">
+          Incoming orders appear with an amber halo. The cashier asks the patron for their 4-digit PIN, verifies it against the screen, and clicks <strong>"Confirm Order"</strong>. The chit is instantly broadcast to the kitchen.
+        </p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Tab 2: Tables &amp; Settlement</h3>
+        <p style="font-size:9.5pt;">
+          A visual overview of all 12 tables. Cashier can open tables for walk-in guests, view accumulated round totals, launch UPI QR on the counter display, or record Cash payment with automatic change-due calculator.
+        </p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">Tab 3: Paid Orders &amp; Audit Ledger</h3>
+      <p style="font-size:9.5pt; margin-bottom:0;">
+        Maintains today's complete payment audit trail: Settlement ID, table number, tender method (PhonePe, Google Pay, Cash), exact timestamps, and a button to re-print or view digital guest chits.
+      </p>
+    </div>
+
+    <div class="page-footer">
+      <span>smol café • Complete System Flow Guide</span>
+      <span>Page 2 of 3</span>
+    </div>
+  </div>
+
+  <!-- PAGE 3: KITCHEN KDS, ADMIN TOWER, & DESIGN SYSTEM -->
+  <div class="page">
+    <div class="brand-header">
+      <div>
+        <h1 class="brand-title" style="font-size: 20pt;">smol café</h1>
+        <div class="brand-subtitle">Kitchen KDS, Admin Control Tower &amp; Design Architecture</div>
+      </div>
+      <div class="brand-badge">Kitchen • Admin • Theme Engine</div>
+    </div>
+
+    <h2>6. Kitchen Display System - KDS (<span class="code-tag">/kitchen</span>)</h2>
+    <p>
+      The KDS provides baristas and chefs with an ultra-responsive, touch-optimized Kanban board. Incoming verified chits play an acoustic café chime.
+    </p>
+
+    <div class="grid-4">
+      <div class="card" style="border-top: 3px solid #3B82F6;">
+        <h4 style="margin:0; font-size:10pt; color:#1D4ED8;">1. NEW ORDERS</h4>
+        <p style="font-size:8pt; margin:4px 0;">Confirmed by cashier. Waiting for prep.</p>
+        <div style="font-size:7.5pt; font-family:'JetBrains Mono'; background:#DBEAFE; color:#1E40AF; padding:2px 4px; border-radius:4px; text-align:center;">Action: Start Prep</div>
+      </div>
+      <div class="card" style="border-top: 3px solid #F59E0B;">
+        <h4 style="margin:0; font-size:10pt; color:#B45309;">2. PREPARING</h4>
+        <p style="font-size:8pt; margin:4px 0;">Brewing espresso, steaming milk, grilling melt.</p>
+        <div style="font-size:7.5pt; font-family:'JetBrains Mono'; background:#FEF3C7; color:#92400E; padding:2px 4px; border-radius:4px; text-align:center;">Action: Mark Ready</div>
+      </div>
+      <div class="card" style="border-top: 3px solid #10B981;">
+        <h4 style="margin:0; font-size:10pt; color:#047857;">3. READY</h4>
+        <p style="font-size:8pt; margin:4px 0;">Plated on counter. Waiter notified.</p>
+        <div style="font-size:7.5pt; font-family:'JetBrains Mono'; background:#D1FAE5; color:#065F46; padding:2px 4px; border-radius:4px; text-align:center;">Action: Serve Table</div>
+      </div>
+      <div class="card" style="border-top: 3px solid #6B7280;">
+        <h4 style="margin:0; font-size:10pt; color:#374151;">4. COMPLETED</h4>
+        <p style="font-size:8pt; margin:4px 0;">Successfully served to guest dining table.</p>
+        <div style="font-size:7.5pt; font-family:'JetBrains Mono'; background:#E5E7EB; color:#374151; padding:2px 4px; border-radius:4px; text-align:center;">Status: Archived</div>
+      </div>
+    </div>
+
+    <h2>7. Admin Control Tower (<span class="code-tag">/admin</span>)</h2>
+    <p>
+      Protected by an encrypted passcode gate (Demo PIN: <span class="code-tag">8888</span>), the Admin Tower is the café manager's cockpit:
+    </p>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">📊 Live Sales &amp; Demand Analytics</h3>
+        <p style="font-size:9pt; margin:0;">
+          Real-time daily gross revenue, orders count, table occupancy %, average ticket size (₹384.50), peak demand curve by hour (Peak 5PM: 26 orders/hr), and bestseller rankings.
+        </p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">🪑 12 Tables Floor Map &amp; JSON Tags</h3>
+        <p style="font-size:9pt; margin:0;">
+          Interactive floor plan displaying table status (Free vs Busy). Generates encrypted Table JSON Tags and dynamic QR bill links for any dining table.
+        </p>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">📦 59-Item Menu Stock Toggle</h3>
+        <p style="font-size:9pt; margin:0;">
+          One-click toggling between <strong>IN STOCK</strong> and <strong>SOLD OUT</strong> for all coffees, sandwiches, and treats. Instantly disables sold-out items on active customer devices.
+        </p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">🎖️ Smol Club Loyalty &amp; Merchant Setup</h3>
+        <p style="font-size:9pt; margin:0;">
+          Patron point ledger (₹10 spent = 1 pt). Tier perks: Seedling (0-100 pts), Regular (101-500 pts), Smol Insider (500+ pts). Configures merchant UPI VPA and 5% GST rate.
+        </p>
+      </div>
+    </div>
+
+    <h2>8. Universal Light / Dark Mode &amp; Design Palette</h2>
+    <div class="card card-dark">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="color:#F2C84B; margin:0;">☀️ Daylight Crème vs 🌙 Midnight Espresso</h3>
+          <p style="font-size:9pt; margin:4px 0 0 0; color:#D6C8B8;">
+            Synchronized theme toggle with instant <span class="code-tag" style="background:#332B25; color:#F2C84B;">localStorage: smol_theme</span> persistence.
+          </p>
+        </div>
+        <div style="font-family:'JetBrains Mono'; font-size:8pt; text-align:right; color:#A89F91;">
+          Light: #F3E7D3 • #FAF4EB<br>Dark: #141211 • #1C1917
+        </div>
+      </div>
+    </div>
+
+    <div class="page-footer">
+      <span>smol café • Complete System Flow Guide</span>
+      <span>Page 3 of 3</span>
+    </div>
+  </div>
+
+</body>
+</html>

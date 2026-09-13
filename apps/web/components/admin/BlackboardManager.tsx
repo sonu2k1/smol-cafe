@@ -162,7 +162,7 @@ export const BlackboardManager: React.FC<BlackboardManagerProps> = ({ initialPos
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Afternoon Fresh Bakes 🥐"
+                  placeholder="e.g. Afternoon Fresh Bakes"
                   required
                   className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3 py-2 text-xs text-stone-900 focus:border-[#9B2C2C] focus:outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
                 />
@@ -226,7 +226,7 @@ export const BlackboardManager: React.FC<BlackboardManagerProps> = ({ initialPos
                 disabled={isCreating || !title.trim()}
                 className="w-full rounded-2xl bg-[#9B2C2C] py-3 text-xs font-bold text-white shadow-md transition hover:bg-[#822424] active:scale-95 disabled:opacity-50 dark:bg-[#C53030]"
               >
-                {isCreating ? "Pinning..." : "📌 Pin to Blackboard"}
+                {isCreating ? "Pinning..." : "Pin to Blackboard"}
               </button>
             </form>
           </div>

@@ -19,6 +19,11 @@ export async function createClient() {
     (!supabaseUrl.startsWith("http://") && !supabaseUrl.startsWith("https://"));
 
   if (isPlaceholder) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Production Error: Missing required Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY). Mock database fallback is disabled in production."
+      );
+    }
     return new MockSupabaseClient() as unknown as ReturnType<typeof createServerClient<Database>>;
   }
 

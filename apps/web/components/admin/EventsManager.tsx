@@ -233,7 +233,7 @@ export const EventsManager: React.FC<EventsManagerProps> = ({ initialEvents }) =
                 disabled={isCreating || !title.trim() || !startsAt}
                 className="w-full rounded-2xl bg-[#9B2C2C] py-3 text-xs font-bold text-white shadow-md transition hover:bg-[#822424] active:scale-95 disabled:opacity-50 dark:bg-[#C53030]"
               >
-                {isCreating ? "Publishing..." : "🎪 Publish Event"}
+                {isCreating ? "Publishing..." : "Publish Event"}
               </button>
             </form>
           </div>

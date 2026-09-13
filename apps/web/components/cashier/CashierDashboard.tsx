@@ -14,16 +14,51 @@ import {
   rejectCashierOrderAction,
   type PendingOrderVerification,
 } from "@/app/cashier/actions";
+import { Bell, Armchair, Sparkles, Check, Receipt, CreditCard, Tag, Printer } from "lucide-react";
+import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
+import { createTableJsonTag, type TableJsonTag } from "@/lib/table-tag";
+import { JsonTagInspectorModal } from "@/components/table/JsonTagInspectorModal";
+import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
+import { DigitalReceiptModal, type ReceiptData } from "@/components/payment/DigitalReceiptModal";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 
 interface CashierDashboardProps {
   initialTables: ActiveCashierTable[];
 }
 
 export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTables }) => {
-  const [activeTab, setActiveTab] = useState<"queue" | "tables">("queue");
+  const [activeTab, setActiveTab] = useState<"queue" | "tables" | "paid">("queue");
   const [tables, setTables] = useState<ActiveCashierTable[]>(initialTables);
   const [pendingOrders, setPendingOrders] = useState<PendingOrderVerification[]>([]);
   const [selectedTable, setSelectedTable] = useState<ActiveCashierTable | null>(null);
+  const [inspectingTag, setInspectingTag] = useState<TableJsonTag | null>(null);
+  const [activeUpiTable, setActiveUpiTable] = useState<ActiveCashierTable | null>(null);
+  const [activeReceipt, setActiveReceipt] = useState<ReceiptData | null>(null);
+  const [paidHistory, setPaidHistory] = useState<Array<{
+    id: string;
+    tableLabel: string;
+    totalRupees: number;
+    paymentMethod: "UPI" | "CASH";
+    paidAt: string;
+    itemsCount: number;
+  }>>([
+    {
+      id: "SETTLE-8421",
+      tableLabel: "02",
+      totalRupees: 640,
+      paymentMethod: "UPI",
+      paidAt: new Date(Date.now() - 1800000).toISOString(),
+      itemsCount: 3,
+    },
+    {
+      id: "SETTLE-8420",
+      tableLabel: "05",
+      totalRupees: 380,
+      paymentMethod: "CASH",
+      paidAt: new Date(Date.now() - 3600000).toISOString(),
+      itemsCount: 2,
+    },
+  ]);
   const [amountTendered, setAmountTendered] = useState("");
   const [staffName, setStaffName] = useState("Cashier");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,7 +92,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
     refreshData();
   };
 
-  // Poll pending orders and tables every 3 seconds
+  // Poll pending orders and tables every 3 seconds + real-time event listener
   useEffect(() => {
     refreshData();
     const interval = setInterval(() => {
@@ -65,7 +100,15 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
         refreshData();
       }
     }, 3000);
-    return () => clearInterval(interval);
+
+    const unsubscribe = subscribeToSyncEvents(() => {
+      refreshData();
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
   }, [refreshData]);
 
   const handleConfirmOrder = async (orderId: string) => {
@@ -74,6 +117,11 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
     try {
       const res = await confirmCashierOrderAction(orderId, staffName);
       if (res.success) {
+        broadcastSyncEvent({
+          type: "ORDER_CONFIRMED",
+          orderId,
+          timestamp: Date.now(),
+        });
         setActionFeedback({ type: "success", text: res.message || "Order confirmed & sent to kitchen!" });
         refreshData();
       } else {
@@ -161,39 +209,42 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
   const changeDueRupees = Math.max(0, tenderedRupees - selectedTotalRupees);
 
   return (
-    <div className="min-h-screen bg-[#141211] text-[#FDFBF7]">
+    <div className="min-h-screen bg-[#F3E7D3] dark:bg-[#141211] text-[#241F1C] dark:text-[#FDFBF7] transition-colors duration-200">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-stone-800 bg-[#1C1917]/95 px-6 py-4 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#1C1917]/95 px-6 py-4 backdrop-blur-md transition-colors duration-200">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/smol-backdoor"
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-stone-800 text-stone-300 hover:bg-stone-700 transition"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-800 text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 transition cursor-pointer"
               title="Back to staff portal"
             >
               ←
             </Link>
             <div>
-              <span className="text-xl font-black tracking-tight text-[#F6AD55]">
+              <span className="text-xl font-black tracking-tight text-[#B72E35] dark:text-[#F6AD55]">
                 smol café • Cashier Desk
               </span>
-              <span className="ml-2 rounded-md bg-stone-800 px-2 py-0.5 font-mono text-[10px] text-stone-400">
+              <span className="ml-2 rounded-md border border-[#C9AE8B]/30 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-2 py-0.5 font-mono text-[10px] text-[#725039] dark:text-stone-400">
                 Front-Desk Queue &amp; POS
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 rounded-full border border-stone-800 bg-stone-900 px-3 py-1 text-xs font-mono text-stone-400">
+            <span className="flex items-center gap-1.5 rounded-full border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 px-3 py-1 text-xs font-mono text-[#725039] dark:text-stone-400">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               Live 3s
             </span>
             <Link
               href="/smol-backdoor"
-              className="rounded-xl border border-stone-800 bg-stone-900 px-3 py-1 text-xs font-mono text-stone-400 hover:bg-stone-800 transition"
+              className="rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 px-3 py-1 text-xs font-mono text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition"
             >
               Role Portal
             </Link>
+
+            {/* Theme Toggle Button */}
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -204,8 +255,8 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
           <div
             className={`rounded-2xl p-4 text-xs font-serif ${
               actionFeedback.type === "error"
-                ? "bg-rose-950/50 text-rose-300 border border-rose-900/60"
-                : "bg-emerald-950/50 text-emerald-300 border border-emerald-900/60"
+                ? "bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-900/60"
+                : "bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-900/60"
             }`}
           >
             {actionFeedback.text}
@@ -213,17 +264,18 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
         )}
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-2 border-b border-stone-800 pb-3">
+        <div className="flex items-center gap-2 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
           <button
             type="button"
             onClick={() => setActiveTab("queue")}
-            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all cursor-pointer ${
               activeTab === "queue"
                 ? "bg-[#B72E35] text-white shadow-md"
-                : "bg-stone-900 text-stone-400 hover:bg-stone-800"
+                : "bg-[#FAF4EB] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800"
             }`}
           >
-            <span>🔔 Order Confirmation Queue</span>
+            <Bell className="h-4 w-4 shrink-0 text-[#8C6207] dark:text-[#F6AD55]" />
+            <span>Order Confirmation Queue</span>
             {pendingOrders.length > 0 && (
               <span className="rounded-full bg-white px-2 py-0.2 text-[10px] font-black text-[#B72E35] animate-bounce">
                 {pendingOrders.length}
@@ -234,16 +286,30 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
           <button
             type="button"
             onClick={() => setActiveTab("tables")}
-            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all cursor-pointer ${
               activeTab === "tables"
-                ? "bg-[#F6AD55] text-stone-900 shadow-md font-extrabold"
-                : "bg-stone-900 text-stone-400 hover:bg-stone-800"
+                ? "bg-[#F2C84B] text-[#241F1C] shadow-md font-extrabold"
+                : "bg-[#FAF4EB] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800"
             }`}
           >
-            <span>🪑 Tables &amp; Settlement</span>
-            <span className="rounded-full bg-stone-800 px-2 py-0.2 text-[10px] font-mono text-stone-300">
+            <Armchair className="h-4 w-4 shrink-0 text-[#8C6207] dark:text-amber-400" />
+            <span>Tables &amp; Settlement</span>
+            <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 px-2 py-0.2 text-[10px] font-mono text-[#725039] dark:text-stone-300">
               {tables.length}
             </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("paid")}
+            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+              activeTab === "paid"
+                ? "bg-[#75AFA7] text-white shadow-md font-extrabold"
+                : "bg-[#FAF4EB] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800"
+            }`}
+          >
+            <Receipt className="h-4 w-4 shrink-0 text-[#245850] dark:text-emerald-400" />
+            <span>Paid Orders ({paidHistory.length})</span>
           </button>
         </div>
 
@@ -252,23 +318,23 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-xl font-extrabold tracking-tight">
+                <h1 className="text-xl font-extrabold tracking-tight text-[#241F1C] dark:text-[#FDFBF7]">
                   Incoming Order Confirmation Queue
                 </h1>
-                <p className="text-xs text-stone-400">
+                <p className="text-xs text-[#725039] dark:text-stone-400">
                   Verify customer Table PIN &amp; confirm before pushing ticket to Kitchen KDS
                 </p>
               </div>
-              <span className="rounded-full bg-[#B72E35]/20 border border-[#B72E35]/40 px-3 py-1 font-mono text-xs font-bold text-[#F2C84B]">
+              <span className="rounded-full bg-[#B72E35]/10 dark:bg-[#B72E35]/20 border border-[#B72E35]/30 dark:border-[#B72E35]/50 px-3 py-1 font-mono text-xs font-bold text-[#B72E35] dark:text-[#F2C84B]">
                 {pendingOrders.length} Awaiting Verification
               </span>
             </div>
 
             {pendingOrders.length === 0 ? (
-              <div className="rounded-3xl border border-stone-800 bg-[#1A1715] p-12 text-center text-stone-500 space-y-2">
-                <span className="text-3xl block">✨</span>
-                <p className="text-sm font-bold text-stone-200">No pending orders in queue</p>
-                <p className="text-xs text-stone-500">
+              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-12 text-center text-[#725039] dark:text-stone-500 space-y-2 shadow-xs transition-colors">
+                <Sparkles className="h-8 w-8 text-amber-500 mx-auto" />
+                <p className="text-sm font-bold text-[#241F1C] dark:text-stone-200">No pending orders in queue</p>
+                <p className="text-xs text-[#8C6D53] dark:text-stone-500">
                   All customer orders have been confirmed and sent to kitchen preparation.
                 </p>
               </div>
@@ -277,26 +343,26 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                 {pendingOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="relative flex flex-col justify-between rounded-3xl border-2 border-amber-500/60 bg-[#1A1715] p-5 shadow-xl space-y-4 animate-scale-in"
+                    className="relative flex flex-col justify-between rounded-3xl border-2 border-[#F2C84B] dark:border-amber-500/60 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-lg space-y-4 animate-scale-in transition-colors"
                   >
                     <div>
                       {/* Top Row: Table Badge & Verification PIN */}
-                      <div className="flex items-start justify-between border-b border-stone-800 pb-3">
+                      <div className="flex items-start justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
                         <div>
-                          <span className="font-mono text-2xl font-black text-white">
+                          <span className="font-mono text-2xl font-black text-[#241F1C] dark:text-white">
                             Table {order.tableLabel}
                           </span>
-                          <p className="font-mono text-xs text-stone-400">
+                          <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
                             Order #{order.orderNo} • {new Date(order.submittedAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </p>
                         </div>
 
                         {/* Customer 4-digit PIN */}
-                        <div className="rounded-2xl border-2 border-[#F2C84B] bg-[#F2C84B]/10 px-3 py-1.5 text-right">
-                          <span className="block font-mono text-[9px] uppercase font-bold text-[#F2C84B] tracking-wider">
+                        <div className="rounded-2xl border-2 border-[#B72E35] dark:border-[#F2C84B] bg-[#B72E35]/10 dark:bg-[#F2C84B]/10 px-3 py-1.5 text-right">
+                          <span className="block font-mono text-[9px] uppercase font-bold text-[#B72E35] dark:text-[#F2C84B] tracking-wider">
                             VERIFY PIN
                           </span>
-                          <span className="font-mono text-xl font-black text-[#F2C84B]">
+                          <span className="font-mono text-xl font-black text-[#B72E35] dark:text-[#F2C84B]">
                             {order.verificationCode}
                           </span>
                         </div>
@@ -304,19 +370,19 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
 
                       {/* Special Instructions Note if present */}
                       {order.instructions && (
-                        <div className="mt-3 rounded-xl border border-amber-800/40 bg-amber-950/20 p-2.5 text-xs text-amber-300 font-serif italic">
-                          📝 &quot;{order.instructions}&quot;
+                        <div className="mt-3 rounded-xl border border-amber-300 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/20 p-2.5 text-xs text-amber-900 dark:text-amber-300 font-serif italic">
+                          &quot;{order.instructions}&quot;
                         </div>
                       )}
 
                       {/* Items List */}
-                      <div className="mt-3 space-y-1.5 font-sans text-xs divide-y divide-stone-800/60">
+                      <div className="mt-3 space-y-1.5 font-sans text-xs divide-y divide-[#C9AE8B]/20 dark:divide-stone-800/60">
                         {order.items.map((item) => (
                           <div key={item.id} className="pt-1.5 flex items-center justify-between">
-                            <span className="font-medium text-stone-200">
-                              <strong className="font-mono text-[#F6AD55]">{item.qty}x</strong> {item.name}
+                            <span className="font-medium text-[#241F1C] dark:text-stone-200">
+                              <strong className="font-mono text-[#B72E35] dark:text-[#F6AD55]">{item.qty}x</strong> {item.name}
                             </span>
-                            <span className="font-mono text-stone-400">
+                            <span className="font-mono text-[#725039] dark:text-stone-400">
                               ₹{Math.round(item.lineSubtotal / 100)}
                             </span>
                           </div>
@@ -325,12 +391,12 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                     </div>
 
                     {/* Bottom: Total & Confirm Action */}
-                    <div className="border-t border-stone-800 pt-3 flex items-center justify-between">
+                    <div className="border-t border-[#C9AE8B]/30 dark:border-stone-800 pt-3 flex items-center justify-between">
                       <div>
-                        <span className="block font-mono text-[9px] uppercase font-bold text-stone-500">
+                        <span className="block font-mono text-[9px] uppercase font-bold text-[#8C6D53] dark:text-stone-500">
                           ORDER TOTAL
                         </span>
-                        <span className="font-mono text-xl font-black text-emerald-400">
+                        <span className="font-mono text-xl font-black text-emerald-600 dark:text-emerald-400">
                           ₹{Math.round(order.totalPaise / 100)}
                         </span>
                       </div>
@@ -340,7 +406,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                           type="button"
                           disabled={isSubmitting}
                           onClick={() => handleRejectOrder(order.id)}
-                          className="rounded-xl border border-rose-900/60 bg-rose-950/30 px-3 py-2 text-xs font-bold text-rose-300 hover:bg-rose-900/40 transition active:scale-95 disabled:opacity-50"
+                          className="rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 px-3 py-2 text-xs font-bold text-rose-800 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition active:scale-95 disabled:opacity-50 cursor-pointer"
                         >
                           Reject
                         </button>
@@ -348,9 +414,10 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                           type="button"
                           disabled={isSubmitting}
                           onClick={() => handleConfirmOrder(order.id)}
-                          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 active:scale-95 transition disabled:opacity-50"
+                          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 active:scale-95 transition disabled:opacity-50 cursor-pointer"
                         >
-                          <span>✓ Confirm &amp; Push to Kitchen</span>
+                          <Check className="h-4 w-4" />
+                          <span>Confirm &amp; Push to Kitchen</span>
                         </button>
                       </div>
                     </div>
@@ -371,16 +438,16 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                   Select a table to record cash settlement &amp; close session
                 </p>
               </div>
-              <span className="rounded-full bg-stone-800 px-3 py-1 font-mono text-xs font-bold text-stone-300">
+              <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 px-3 py-1 font-mono text-xs font-bold text-[#725039] dark:text-stone-300">
                 {tables.length} {tables.length === 1 ? "Active Table" : "Active Tables"}
               </span>
             </div>
 
             {tables.length === 0 ? (
-              <div className="rounded-3xl border border-stone-800 bg-[#1A1715] p-8 text-center text-stone-400 space-y-4">
-                <span className="text-3xl block">🪑</span>
-                <p className="text-sm font-bold text-stone-200">No open table sessions</p>
-                <p className="text-xs text-stone-500 max-w-sm mx-auto">
+              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-8 text-center text-[#725039] dark:text-stone-400 space-y-4 shadow-xs transition-colors">
+                <Armchair className="h-8 w-8 text-[#8C6D53] dark:text-stone-500 mx-auto" />
+                <p className="text-sm font-bold text-[#241F1C] dark:text-stone-200">No open table sessions</p>
+                <p className="text-xs text-[#8C6D53] dark:text-stone-500 max-w-sm mx-auto">
                   All tables are currently settled. Open a table for walk-in guests:
                 </p>
                 <div className="flex flex-wrap justify-center gap-2 pt-2">
@@ -389,7 +456,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                       key={num}
                       type="button"
                       onClick={() => handleOpenTableForGuest(num)}
-                      className="rounded-xl border border-stone-700 bg-stone-900 px-4 py-2 font-mono text-xs font-bold text-[#F6AD55] hover:bg-stone-800 active:scale-95 transition"
+                      className="rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-4 py-2 font-mono text-xs font-bold text-[#8C6207] dark:text-[#F6AD55] hover:bg-[#F3E7D3] dark:hover:bg-stone-800 active:scale-95 transition cursor-pointer"
                     >
                       + Open Table {num}
                     </button>
@@ -410,50 +477,161 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                       tabIndex={0}
                       className={`group relative flex flex-col justify-between rounded-3xl border-2 p-5 text-left transition-all hover:scale-[1.01] hover:shadow-xl active:scale-[0.99] cursor-pointer ${
                         isRequested
-                          ? "border-amber-500/80 bg-amber-950/30"
-                          : "border-stone-800 bg-[#1A1715] hover:border-stone-700"
+                          ? "border-[#F2C84B] bg-[#FDF8E7] dark:border-amber-500/80 dark:bg-amber-950/30"
+                          : "border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] hover:border-[#B72E35]/40 dark:hover:border-stone-700"
                       }`}
                     >
                       <div>
                         {/* Top Row: Table Label & Status */}
                         <div className="flex items-center justify-between">
-                          <h2 className="text-2xl font-black font-mono tracking-tight text-white group-hover:text-[#F6AD55]">
+                          <h2 className="text-2xl font-black font-mono tracking-tight text-[#241F1C] dark:text-white group-hover:text-[#B72E35] dark:group-hover:text-[#F6AD55]">
                             Table {table.tableLabel}
                           </h2>
                           {isRequested ? (
-                            <span className="flex items-center gap-1 rounded-full border border-amber-500/80 bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-300 animate-pulse">
-                              🔔 Bill Requested
+                            <span className="flex items-center gap-1 rounded-full border border-amber-300 dark:border-amber-500/80 bg-amber-100 dark:bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-300 animate-pulse">
+                              <Receipt className="h-3.5 w-3.5" /> Bill Requested
                             </span>
                           ) : (
-                            <span className="rounded-full bg-stone-800 px-2.5 py-0.5 text-xs font-semibold text-stone-400">
+                            <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 border border-[#C9AE8B]/30 dark:border-transparent px-2.5 py-0.5 text-xs font-semibold text-[#725039] dark:text-stone-400">
                               Dining Active
                             </span>
                           )}
                         </div>
 
-                        <p className="mt-2 text-xs text-stone-400">
+                        <p className="mt-2 text-xs text-[#725039] dark:text-stone-400">
                           {table.orderCount} {table.orderCount === 1 ? "order round" : "order rounds"}
                         </p>
                       </div>
 
                       {/* Bottom: Total Bill & Action */}
-                      <div className="mt-6 flex items-baseline justify-between border-t border-stone-800/80 pt-4">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-stone-500">
-                            Bill Total
-                          </span>
-                          <p className="font-mono text-xl font-black text-[#F6AD55]">₹{totalRupees}</p>
+                      <div className="mt-6 flex flex-col gap-2 border-t border-[#C9AE8B]/30 dark:border-stone-800/80 pt-4">
+                        <div className="flex items-baseline justify-between">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-[#8C6D53] dark:text-stone-500">
+                              Bill Total
+                            </span>
+                            <p className="font-mono text-xl font-black text-[#B72E35] dark:text-[#F6AD55]">₹{totalRupees}</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInspectingTag(createTableJsonTag(table.tableLabel));
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-2 py-1 text-[10px] font-mono text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 transition cursor-pointer"
+                            title="Inspect JSON Tag"
+                          >
+                            <Tag className="h-3 w-3 text-[#B72E35] dark:text-[#F2C84B]" />
+                            <span>JSON Tag</span>
+                          </button>
                         </div>
 
-                        <button className="rounded-xl bg-[#9B2C2C] px-3.5 py-2 text-xs font-bold text-white shadow transition hover:bg-[#822424]">
-                          Settle Cash →
-                        </button>
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveUpiTable(table);
+                            }}
+                            className="flex items-center justify-center gap-1 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 py-2 text-xs font-bold text-[#8C6207] dark:text-[#F2C84B] hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition cursor-pointer"
+                          >
+                            <CreditCard className="h-3.5 w-3.5" />
+                            <span>UPI QR</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenSettlement(table);
+                            }}
+                            className="rounded-xl bg-[#B72E35] py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#9B242A] cursor-pointer"
+                          >
+                            Settle Cash →
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB 3: PAID ORDERS & SETTLEMENT AUDIT */}
+        {activeTab === "paid" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-extrabold tracking-tight text-[#241F1C] dark:text-white">Today&apos;s Paid Orders &amp; Audit Log</h1>
+                <p className="text-xs text-[#725039] dark:text-stone-400">
+                  Closed table chits and completed payment transactions
+                </p>
+              </div>
+              <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/60 px-3 py-1 font-mono text-xs font-bold text-emerald-800 dark:text-emerald-400">
+                Total: ₹{paidHistory.reduce((acc, p) => acc + p.totalRupees, 0)}
+              </span>
+            </div>
+
+            <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
+                  <tr>
+                    <th className="p-3.5">Settlement ID</th>
+                    <th className="p-3.5">Table</th>
+                    <th className="p-3.5">Method</th>
+                    <th className="p-3.5">Amount</th>
+                    <th className="p-3.5">Settled At</th>
+                    <th className="p-3.5 text-right">Receipt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
+                  {paidHistory.map((rec) => (
+                    <tr key={rec.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
+                      <td className="p-3.5 font-bold text-[#241F1C] dark:text-stone-200">{rec.id}</td>
+                      <td className="p-3.5 text-[#8C6207] dark:text-[#F6AD55] font-bold">Table {rec.tableLabel}</td>
+                      <td className="p-3.5">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                          rec.paymentMethod === "UPI"
+                            ? "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800/50"
+                            : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50"
+                        }`}>
+                          {rec.paymentMethod}
+                        </span>
+                      </td>
+                      <td className="p-3.5 font-bold text-[#241F1C] dark:text-white font-serif text-sm">₹{rec.totalRupees}</td>
+                      <td className="p-3.5 text-[#725039] dark:text-stone-400 text-[11px]">
+                        {new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="p-3.5 text-right">
+                        <button
+                          onClick={() => {
+                            setActiveReceipt({
+                              orderId: rec.id,
+                              tableLabel: rec.tableLabel,
+                              items: [
+                                { name: "Settled Order Items", qty: rec.itemsCount, priceRupees: Math.round(rec.totalRupees / rec.itemsCount), subtotalRupees: rec.totalRupees }
+                              ],
+                              subtotalRupees: Math.round(rec.totalRupees / 1.05),
+                              taxRupees: Math.round(rec.totalRupees - rec.totalRupees / 1.05),
+                              totalRupees: rec.totalRupees,
+                              paymentMethod: rec.paymentMethod,
+                              paidAt: rec.paidAt,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-3 py-1 text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 hover:text-[#241F1C] dark:hover:text-white transition cursor-pointer"
+                        >
+                          <Printer className="h-3 w-3" />
+                          <span>Chit</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>
@@ -465,20 +643,20 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
           onClick={() => setSelectedTable(null)}
         >
           <div
-            className="w-full max-w-md rounded-3xl border border-stone-800 bg-[#1C1917] p-6 shadow-2xl"
+            className="w-full max-w-md rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1917] p-6 shadow-2xl transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-stone-800 pb-4">
+            <div className="flex items-start justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-4">
               <div>
-                <span className="text-xs font-bold text-[#F6AD55]">Cash Settlement</span>
-                <h3 className="text-2xl font-black font-mono text-white">
+                <span className="text-xs font-bold text-[#B72E35] dark:text-[#F6AD55]">Cash Settlement</span>
+                <h3 className="text-2xl font-black font-mono text-[#241F1C] dark:text-white">
                   Table {selectedTable.tableLabel}
                 </h3>
               </div>
               <button
                 onClick={() => setSelectedTable(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-800 text-stone-400 hover:bg-stone-700"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3E7D3] dark:bg-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 transition cursor-pointer"
               >
                 ✕
               </button>
@@ -490,18 +668,18 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                 <div
                   className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${
                     resultMessage.type === "success"
-                      ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
-                      : "bg-red-950 text-red-300 border border-red-800"
+                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                      : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 border border-red-300 dark:border-red-800"
                   }`}
                 >
                   {resultMessage.type === "success" ? "✓" : "✕"}
                 </div>
-                <h4 className="text-lg font-bold text-white">{resultMessage.text}</h4>
+                <h4 className="text-lg font-bold text-[#241F1C] dark:text-white">{resultMessage.text}</h4>
 
                 {resultMessage.changeRupees !== undefined && resultMessage.changeRupees > 0 && (
-                  <div className="rounded-2xl border border-amber-900/60 bg-amber-950/40 p-4">
-                    <span className="text-xs text-amber-300 font-semibold">Change to Return</span>
-                    <p className="text-3xl font-black font-mono text-amber-200 mt-1">
+                  <div className="rounded-2xl border border-amber-300 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 p-4">
+                    <span className="text-xs text-amber-900 dark:text-amber-300 font-semibold">Change to Return</span>
+                    <p className="text-3xl font-black font-mono text-amber-800 dark:text-amber-200 mt-1">
                       ₹{resultMessage.changeRupees}
                     </p>
                   </div>
@@ -512,7 +690,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                     setSelectedTable(null);
                     setResultMessage(null);
                   }}
-                  className="w-full rounded-2xl bg-stone-800 py-3 text-xs font-bold text-white transition hover:bg-stone-700"
+                  className="w-full rounded-2xl bg-[#241F1C] dark:bg-stone-800 py-3 text-xs font-bold text-[#F3E7D3] dark:text-white transition hover:bg-[#362B24] dark:hover:bg-stone-700 cursor-pointer"
                 >
                   Close & Done
                 </button>
@@ -521,16 +699,16 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
               /* Settlement Form */
               <form onSubmit={handleRecordPayment} className="mt-5 space-y-4">
                 {/* Total Bill Display */}
-                <div className="flex items-center justify-between rounded-2xl border border-stone-800 bg-stone-900/80 p-4">
-                  <span className="text-xs font-bold text-stone-400">Total Bill Due</span>
-                  <span className="font-mono text-2xl font-black text-[#F6AD55]">
+                <div className="flex items-center justify-between rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900/80 p-4">
+                  <span className="text-xs font-bold text-[#725039] dark:text-stone-400">Total Bill Due</span>
+                  <span className="font-mono text-2xl font-black text-[#B72E35] dark:text-[#F6AD55]">
                     ₹{selectedTotalRupees}
                   </span>
                 </div>
 
                 {/* Amount Tendered Input */}
                 <div>
-                  <label className="block text-xs font-bold text-stone-400 mb-1.5">
+                  <label className="block text-xs font-bold text-[#725039] dark:text-stone-400 mb-1.5">
                     Amount Tendered by Customer (₹)
                   </label>
                   <input
@@ -539,30 +717,30 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                     step="1"
                     value={amountTendered}
                     onChange={(e) => setAmountTendered(e.target.value)}
-                    className="w-full rounded-2xl border border-stone-700 bg-stone-900 px-4 py-3.5 font-mono text-xl font-bold text-white focus:border-[#F6AD55] focus:outline-none"
+                    className="w-full rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-900 px-4 py-3.5 font-mono text-xl font-bold text-[#241F1C] dark:text-white focus:border-[#B72E35] focus:outline-none"
                     autoFocus
                     required
                   />
                 </div>
 
                 {/* Change Due Calculator */}
-                <div className="flex items-center justify-between rounded-2xl border border-emerald-900/50 bg-emerald-950/30 p-3.5 text-xs">
-                  <span className="font-semibold text-emerald-300">Change Due to Customer</span>
-                  <span className="font-mono text-lg font-bold text-emerald-300">
+                <div className="flex items-center justify-between rounded-2xl border border-emerald-300 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 p-3.5 text-xs">
+                  <span className="font-semibold text-emerald-800 dark:text-emerald-300">Change Due to Customer</span>
+                  <span className="font-mono text-lg font-bold text-emerald-800 dark:text-emerald-300">
                     ₹{changeDueRupees}
                   </span>
                 </div>
 
                 {/* Staff Identifier */}
                 <div>
-                  <label className="block text-xs font-semibold text-stone-500 mb-1">
+                  <label className="block text-xs font-semibold text-[#8C6D53] dark:text-stone-500 mb-1">
                     Staff Identifier
                   </label>
                   <input
                     type="text"
                     value={staffName}
                     onChange={(e) => setStaffName(e.target.value)}
-                    className="w-full rounded-xl border border-stone-800 bg-stone-900 px-3 py-2 text-xs text-white focus:border-stone-600 focus:outline-none"
+                    className="w-full rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 px-3 py-2 text-xs text-[#241F1C] dark:text-white focus:border-[#B72E35] focus:outline-none"
                     required
                   />
                 </div>
@@ -572,7 +750,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                   <button
                     type="submit"
                     disabled={isSubmitting || tenderedRupees < selectedTotalRupees}
-                    className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-[#9B2C2C] py-4 text-base font-bold text-white shadow-xl transition hover:bg-[#822424] active:scale-[0.98] disabled:opacity-50"
+                    className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-[#B72E35] py-4 text-base font-bold text-white shadow-xl transition hover:bg-[#9B242A] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     {isSubmitting
                       ? "Processing Settlement..."
@@ -583,6 +761,46 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
             )}
           </div>
         </div>
+      )}
+
+      {/* JSON Table Tag Inspector Modal */}
+      {inspectingTag && (
+        <JsonTagInspectorModal
+          tag={inspectingTag}
+          onClose={() => setInspectingTag(null)}
+        />
+      )}
+
+      {/* UPI Payment Gateway Drawer */}
+      {activeUpiTable && (
+        <UpiPaymentDrawer
+          tableLabel={activeUpiTable.tableLabel}
+          amountPaise={activeUpiTable.totalPaise}
+          onClose={() => setActiveUpiTable(null)}
+          onPaymentSuccess={(res) => {
+            setActiveUpiTable(null);
+            setPaidHistory((prev) => [
+              {
+                id: res.transactionId || `SETTLE-${Math.floor(1000 + Math.random() * 9000)}`,
+                tableLabel: activeUpiTable.tableLabel,
+                totalRupees: Math.round(activeUpiTable.totalPaise / 100),
+                paymentMethod: "UPI",
+                paidAt: res.paidAt,
+                itemsCount: activeUpiTable.orderCount || 1,
+              },
+              ...prev,
+            ]);
+            refreshData();
+          }}
+        />
+      )}
+
+      {/* Digital Receipt / Tax Chit Modal */}
+      {activeReceipt && (
+        <DigitalReceiptModal
+          receipt={activeReceipt}
+          onClose={() => setActiveReceipt(null)}
+        />
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import {
   toggleMusicSessionAction,
   type StaffJukeboxData,
 } from "@/app/music/actions";
+import { Music, Check, SkipForward, Play, Flame } from "lucide-react";
 
 interface StaffJukeboxDjProps {
   initialData: StaffJukeboxData;
@@ -79,8 +80,9 @@ export const StaffJukeboxDj: React.FC<StaffJukeboxDjProps> = ({ initialData }) =
               ← Back
             </Link>
             <div>
-              <h1 className="text-lg font-black tracking-tight text-[#9B2C2C] dark:text-[#F6AD55]">
-                Café Jukebox DJ Panel 🎧
+              <h1 className="text-lg font-black tracking-tight text-[#9B2C2C] dark:text-[#F6AD55] flex items-center gap-2">
+                <Music className="h-5 w-5" />
+                Café Jukebox DJ Panel
               </h1>
               <p className="text-xs text-stone-500 font-medium">
                 Live Song Moderation & Queue Controller
@@ -91,13 +93,14 @@ export const StaffJukeboxDj: React.FC<StaffJukeboxDjProps> = ({ initialData }) =
           <div className="flex items-center gap-2">
             <button
               onClick={handleToggleSession}
-              className={`rounded-full px-3.5 py-1 text-xs font-bold transition shadow-sm ${
+              className={`rounded-full px-3.5 py-1 text-xs font-bold transition shadow-sm flex items-center gap-1.5 ${
                 isOpen
                   ? "bg-emerald-600 text-white hover:bg-emerald-700"
                   : "bg-stone-300 text-stone-700 hover:bg-stone-400 dark:bg-stone-800 dark:text-stone-300"
               }`}
             >
-              {isOpen ? "🟢 Jukebox OPEN" : "🔴 Jukebox CLOSED"}
+              <span className={`h-2 w-2 rounded-full ${isOpen ? "bg-emerald-300 animate-pulse" : "bg-stone-500"}`} />
+              {isOpen ? "Jukebox OPEN" : "Jukebox CLOSED"}
             </button>
           </div>
         </div>
@@ -120,22 +123,22 @@ export const StaffJukeboxDj: React.FC<StaffJukeboxDjProps> = ({ initialData }) =
               <div>
                 <h2 className="text-base font-black">{data.playingTrack.track_name}</h2>
                 <p className="text-xs text-stone-400">{data.playingTrack.artist}</p>
-                <span className="mt-1 inline-block text-[10px] font-mono text-amber-300">
-                  🔥 {data.playingTrack.vote_count} Upvotes
+                <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-mono text-amber-300">
+                  <Flame className="h-3 w-3" /> {data.playingTrack.vote_count} Upvotes
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleStatusUpdate(data.playingTrack!.id, "PLAYED")}
-                  className="rounded-xl bg-stone-800 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:bg-stone-700"
+                  className="rounded-xl bg-stone-800 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:bg-stone-700 flex items-center gap-1"
                 >
-                  ✓ Finished
+                  <Check className="h-3.5 w-3.5" /> Finished
                 </button>
                 <button
                   onClick={() => handleStatusUpdate(data.playingTrack!.id, "SKIPPED")}
-                  className="rounded-xl bg-stone-800 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-stone-700"
+                  className="rounded-xl bg-stone-800 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-stone-700 flex items-center gap-1"
                 >
-                  Skip ⏭
+                  Skip <SkipForward className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
@@ -177,9 +180,9 @@ export const StaffJukeboxDj: React.FC<StaffJukeboxDjProps> = ({ initialData }) =
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={() => handleStatusUpdate(track.id, "QUEUED")}
-                        className="flex-1 rounded-xl bg-emerald-600 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
+                        className="flex-1 rounded-xl bg-emerald-600 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 flex items-center justify-center gap-1"
                       >
-                        ✓ Approve & Queue
+                        <Check className="h-3.5 w-3.5" /> Approve & Queue
                       </button>
                       <button
                         onClick={() => handleStatusUpdate(track.id, "REJECTED")}
@@ -226,14 +229,14 @@ export const StaffJukeboxDj: React.FC<StaffJukeboxDjProps> = ({ initialData }) =
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-mono font-bold text-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-                        ▲ {track.vote_count}
+                      <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-mono font-bold text-amber-900 dark:bg-amber-950/40 dark:text-amber-300 flex items-center gap-0.5">
+                        <Flame className="h-3 w-3" /> {track.vote_count}
                       </span>
                       <button
                         onClick={() => handleStatusUpdate(track.id, "PLAYING")}
-                        className="rounded-xl bg-[#9B2C2C] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#822424] dark:bg-[#C53030]"
+                        className="rounded-xl bg-[#9B2C2C] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#822424] dark:bg-[#C53030] flex items-center gap-1"
                       >
-                        Play ▶
+                        Play <Play className="h-3 w-3 fill-current" />
                       </button>
                     </div>
                   </div>

@@ -5,6 +5,7 @@ import {
   createRazorpayOrderAction,
   verifyRazorpayPaymentAction,
 } from "@/app/bill/razorpay-actions";
+import { Zap } from "lucide-react";
 
 interface RazorpayPaymentButtonProps {
   tableSessionId: string;
@@ -61,8 +62,8 @@ export const RazorpayPaymentButton: React.FC<RazorpayPaymentButtonProps> = ({
       // 2. Load script
       const scriptLoaded = await loadRazorpayScript();
 
-      if (!scriptLoaded || !window.Razorpay) {
-        // Fallback for offline/test mode: simulate successful client callback
+      if (!scriptLoaded || !window.Razorpay || orderRes.keyId?.includes("placeholder")) {
+        // Fallback for offline/test mode: simulate successful client callback directly
         const mockPaymentId = `pay_${Date.now()}`;
         const verifyRes = await verifyRazorpayPaymentAction({
           tableSessionId,
@@ -158,7 +159,7 @@ export const RazorpayPaymentButton: React.FC<RazorpayPaymentButtonProps> = ({
           </>
         ) : (
           <>
-            <span>⚡</span>
+            <Zap className="h-4 w-4 fill-current" />
             Pay ₹{totalRupees} Online (UPI / Card)
             <span aria-hidden="true">→</span>
           </>

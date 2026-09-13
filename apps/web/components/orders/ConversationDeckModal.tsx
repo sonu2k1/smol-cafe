@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Sparkles, Shuffle, X } from "lucide-react";
 
 interface PromptCard {
   id: number;
@@ -14,14 +15,14 @@ const PROMPT_CARDS: PromptCard[] = [
   {
     id: 1,
     category: "Warm & Cozy",
-    tag: "✨ Scent & Memory",
+    tag: "Scent & Memory",
     prompt: "What is a simple everyday scent that instantly transports you back to childhood?",
     subtext: "Rain on asphalt, freshly baked bread, old books, or mom's cardamom chai?",
   },
   {
     id: 2,
     category: "Quirky & Fun",
-    tag: "☕ House Rules",
+    tag: "House Rules",
     prompt:
       "If you had to open a quirky café tomorrow, what would be your signature drink and one unusual house rule?",
     subtext: "e.g. 10% discount if you tell the barista a clean dad joke.",
@@ -29,7 +30,7 @@ const PROMPT_CARDS: PromptCard[] = [
   {
     id: 3,
     category: "Deep Thoughts",
-    tag: "⏳ Time Machine",
+    tag: "Time Machine",
     prompt:
       "If you could relive any single 24-hour day from your past just to soak in the feeling again, which day would it be?",
     subtext: "No changing outcomes — just pure nostalgia and presence.",
@@ -37,14 +38,14 @@ const PROMPT_CARDS: PromptCard[] = [
   {
     id: 4,
     category: "Café Tales",
-    tag: "🎧 Soundtrack",
+    tag: "Soundtrack",
     prompt: "What is a song that feels like a warm hug on a rainy evening?",
     subtext: "Pass the phone or hum the melody to the table.",
   },
   {
     id: 5,
     category: "Quirky & Fun",
-    tag: "🪄 Obscure Mastery",
+    tag: "Obscure Mastery",
     prompt:
       "If you could instantly wake up as a world-class master of one obscure, non-useful skill, what would you choose?",
     subtext:
@@ -53,7 +54,7 @@ const PROMPT_CARDS: PromptCard[] = [
   {
     id: 6,
     category: "Warm & Cozy",
-    tag: "🍽️ Best Meal Ever",
+    tag: "Best Meal Ever",
     prompt:
       "What is the single most memorable meal or roadside bite you've ever had, and who were you sitting with?",
     subtext: "Sometimes it's 2 AM roadside Maggi with best friends.",
@@ -61,7 +62,7 @@ const PROMPT_CARDS: PromptCard[] = [
   {
     id: 7,
     category: "Deep Thoughts",
-    tag: "🌱 Small Joys",
+    tag: "Small Joys",
     prompt:
       "What is an unpopular opinion or tiny guilty pleasure that you will passionately defend forever?",
     subtext:
@@ -109,7 +110,7 @@ export const ConversationDeckModal: React.FC<ConversationDeckModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🃏</span>
+            <Sparkles className="h-5 w-5 text-[#F6AD55]" />
             <div>
               <h3 className="text-sm font-bold tracking-tight text-[#F6AD55]">
                 Conversation Prompt Deck
@@ -123,7 +124,7 @@ export const ConversationDeckModal: React.FC<ConversationDeckModalProps> = ({
             onClick={onClose}
             className="rounded-full bg-stone-800 p-1.5 text-stone-400 hover:text-white"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -163,9 +164,10 @@ export const ConversationDeckModal: React.FC<ConversationDeckModalProps> = ({
 
           <button
             onClick={handleShuffle}
-            className="rounded-2xl border border-amber-900/60 bg-amber-950/40 px-3.5 py-2 text-xs font-bold text-amber-300 hover:bg-amber-900/40"
+            className="flex items-center gap-1.5 rounded-2xl border border-amber-900/60 bg-amber-950/40 px-3.5 py-2 text-xs font-bold text-amber-300 hover:bg-amber-900/40"
           >
-            🔀 Shuffle
+            <Shuffle className="h-3.5 w-3.5" />
+            <span>Shuffle</span>
           </button>
 
           <button

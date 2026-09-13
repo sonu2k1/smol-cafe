@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import type { SuggestedMenuItem } from "@/app/orders/pairings-actions";
 import { useCart } from "@/context/CartContext";
+import { Coffee } from "lucide-react";
 
 interface AnotherRoundSuggestionsProps {
   suggestions: SuggestedMenuItem[];
@@ -43,7 +44,7 @@ export const AnotherRoundSuggestions: React.FC<AnotherRoundSuggestionsProps> = (
     <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-stone-900 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-base">☕</span>
+          <Coffee className="h-4 w-4 text-[#9B2C2C] dark:text-[#F6AD55]" />
           <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
             Fancy Another Round?
           </h3>

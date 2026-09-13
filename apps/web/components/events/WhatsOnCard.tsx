@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import type { CustomerEventView } from "@/app/events/actions";
 import { registerEventRsvpAction } from "@/app/events/actions";
+import { Ticket, Calendar, Clock, Check } from "lucide-react";
 
 interface WhatsOnCardProps {
   initialEvents: CustomerEventView[];
@@ -55,7 +56,7 @@ export const WhatsOnCard: React.FC<WhatsOnCardProps> = ({ initialEvents }) => {
     <section className="space-y-3">
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <span className="text-base">🎪</span>
+          <Ticket className="h-4 w-4 text-[#9B2C2C] dark:text-[#F6AD55]" />
           <h2 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
             What&apos;s On at Smol Café
           </h2>
@@ -89,9 +90,9 @@ export const WhatsOnCard: React.FC<WhatsOnCardProps> = ({ initialEvents }) => {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#9B2C2C] dark:text-[#F6AD55]">
-                    <span>📅 {formattedDate}</span>
+                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formattedDate}</span>
                     <span>•</span>
-                    <span>⏰ {formattedTime}</span>
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formattedTime}</span>
                   </div>
                   <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 mt-1">
                     {event.title}
@@ -115,7 +116,7 @@ export const WhatsOnCard: React.FC<WhatsOnCardProps> = ({ initialEvents }) => {
 
               {event.joinUrlOrNote && (
                 <p className="text-[11px] font-medium text-stone-500 bg-stone-50 p-2.5 rounded-xl dark:bg-stone-800/60 dark:text-stone-400">
-                  ℹ️ {event.joinUrlOrNote}
+                  {event.joinUrlOrNote}
                 </p>
               )}
 
@@ -169,7 +170,7 @@ export const WhatsOnCard: React.FC<WhatsOnCardProps> = ({ initialEvents }) => {
 
                   {event.isRegistered ? (
                     <span className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                      ✓ Registered
+                      <Check className="h-3.5 w-3.5" /> Registered
                     </span>
                   ) : event.isFull ? (
                     <span className="rounded-xl border border-stone-200 bg-stone-100 px-3 py-1.5 text-xs font-bold text-stone-400 dark:border-stone-800 dark:bg-stone-800">
