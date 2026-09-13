@@ -9,7 +9,8 @@ import {
 } from "@/lib/upi";
 import { broadcastSyncEvent } from "@/lib/sync-events";
 import { DigitalReceiptModal, type ReceiptData } from "./DigitalReceiptModal";
-import { X, QrCode, Copy, Check, ShieldCheck, Smartphone } from "lucide-react";
+import { PostPaymentCelebrationModal } from "./PostPaymentCelebrationModal";
+import { X, QrCode, Copy, Check, Smartphone } from "lucide-react";
 
 interface UpiPaymentDrawerProps {
   orderId?: string;
@@ -161,40 +162,17 @@ export const UpiPaymentDrawer: React.FC<UpiPaymentDrawerProps> = ({
 
         {/* Successful Payment State */}
         {paymentResult ? (
-          <div className="py-6 text-center space-y-4 animate-scale-in">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 shadow-inner">
-              <ShieldCheck className="h-8 w-8" />
-            </div>
-            <div>
-              <span className="rounded-md bg-emerald-100 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 uppercase">
-                PAYMENT VERIFIED
-              </span>
-              <h4 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] mt-1">
-                ₹{totalRupees} Received!
-              </h4>
-              <p className="font-mono text-xs text-stone-500 mt-1">
-                Txn ID: {paymentResult.transactionId}
-              </p>
-              <p className="font-serif italic text-xs text-[#725039] mt-0.5">
-                Paid via {paymentResult.appName} • Table {tableLabel}
-              </p>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <button
-                onClick={() => setShowReceipt(true)}
-                className="w-full rounded-2xl bg-[#B72E35] py-3.5 font-serif text-sm font-bold text-white shadow-md hover:bg-[#9E242B] transition"
-              >
-                View &amp; Print Digital Receipt →
-              </button>
-              <button
-                onClick={onClose}
-                className="w-full rounded-2xl border border-[#E2D7C7] bg-white py-3 font-serif text-xs font-semibold text-stone-600 hover:bg-stone-50 transition"
-              >
-                Done
-              </button>
-            </div>
-          </div>
+          <PostPaymentCelebrationModal
+            orderId={orderId}
+            orderNo={orderNo}
+            tableLabel={tableLabel}
+            zone={zone}
+            totalRupees={totalRupees}
+            items={items}
+            transactionId={paymentResult.transactionId}
+            appName={paymentResult.appName}
+            onClose={onClose}
+          />
         ) : (
           /* Payment Interface: QR + VPA + App Drawer */
           <div className="space-y-5 pt-4">

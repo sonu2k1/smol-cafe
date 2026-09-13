@@ -279,7 +279,11 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
 
       {/* Item Detail Modal */}
       {selectedItem && (
-        <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+        <ItemDetailModal
+          item={selectedItem}
+          categories={categories}
+          onClose={() => setSelectedItem(null)}
+        />
       )}
 
       {/* Bottom Sticky Navigation */}

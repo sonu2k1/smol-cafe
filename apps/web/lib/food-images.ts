@@ -15,11 +15,13 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "creamy cheese mushroom omelette":
     "https://images.unsplash.com/photo-1584776296944-ab6fb57b0bdd?auto=format&fit=crop&w=600&q=80",
   "egg bhurji pav":
-    "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=600&q=80",
+    "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=85",
   "paneer bhurji pav":
     "https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=600&q=80",
 
   // Sandwiches & Deckers
+  "triple decker":
+    "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=80",
   "the smol triple decker":
     "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=80",
   "creamy cheese mushroom decker":
@@ -85,6 +87,10 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
     "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80",
 
   // Coffee, Cold Brews & Signature Drinks
+  "tapovan pour over":
+    "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=85",
+  "pour over":
+    "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=85",
   "espresso":
     "https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?auto=format&fit=crop&w=600&q=80",
   "americano":

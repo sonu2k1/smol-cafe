@@ -186,43 +186,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </div>
 
-        {/* Staff & Admin Quick Portals */}
-        <div className="rounded-2xl border border-[#E2D7C7] bg-[#FAF5ED] p-3.5 space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <span className="block font-serif text-xs font-bold text-[#8C7E72] uppercase tracking-wider">
-              Staff &amp; Role Portals
-            </span>
-            <Link
-              href="/smol-backdoor"
-              className="font-mono text-[10px] font-bold text-[#B72E35] hover:underline"
-            >
-              Backdoor →
-            </Link>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Link
-              href="/smol-backdoor/kitchen"
-              className="flex flex-col items-center gap-1 rounded-xl border border-[#D8CEBF] bg-[#FCF8F2] p-2 text-center hover:bg-[#EFE7DC] transition"
-            >
-              <ChefHat className="h-5 w-5 text-[#B72E35]" />
-              <span className="font-serif text-[11px] font-bold text-[#1C1917]">Kitchen KDS</span>
-            </Link>
-            <Link
-              href="/smol-backdoor/cashier"
-              className="flex flex-col items-center gap-1 rounded-xl border border-[#D8CEBF] bg-[#FCF8F2] p-2 text-center hover:bg-[#EFE7DC] transition"
-            >
-              <CreditCard className="h-5 w-5 text-[#B72E35]" />
-              <span className="font-serif text-[11px] font-bold text-[#1C1917]">Cashier POS</span>
-            </Link>
-            <Link
-              href="/smol-backdoor/admin"
-              className="flex flex-col items-center gap-1 rounded-xl border border-[#D8CEBF] bg-[#FCF8F2] p-2 text-center hover:bg-[#EFE7DC] transition"
-            >
-              <Zap className="h-5 w-5 text-[#B72E35]" />
-              <span className="font-serif text-[11px] font-bold text-[#1C1917]">Admin Tower</span>
-            </Link>
-          </div>
-        </div>
 
         {/* Active Session Claim Card (if seated) */}
         {activeSession && (

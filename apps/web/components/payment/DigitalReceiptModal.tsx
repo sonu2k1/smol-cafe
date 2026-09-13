@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef } from "react";
+import Image from "next/image";
 import { X, Printer, CheckCircle } from "lucide-react";
 
 export interface ReceiptItem {
@@ -77,6 +78,16 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({ receip
         <div className="pt-4 space-y-4 font-mono text-xs">
           {/* Cafe Header */}
           <div className="text-center space-y-1">
+            <div className="mx-auto flex justify-center pb-1">
+              <Image
+                src="/logo-transparent.png"
+                alt="smol café logo"
+                width={60}
+                height={88}
+                className="h-16 w-auto object-contain drop-shadow-xs"
+                priority
+              />
+            </div>
             <h2 className="font-serif text-2xl font-black tracking-tight text-[#241F1C] lowercase">
               smol café
             </h2>

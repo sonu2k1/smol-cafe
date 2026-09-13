@@ -58,10 +58,10 @@ export const OrderStatusProgress: React.FC<OrderStatusProgressProps> = ({ status
     <div className="w-full py-3">
       <div className="relative flex items-center justify-between">
         {/* Background connector line */}
-        <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-stone-200 dark:bg-stone-800 -z-0" />
+        <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-[#C9AE8B]/30 -z-0" />
         {/* Progress fill line */}
         <div
-          className="absolute left-4 top-1/2 -translate-y-1/2 h-1 bg-[#9B2C2C] transition-all duration-500 -z-0 dark:bg-[#F6AD55]"
+          className="absolute left-4 top-1/2 -translate-y-1/2 h-1 bg-[#B72E35] transition-all duration-500 -z-0"
           style={{
             width: `${(Math.min(currentIndex, STEPS.length - 1) / (STEPS.length - 1)) * 90}%`,
           }}
@@ -74,26 +74,26 @@ export const OrderStatusProgress: React.FC<OrderStatusProgressProps> = ({ status
           return (
             <div key={step.key} className="relative z-10 flex flex-col items-center">
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ${
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-mono font-bold transition-all duration-300 ${
                   isCurrent
-                    ? "bg-[#9B2C2C] text-white ring-4 ring-red-100 scale-110 shadow-md dark:bg-[#C53030] dark:ring-red-950/60"
+                    ? "bg-[#B72E35] text-white ring-4 ring-[#B72E35]/20 scale-110 shadow-md"
                     : isDone
-                      ? "bg-[#9B2C2C] text-white dark:bg-[#C53030]"
-                      : "bg-white text-stone-400 border border-stone-300 dark:bg-stone-900 dark:border-stone-700 dark:text-stone-500"
+                      ? "bg-[#B72E35] text-white"
+                      : "bg-[#FAF4EB] text-[#725039]/60 border border-[#C9AE8B]/60"
                 }`}
               >
                 {isDone ? <step.icon className="h-4 w-4" /> : idx + 1}
               </div>
               <span
-                className={`mt-1.5 text-[10px] tracking-tight font-medium ${
+                className={`mt-1.5 text-[10px] tracking-tight font-serif ${
                   isCurrent
-                    ? "font-bold text-[#9B2C2C] dark:text-[#F6AD55]"
+                    ? "font-bold text-[#B72E35]"
                     : isDone
-                      ? "text-stone-800 dark:text-stone-200"
-                      : "text-stone-400 dark:text-stone-600"
+                      ? "text-[#241F1C] font-semibold"
+                      : "text-[#725039]/60"
                 }`}
               >
-                {step.label}
+                {step.label.toLowerCase()}
               </span>
             </div>
           );

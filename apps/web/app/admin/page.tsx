@@ -1,6 +1,6 @@
 import React from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AdminTowerDashboard } from "@/components/admin/AdminTowerDashboard";
+import { AdminClientWrapper } from "@/components/admin/AdminClientWrapper";
 
 export const metadata = {
   title: "Admin Control Tower — smol café",
@@ -19,7 +19,7 @@ export default async function AdminDashboardPage() {
     ]);
 
   return (
-    <AdminTowerDashboard
+    <AdminClientWrapper
       initialMetrics={{
         activeTablesCount: activeTablesCount || 5,
         activeOrdersCount: activeOrdersCount || 3,

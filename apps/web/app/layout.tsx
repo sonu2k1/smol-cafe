@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { EB_Garamond, Inter, Noto_Sans_Mono } from "next/font/google";
+import { EB_Garamond, Inter, Noto_Sans_Mono, Caveat } from "next/font/google";
 import "./globals.css";
 
 const ebGaramond = EB_Garamond({
@@ -24,6 +24,13 @@ const notoSansMono = Noto_Sans_Mono({
   weight: ["400", "500", "600", "700"],
 });
 
+const caveat = Caveat({
+  subsets: ["latin"],
+  variable: "--font-chalk",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+});
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -38,7 +45,7 @@ export const metadata: Metadata = {
   description: "A warm, literary neighbourhood café with a day-to-night personality in Rishikesh.",
 };
 
-import { RoleSwitcherBar } from "@/components/navigation/RoleSwitcherBar";
+import { LayoutShell } from "@/components/navigation/LayoutShell";
 
 export default function RootLayout({
   children,
@@ -48,11 +55,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${ebGaramond.variable} ${inter.variable} ${notoSansMono.variable}`}
+      className={`${ebGaramond.variable} ${inter.variable} ${notoSansMono.variable} ${caveat.variable}`}
     >
-      <body className="antialiased min-h-screen bg-[#F3E7D3] text-[#241F1C] font-sans selection:bg-[#B72E35]/20 selection:text-[#B72E35]">
-        <RoleSwitcherBar />
-        {children}
+      <body className="antialiased min-h-screen bg-[#F3E7D3] dark:bg-[#241F1C] text-[#241F1C] dark:text-[#F3E7D3] font-sans selection:bg-[#B72E35]/20 selection:text-[#B72E35]">
+        <LayoutShell>
+          {children}
+        </LayoutShell>
       </body>
     </html>
   );

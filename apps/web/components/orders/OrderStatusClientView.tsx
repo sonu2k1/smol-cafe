@@ -129,25 +129,25 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
   const firstItemName = latestOrder?.items[0]?.name || "Pour Over Coffee";
 
   return (
-    <div className="min-h-screen bg-[#F5EFEB] text-[#1C1917] pb-28 font-sans">
+    <div className="min-h-screen bg-[#F3E7D3] text-[#241F1C] pb-28 font-serif">
       {/* Top Header */}
-      <header className="sticky top-0 z-40 border-b border-[#E8DFD3]/80 bg-[#F5EFEB]/90 px-5 py-3.5 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-[#C9AE8B]/40 bg-[#F3E7D3]/95 px-5 py-3.5 backdrop-blur-md">
         <div className="mx-auto flex max-w-md items-start justify-between">
           <div>
-            <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-[#A62B34]">
+            <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-[#B72E35]">
               4. ORDER STATUS
             </span>
-            <h1 className="font-serif text-2xl font-bold tracking-tight text-[#1C1917]">
+            <h1 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] lowercase">
               your order
             </h1>
-            <p className="font-serif italic text-xs text-[#786F66]">
-              {tableLabel ? `Table ${tableLabel} • ${locationName}` : "brewing happiness"}
+            <p className="font-serif italic text-xs text-[#725039]">
+              {tableLabel ? `Table ${tableLabel} • ${locationName.toLowerCase()}` : "brewing happiness"}
             </p>
           </div>
 
           <div className="pt-1">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#94B8A3] px-3 py-0.5 text-[10px] font-bold text-[#1E432B] shadow-xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#1E432B] animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#75AFA7]/25 border border-[#75AFA7]/40 px-3 py-0.5 text-[10px] font-mono font-bold tracking-wider text-[#1C463F] shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#1C463F] animate-pulse" />
               LIVE
             </span>
           </div>
@@ -157,15 +157,14 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
       {/* Main Content */}
       <main className="mx-auto max-w-md px-4 pt-4 space-y-5">
         {/* Black Arched Hero Status Card */}
-        <div className="relative overflow-hidden rounded-t-[5.5rem] rounded-b-3xl border-t-2 border-[#E5383B] bg-[#141517] p-6 text-center text-white shadow-2xl animate-scale-in">
+        <div className="relative overflow-hidden rounded-t-[5.5rem] rounded-b-3xl border-t-2 border-[#B72E35] bg-[#141517] p-6 text-center text-white shadow-2xl animate-scale-in">
           {/* Top Red Ambient Neon Glow */}
-          <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-20 bg-[#E5383B]/20 rounded-full blur-xl pointer-events-none animate-pulse-glow" />
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-20 bg-[#B72E35]/25 rounded-full blur-xl pointer-events-none animate-pulse-glow" />
 
-          {/* Smol Café Badge Logo in Center */}
-          <div className="relative mx-auto mt-2 inline-flex items-center justify-center rounded-2xl border-2 border-white/20 bg-[#A62B34] px-4 py-2 shadow-lg shadow-red-950/50 hover-lift">
-
+          {/* smol café Badge Logo in Center */}
+          <div className="relative mx-auto mt-2 inline-flex items-center justify-center rounded-2xl border border-white/20 bg-[#B72E35] px-4 py-2 shadow-lg shadow-red-950/50 hover-lift">
             <div className="text-center leading-none">
-              <span className="block font-serif text-xs font-black tracking-tighter text-white uppercase">
+              <span className="block font-serif text-xs font-black tracking-wider text-white uppercase">
                 SMOL
               </span>
               <span className="block font-serif text-sm font-black italic text-white lowercase">
@@ -176,10 +175,10 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
 
           {/* Headline & Subtitle */}
           <div className="mt-4 space-y-1">
-            <h2 className="font-serif text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#F3E7D3] tracking-tight">
               Brewing Your {firstItemName}
             </h2>
-            <p className="font-serif italic text-xs text-stone-300">
+            <p className="font-serif italic text-xs text-[#C9AE8B]">
               single-origin South Indian estate beans
             </p>
           </div>
@@ -188,20 +187,20 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
           <div className="mt-5 grid grid-cols-2 gap-2.5">
             {/* Order Number */}
             <div className="rounded-2xl border border-white/10 bg-[#0C0D0E] p-3 text-center">
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-stone-400">
+              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#C9AE8B]/70">
                 YOUR ORDER NO.
               </span>
-              <span className="block font-mono text-sm font-bold text-[#F7D070] mt-1 tracking-wider">
+              <span className="block font-mono text-sm font-bold text-[#F2C84B] mt-1 tracking-wider">
                 {orderNumberStr}
               </span>
             </div>
 
             {/* Ready Time */}
             <div className="rounded-2xl border border-white/10 bg-[#0C0D0E] p-3 text-center">
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-stone-400">
+              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#C9AE8B]/70">
                 EST. READY TIME
               </span>
-              <span className="block font-mono text-sm font-bold text-[#FF5A5F] mt-1 tracking-wider">
+              <span className="block font-mono text-sm font-bold text-[#FF6B6B] mt-1 tracking-wider">
                 ⏱ 8-10 mins
               </span>
             </div>
@@ -212,10 +211,10 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             <button
               type="button"
               onClick={() => setIsJsonInspectorOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-mono text-stone-300 hover:bg-white/10 transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-mono text-[#F3E7D3]/80 hover:bg-white/10 transition"
               title="Inspect JSON Table Tag"
             >
-              <Tag className="h-3 w-3 text-[#F7D070]" />
+              <Tag className="h-3 w-3 text-[#F2C84B]" />
               <span>{tableJsonTag.zone} • Tag</span>
             </button>
 
@@ -235,24 +234,24 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
         {/* Another Round While You Wait */}
         <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between">
-            <h3 className="font-serif text-xs font-bold text-[#1C1917]">
-              another round? <span className="font-normal text-[#786F66]">while you wait</span>
+            <h3 className="font-serif text-sm font-bold text-[#241F1C]">
+              another round? <span className="font-normal text-[#725039]">while you wait</span>
             </h3>
-            <span className="text-[#E5A842] text-xs">✧</span>
+            <span className="text-[#F2C84B] text-xs">✧</span>
           </div>
 
           {/* Horizontal Scroller Cards */}
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
             {/* Card 1: Smol Espresso */}
-            <div className="w-36 shrink-0 rounded-2xl border border-[#E2D7C7] bg-[#FAF5ED] p-3 shadow-xs flex flex-col justify-between h-24">
-              <p className="font-serif font-bold text-xs text-[#1C1917] truncate">
-                Smol Espresso
+            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 bg-[#FAF4EB] p-3 shadow-xs flex flex-col justify-between h-24">
+              <p className="font-serif font-bold text-xs text-[#241F1C] truncate">
+                smol espresso
               </p>
               <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-xs text-[#9E2A2B]">₹120</span>
+                <span className="font-serif font-bold text-xs text-[#B72E35]">₹120</span>
                 <Link
-                  href="/menu"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#A62B34] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
+                  href="/smol-menu"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#B72E35] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
                 >
                   +
                 </Link>
@@ -260,15 +259,15 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             </div>
 
             {/* Card 2: Jaggery Latte */}
-            <div className="w-36 shrink-0 rounded-2xl border border-[#E2D7C7] bg-[#FAF5ED] p-3 shadow-xs flex flex-col justify-between h-24">
-              <p className="font-serif font-bold text-xs text-[#1C1917] truncate">
-                Jaggery Latte
+            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 bg-[#FAF4EB] p-3 shadow-xs flex flex-col justify-between h-24">
+              <p className="font-serif font-bold text-xs text-[#241F1C] truncate">
+                jaggery latte
               </p>
               <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-xs text-[#9E2A2B]">₹150</span>
+                <span className="font-serif font-bold text-xs text-[#B72E35]">₹150</span>
                 <Link
-                  href="/menu"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#A62B34] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
+                  href="/smol-menu"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#B72E35] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
                 >
                   +
                 </Link>
@@ -276,15 +275,15 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             </div>
 
             {/* Card 3: Triple Decker */}
-            <div className="w-36 shrink-0 rounded-2xl border border-[#E2D7C7] bg-[#FAF5ED] p-3 shadow-xs flex flex-col justify-between h-24">
-              <p className="font-serif font-bold text-xs text-[#1C1917] truncate">
-                Triple Decker
+            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 bg-[#FAF4EB] p-3 shadow-xs flex flex-col justify-between h-24">
+              <p className="font-serif font-bold text-xs text-[#241F1C] truncate">
+                triple decker
               </p>
               <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-xs text-[#9E2A2B]">₹140</span>
+                <span className="font-serif font-bold text-xs text-[#B72E35]">₹140</span>
                 <Link
-                  href="/menu"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#A62B34] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
+                  href="/smol-menu"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#B72E35] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
                 >
                   +
                 </Link>
@@ -303,9 +302,9 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
               }
               alert("You will be notified as soon as your order is ready!");
             }}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#A62B34] py-3.5 font-serif text-sm font-semibold text-white shadow-md transition hover:bg-[#91242C] active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 font-serif text-sm font-semibold text-[#F3E7D3] shadow-md transition hover:bg-[#91242C] active:scale-[0.98]"
           >
-            <Bell className="h-4 w-4" />
+            <Bell className="h-4 w-4 text-[#F3E7D3]" />
             <span>notify me when ready</span>
           </button>
         </div>

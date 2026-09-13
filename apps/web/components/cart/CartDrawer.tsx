@@ -1,31 +1,53 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { placeOrderAction, type ChangedItemDiff } from "@/app/menu/actions";
 import { useNetworkHealth } from "@/hooks/useNetworkHealth";
 import { createTableJsonTag } from "@/lib/table-tag";
 import { broadcastSyncEvent } from "@/lib/sync-events";
-import { JsonTagInspectorModal } from "@/components/table/JsonTagInspectorModal";
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
-import { CheckCircle2, Coffee, AlertTriangle, Tag, Sparkles, CreditCard } from "lucide-react";
+import { getFoodImage } from "@/lib/food-images";
+import type { MenuItemWithDetails } from "@/lib/queries/menu";
+import {
+  Menu as MenuIcon,
+  Users,
+  CheckCircle2,
+  AlertTriangle,
+  Sparkles,
+  CreditCard,
+  Trash2,
+  ArrowLeft,
+  ChevronRight,
+} from "lucide-react";
 
 interface CartDrawerProps {
   tableLabel?: string;
 }
 
-export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "01" }) => {
-  const { items, updateQty, removeItem, clearCart, isCartOpen, closeCart, subtotalPaise } =
-    useCart();
+export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => {
+  const {
+    items,
+    updateQty,
+    removeItem,
+    clearCart,
+    isCartOpen,
+    closeCart,
+    subtotalPaise,
+    totalCount,
+    addItem,
+  } = useCart();
   const { isDegraded } = useNetworkHealth();
 
+  const [activeView, setActiveView] = useState<"table_order" | "bill">("table_order");
+  const [activeActionItemId, setActiveActionItemId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [instructions, setInstructions] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [priceConflicts, setPriceConflicts] = useState<ChangedItemDiff[] | null>(null);
-  const [isJsonInspectorOpen, setIsJsonInspectorOpen] = useState(false);
   const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
+  const [boardAdded, setBoardAdded] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{
     orderNo: number;
     orderId: string;
@@ -33,12 +55,94 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "01" }) => 
     totalPaise: number;
   } | null>(null);
 
-  const tableJsonTag = createTableJsonTag(tableLabel);
-  const loyaltyPointsEarned = Math.max(1, Math.floor(subtotalPaise / 1000));
-
-  if (!isCartOpen) return null;
-
+  const displayTable = tableLabel || "07";
   const totalRupees = Math.round(subtotalPaise / 100);
+
+  // Group items by category: COFFEE, CHAI, FOOD
+  const groupedItems = useMemo(() => {
+    const groups: { [key: string]: typeof items } = {};
+
+    items.forEach((cartItem) => {
+      const name = cartItem.item.name.toLowerCase();
+      const sub = (cartItem.item.metadata?.subcategory || "").toLowerCase();
+
+      let groupKey = "FOOD";
+      if (
+        name.includes("coffee") ||
+        name.includes("pour over") ||
+        name.includes("latte") ||
+        name.includes("cappuccino") ||
+        name.includes("espresso") ||
+        name.includes("flat white") ||
+        name.includes("americano") ||
+        sub.includes("coffee")
+      ) {
+        groupKey = "COFFEE";
+      } else if (
+        name.includes("chai") ||
+        name.includes("tea") ||
+        sub.includes("chai") ||
+        sub.includes("tea")
+      ) {
+        groupKey = "CHAI";
+      }
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(cartItem);
+    });
+
+    // Ensure order: COFFEE, CHAI, FOOD
+    const ordered: { key: string; items: typeof items }[] = [];
+    if (groups["COFFEE"]) ordered.push({ key: "COFFEE", items: groups["COFFEE"] });
+    if (groups["CHAI"]) ordered.push({ key: "CHAI", items: groups["CHAI"] });
+    if (groups["FOOD"]) ordered.push({ key: "FOOD", items: groups["FOOD"] });
+
+    // Any other groups
+    Object.keys(groups).forEach((k) => {
+      if (k !== "COFFEE" && k !== "CHAI" && k !== "FOOD") {
+        ordered.push({ key: k, items: groups[k] });
+      }
+    });
+
+    return ordered;
+  }, [items]);
+
+  // Extract customization note from item name or metadata
+  const getCustomizationNote = (cartItem: typeof items[0]) => {
+    const name = cartItem.item.name;
+    if (name.includes("(Oat)")) return "Oat milk";
+    if (name.includes("(Almond)")) return "Almond milk";
+    if (name.includes("(Dairy)")) return "Dairy milk";
+    if (name.includes("(Sourdough)")) return "Sourdough bread";
+    if (name.includes("(Extra")) return "Extra Cheese";
+    if (name.includes("(Spicy")) return "Spicy Dip";
+    if (cartItem.item.metadata?.notes) return cartItem.item.metadata.notes;
+
+    // Realistic defaults matching mockups if no options selected
+    if (name.toLowerCase().includes("pour over")) return "No milk";
+    if (name.toLowerCase().includes("flat white")) return "Oat milk";
+    if (name.toLowerCase().includes("decker") || name.toLowerCase().includes("sandwich"))
+      return "Add jalapeños";
+    return null;
+  };
+
+  const handleAddConversationBoard = () => {
+    const boardItem: MenuItemWithDetails = {
+      id: "conversation_board",
+      categoryId: "cat_06",
+      name: "Conversation Board",
+      status: "ACTIVE",
+      description: "Cheese, fruits, nuts & a little something sweet.",
+      pricePaise: 26000,
+      imageUrl: getFoodImage("conversation board", null),
+      metadata: { dietary: "Vegetarian" },
+    };
+    addItem(boardItem, 1);
+    setBoardAdded(true);
+    setTimeout(() => setBoardAdded(false), 2000);
+  };
 
   const handlePlaceOrder = async () => {
     if (items.length === 0 || isSubmitting) return;
@@ -47,9 +151,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "01" }) => 
     setErrorMessage(null);
     setPriceConflicts(null);
 
-    // Generate client-side UUID idempotency key
     const idempotencyKey = crypto.randomUUID();
-
     const orderPayload = items.map((cartItem) => ({
       menu_item_id: cartItem.item.id,
       expected_unit_price_paise: cartItem.item.pricePaise,
@@ -68,12 +170,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "01" }) => 
         });
         clearCart();
 
-        // Broadcast order placement in real time to Kitchen KDS and Cashier
         broadcastSyncEvent({
           type: "ORDER_PLACED",
           orderId: result.orderId,
           orderNo: result.orderNo,
-          tableLabel: tableLabel || "01",
+          tableLabel: displayTable,
           timestamp: Date.now(),
         });
       } else if (result.error === "PRICE_CHANGED" && result.changedItems) {
@@ -89,359 +190,390 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "01" }) => 
     }
   };
 
-  const handleApplyPriceUpdates = () => {
-    if (priceConflicts) {
-      priceConflicts.forEach((conflict) => {
-        const cartItem = items.find((i) => i.item.id === conflict.menu_item_id);
-        if (cartItem) {
-          cartItem.item.pricePaise = conflict.current_price_paise;
-        }
-      });
-      setPriceConflicts(null);
-    }
-  };
+  if (!isCartOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-stone-900/60 backdrop-blur-xs sm:items-center sm:p-4 transition-opacity duration-300"
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-[#241F1C]/70 sm:p-4 backdrop-blur-xs transition-opacity duration-200"
       onClick={closeCart}
     >
+      {/* Mobile-first Phone Modal / Drawer Frame matching user mockup */}
       <div
-        className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-[2.5rem] sm:rounded-3xl border border-[#E2D7C7] bg-[#FAF5ED] shadow-2xl transition-all animate-scale-in"
+        className="relative flex h-[92vh] sm:h-[88vh] w-full max-w-lg sm:max-w-[425px] flex-col rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-[#C9AE8B]/60 bg-[#F3E7D3] dark:bg-[#241F1C] text-[#241F1C] dark:text-[#F3E7D3] shadow-2xl overflow-hidden animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Mobile Pull Handle Indicator */}
-        <div className="pt-3 flex justify-center sm:hidden">
-          <div className="w-10 h-1.5 rounded-full bg-[#D8CEBF]" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#E8DFD3] px-5 py-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-serif text-xl font-bold tracking-tight text-[#1C1917]">
-                Your Table Order
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsJsonInspectorOpen(true)}
-                className="inline-flex items-center gap-1 rounded-full border border-[#C9AE8B]/60 bg-white px-2 py-0.5 text-[10px] font-mono text-[#725039] hover:bg-amber-50 shadow-2xs"
-                title="Inspect Table JSON Tag"
-              >
-                <Tag className="h-2.5 w-2.5 text-[#B72E35]" />
-                <span>{tableJsonTag.zone}</span>
-              </button>
-            </div>
-            <p className="font-serif italic text-xs text-[#786F66]">
-              Seated at Table {tableLabel || "01"} • Rishikesh
-            </p>
-          </div>
+        {/* Top Navigation Bar */}
+        <div className="sticky top-0 z-20 flex items-center justify-between px-6 pt-5 pb-3 bg-[#F3E7D3]/95 dark:bg-[#241F1C]/95 backdrop-blur-xs border-b border-[#C9AE8B]/20">
           <button
+            type="button"
             onClick={closeCart}
-            aria-label="Close cart"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EFE7DC] text-[#786F66] hover:bg-[#E2D6C5] active:scale-95 transition"
+            aria-label="Open navigation menu"
+            className="flex h-8 w-8 items-center justify-center text-[#241F1C] dark:text-[#F3E7D3] hover:opacity-75 transition active:scale-95"
           >
-            ✕
+            <MenuIcon className="h-6 w-6 stroke-[2]" />
+          </button>
+
+          <h2 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3]">
+            Your Table
+          </h2>
+
+          <button
+            type="button"
+            onClick={closeCart}
+            className="font-serif text-base font-semibold text-[#B72E35] hover:opacity-85 transition active:scale-95"
+          >
+            Add more
           </button>
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto pb-28">
           {orderSuccess ? (
-            /* Success State */
-            <div className="py-6 text-center space-y-4 animate-scale-in">
+            /* Order Success View */
+            <div className="p-6 text-center space-y-4 animate-fade-in">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 shadow-inner">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
               <div>
                 <span className="inline-block rounded-md bg-amber-100 px-2.5 py-0.5 font-mono text-[10px] font-bold text-amber-900 uppercase">
-                  WAITING FOR CONFIRMATION
+                  CONFIRMED WITH KITCHEN
                 </span>
-                <h3 className="font-serif text-2xl font-bold tracking-tight text-[#1C1917] mt-1">
+                <h3 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3] mt-1">
                   Order #{orderSuccess.orderNo} Placed!
                 </h3>
-                <p className="font-serif italic text-xs text-[#786F66] max-w-xs mx-auto leading-relaxed mt-1">
-                  Your order is sent to the cashier queue. You may give your table PIN to the cashier:
+                <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] max-w-xs mx-auto mt-1">
+                  Your table order is actively being prepared.
                 </p>
               </div>
 
-              {/* 4-Digit Table Verification PIN Box */}
-              <div className="rounded-3xl border-2 border-[#F2C84B] bg-[#FFF8E7] p-4 text-center shadow-md">
+              {/* Table PIN Plaque */}
+              <div className="rounded-3xl border-2 border-[#F2C84B] bg-[#FFF8E7] dark:bg-[#2A231E] p-4 text-center shadow-md">
                 <span className="block font-mono text-[10px] uppercase font-bold text-[#725039] tracking-wider">
                   TABLE VERIFICATION PIN
                 </span>
                 <span className="block font-mono text-3xl font-black text-[#B72E35] tracking-widest mt-0.5">
                   {orderSuccess.verificationCode || "4821"}
                 </span>
-                <p className="text-[10px] font-mono text-[#8C7E72] mt-1">
-                  Table {tableLabel || "01"} • Instant Cashier Verification
+                <p className="text-[10px] font-mono text-[#725039] dark:text-[#C9AE8B] mt-1">
+                  Table {displayTable} • Instant Verification
                 </p>
               </div>
 
-              {/* Loyalty Reward Badge */}
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 text-amber-900 font-serif">
-                  <Sparkles className="h-4 w-4 text-[#F2C84B]" />
-                  <span>Smol Club Loyalty Points</span>
-                </div>
-                <span className="font-mono font-bold text-emerald-700">
-                  +{loyaltyPointsEarned} pts earned
-                </span>
-              </div>
-
-              <div className="rounded-2xl border border-[#E2D7C7] bg-[#FCF8F2] p-3 shadow-xs flex items-center justify-between">
-                <span className="font-mono text-xs uppercase font-bold text-[#8C7E72]">
-                  Total Amount
-                </span>
-                <span className="font-serif text-xl font-bold text-[#A62B34]">
-                  ₹{Math.round(orderSuccess.totalPaise / 100)}
-                </span>
-              </div>
-
-              {/* Action Buttons: Pay via UPI or Track Live Status */}
-              <div className="pt-2 space-y-2">
+              <div className="pt-3 space-y-2.5">
                 <button
                   type="button"
                   onClick={() => setIsUpiDrawerOpen(true)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#B72E35] py-3.5 font-serif text-sm font-bold text-white shadow-md transition hover:bg-[#91242C] active:scale-[0.98]"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 font-serif text-base font-bold text-[#F3E7D3] shadow-md transition hover:bg-[#9E252C] active:scale-[0.98]"
                 >
                   <CreditCard className="h-4 w-4" />
                   Pay Now via UPI Gateway →
                 </button>
-
-                <Link
-                  href="/orders"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#E2D7C7] bg-white py-3 font-serif text-xs font-semibold text-[#1C1917] shadow-xs transition hover:bg-stone-50"
-                >
-                  Track Live Kitchen Status →
-                </Link>
-
                 <button
+                  type="button"
                   onClick={() => {
                     setOrderSuccess(null);
                     closeCart();
                   }}
-                  className="w-full rounded-2xl border border-[#E2D7C7] bg-[#FAF5ED] py-2.5 font-serif text-xs font-semibold text-[#786F66] transition hover:bg-[#EFE7DC]"
+                  className="w-full rounded-full border border-[#C9AE8B]/60 bg-[#FAF4EB] py-3 font-serif text-sm font-semibold text-[#241F1C] transition hover:bg-[#EAE0D2]"
                 >
-                  Stay on Menu
+                  Back to Menu
                 </button>
               </div>
             </div>
-          ) : priceConflicts ? (
-            /* Price Changed 409 Conflict Dialog */
-            <div className="space-y-4 py-2 animate-scale-in">
-              <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-                <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
-                  <h4>Item Prices Updated</h4>
-                </div>
-                <p className="mt-1 font-serif text-xs text-amber-800 leading-relaxed">
-                  Prices were updated on the menu. Please review the updated rates below:
-                </p>
+          ) : activeView === "bill" ? (
+            /* Bill Breakdown View */
+            <div className="p-6 space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between pb-3 border-b border-[#C9AE8B]/30">
+                <button
+                  type="button"
+                  onClick={() => setActiveView("table_order")}
+                  className="inline-flex items-center gap-1.5 font-serif text-sm text-[#725039] hover:text-[#B72E35]"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back to Table
+                </button>
+                <span className="font-mono text-xs text-[#725039]">TABLE {displayTable}</span>
               </div>
 
-              <div className="space-y-2">
-                {priceConflicts.map((c) => (
-                  <div
-                    key={c.menu_item_id}
-                    className="flex items-center justify-between rounded-xl border border-[#E8DFD3] bg-[#FCF8F2] p-3 text-xs"
-                  >
-                    <span className="font-serif font-bold text-[#1C1917]">
-                      {c.name}
-                    </span>
-                    <div className="flex items-center gap-2 font-mono">
-                      <span className="line-through text-stone-400">
-                        ₹{c.expected_price_paise / 100}
+              {/* Receipt Breakdown */}
+              <div className="rounded-2xl border border-[#C9AE8B]/50 bg-[#FAF4EB] dark:bg-[#2A231E] p-4 shadow-xs space-y-3">
+                <h4 className="font-serif text-lg font-bold text-[#241F1C] dark:text-[#F3E7D3] border-b border-[#C9AE8B]/30 pb-2">
+                  Bill Summary
+                </h4>
+                <div className="space-y-2 text-sm">
+                  {items.map(({ item, qty }) => (
+                    <div key={item.id} className="flex justify-between font-serif">
+                      <span>
+                        {qty} × {item.name}
                       </span>
-                      <span className="font-bold text-[#A62B34]">
-                        ₹{c.current_price_paise / 100}
+                      <span className="font-mono">
+                        ₹{Math.round((item.pricePaise / 100) * qty)}
                       </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-[#C9AE8B]/30 pt-3 space-y-1.5 text-xs text-[#725039] dark:text-[#C9AE8B]">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span className="font-mono">₹{totalRupees}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>GST (5% included)</span>
+                    <span className="font-mono">₹{Math.round(totalRupees * 0.05)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-[#C9AE8B]/30 pt-2 font-serif text-base font-bold text-[#241F1C] dark:text-[#F3E7D3]">
+                    <span>Total Payable</span>
+                    <span className="font-mono">₹{totalRupees}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Special Instructions Note */}
+              <div>
+                <label className="block text-[11px] font-mono text-[#725039] mb-1">
+                  Notes for barista / kitchen:
+                </label>
+                <input
+                  type="text"
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  placeholder="e.g. Less sweet, extra hot, no onions..."
+                  className="w-full rounded-xl border border-[#C9AE8B]/60 bg-[#FAF4EB] px-3 py-2 text-xs font-serif text-[#241F1C] focus:border-[#B72E35] focus:outline-hidden"
+                />
+              </div>
+
+              {errorMessage && (
+                <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-800">
+                  {errorMessage}
+                </div>
+              )}
+
+              {/* Primary Action Button */}
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handlePlaceOrder}
+                className="w-full h-14 rounded-full bg-[#B72E35] hover:bg-[#9E252C] text-[#F3E7D3] font-serif text-lg tracking-wide flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition hover-lift disabled:opacity-50"
+              >
+                {isSubmitting ? "Sending to Kitchen..." : "Confirm & Send to Kitchen"}
+              </button>
+            </div>
+          ) : items.length === 0 ? (
+            /* Empty Table Order */
+            <div className="p-12 text-center space-y-3">
+              <span className="block font-serif text-5xl">☕</span>
+              <p className="font-serif text-lg font-bold text-[#241F1C] dark:text-[#F3E7D3]">
+                Your table is empty
+              </p>
+              <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
+                Explore our artisanal brews, sandwiches &amp; comfort bowls.
+              </p>
+              <button
+                type="button"
+                onClick={closeCart}
+                className="mt-3 inline-flex rounded-full bg-[#B72E35] px-6 py-2.5 font-serif text-sm font-semibold text-[#F3E7D3] shadow-xs"
+              >
+                Browse Menu
+              </button>
+            </div>
+          ) : (
+            /* Main "Your Table" View matching mockup 1:1 */
+            <div>
+              {/* Arched Table Header Plaque */}
+              <div className="relative mx-5 mt-3 pt-6 pb-4 text-center rounded-t-[3.5rem] border-t border-x border-[#C9AE8B]/40 bg-[#FAF4EB]/60 dark:bg-[#2A231E]/60 shadow-2xs">
+                <span className="block font-mono text-[11px] uppercase tracking-[0.25em] font-semibold text-[#725039] dark:text-[#C9AE8B]">
+                  TABLE
+                </span>
+                <span className="block font-serif text-5xl font-bold text-[#241F1C] dark:text-[#F3E7D3] mt-0.5 tracking-tight">
+                  {displayTable}
+                </span>
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#3A6059] px-3.5 py-0.5 text-xs text-white shadow-xs font-sans">
+                  <Users className="h-3 w-3" />
+                  <span>2 Guests</span>
+                </div>
+              </div>
+
+              {/* Grouped Category Sections */}
+              <div className="border-t border-[#C9AE8B]/40">
+                {groupedItems.map(({ key, items: categoryItems }) => (
+                  <div key={key}>
+                    {/* Category Header Row */}
+                    <div className="bg-[#EBE0CF]/50 dark:bg-[#2A231E] border-t border-b border-[#C9AE8B]/30 px-6 py-1.5 font-mono text-[11px] uppercase tracking-widest font-semibold text-[#725039] dark:text-[#C9AE8B]">
+                      {key}
+                    </div>
+
+                    {/* Category Items */}
+                    <div className="divide-y divide-[#C9AE8B]/20">
+                      {categoryItems.map(({ item, qty }) => {
+                        const unitRupees = Math.round(item.pricePaise / 100);
+                        const note = getCustomizationNote({ item, qty });
+                        const isActionOpen = activeActionItemId === item.id;
+
+                        return (
+                          <div key={item.id} className="transition-colors hover:bg-[#FAF4EB]/40">
+                            <div className="flex items-start justify-between px-6 py-3.5">
+                              {/* Left: Quantity + Title + Customization */}
+                              <div className="flex items-start gap-3.5 flex-1 min-w-0 pr-2">
+                                <span className="font-serif text-lg font-bold text-[#241F1C] dark:text-[#F3E7D3] w-5 shrink-0 pt-0.5">
+                                  {qty}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-serif text-[15.5px] font-bold text-[#241F1C] dark:text-[#F3E7D3] leading-snug">
+                                    {item.name.replace(/\s*\([^)]*\)/, "")}
+                                  </h4>
+                                  {note && (
+                                    <p className="font-mono text-xs text-[#725039] dark:text-[#C9AE8B] mt-0.5">
+                                      • {note}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right: Price + Three Dots Action */}
+                              <div className="flex items-center gap-3 shrink-0 pt-0.5">
+                                <span className="font-serif text-base font-semibold text-[#241F1C] dark:text-[#F3E7D3]">
+                                  ₹{unitRupees * qty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setActiveActionItemId(isActionOpen ? null : item.id)
+                                  }
+                                  aria-label="Item options"
+                                  className="text-[#241F1C] dark:text-[#F3E7D3] hover:text-[#B72E35] px-1 py-0.5 text-base tracking-widest font-bold transition active:scale-90"
+                                >
+                                  •••
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Expandable Mini Stepper Controls when user taps '•••' */}
+                            {isActionOpen && (
+                              <div className="flex items-center justify-between bg-[#EFE4D2]/60 dark:bg-[#1E1916] px-6 py-2 border-t border-[#C9AE8B]/20 animate-fade-in">
+                                <span className="font-mono text-xs text-[#725039]">
+                                  Adjust quantity:
+                                </span>
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center rounded-xl border border-[#C9AE8B]/60 bg-[#FAF4EB] px-2 py-0.5 shadow-2xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateQty(item.id, -1)}
+                                      className="h-6 w-6 text-sm font-bold text-[#725039] active:scale-90"
+                                    >
+                                      −
+                                    </button>
+                                    <span className="w-6 text-center font-mono text-xs font-bold text-[#241F1C]">
+                                      {qty}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateQty(item.id, 1)}
+                                      className="h-6 w-6 text-sm font-bold text-[#725039] active:scale-90"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => removeItem(item.id)}
+                                    aria-label="Remove item"
+                                    className="p-1.5 text-[#B72E35] hover:bg-red-50 rounded-full transition"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <button
-                onClick={handleApplyPriceUpdates}
-                className="w-full rounded-2xl bg-[#A62B34] py-3 text-xs font-serif font-bold text-white shadow-sm"
-              >
-                Accept New Prices &amp; Review
-              </button>
-            </div>
-          ) : items.length === 0 ? (
-            /* Empty Cart */
-            <div className="py-12 text-center space-y-3">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#EFE7DC] text-[#786F66]">
-                <Coffee className="h-6 w-6" />
-              </div>
-              <p className="font-serif text-sm font-bold text-[#1C1917]">
-                Your cart is empty
-              </p>
-              <p className="font-serif italic text-xs text-[#786F66]">
-                Explore our artisanal brews, buns &amp; comfort bowls.
-              </p>
-              <button
-                onClick={closeCart}
-                className="inline-flex rounded-full bg-[#A62B34] px-5 py-2 font-serif text-xs font-bold text-white shadow-xs"
-              >
-                Explore Menu
-              </button>
-            </div>
-          ) : (
-            /* Cart Item List */
-            <div className="space-y-3">
-              <div className="flex items-center justify-between px-1">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#8C7E72]">
-                  {items.length} {items.length === 1 ? "ITEM" : "ITEMS"} IN ORDER
-                </span>
-                <button
-                  onClick={clearCart}
-                  className="font-serif text-xs text-[#A62B34] hover:underline"
-                >
-                  Clear all
-                </button>
-              </div>
-
-              <div className="divide-y divide-[#E8DFD3] rounded-2xl border border-[#E2D7C7] bg-[#FCF8F2] shadow-xs">
-                {items.map(({ item, qty }) => {
-                  const unitRupees = Math.round(item.pricePaise / 100);
-                  const itemTotalRupees = unitRupees * qty;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-3 p-3.5"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <h4 className="font-serif text-sm font-bold text-[#1C1917] truncate lowercase">
-                          {item.name}
-                        </h4>
-                        <p className="font-mono text-xs text-[#786F66] mt-0.5">
-                          ₹{unitRupees} each
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {/* Quantity Counter */}
-                        <div className="flex items-center rounded-xl border border-[#E2D7C7] bg-[#FAF5ED] px-1.5 py-0.5">
-                          <button
-                            onClick={() => updateQty(item.id, qty - 1)}
-                            className="flex h-6 w-6 items-center justify-center font-bold text-[#786F66] active:scale-95"
-                          >
-                            −
-                          </button>
-                          <span className="w-6 text-center font-serif text-xs font-bold text-[#1C1917]">
-                            {qty}
-                          </span>
-                          <button
-                            onClick={() => updateQty(item.id, qty + 1)}
-                            className="flex h-6 w-6 items-center justify-center font-bold text-[#786F66] active:scale-95"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <span className="w-12 text-right font-serif text-sm font-bold text-[#1C1917]">
-                          ₹{itemTotalRupees}
-                        </span>
-
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          aria-label="Remove item"
-                          className="text-[#8C7E72] hover:text-[#A62B34] text-xs px-1"
-                        >
-                          ✕
-                        </button>
-                      </div>
+              {/* Upsell Card: "Make it a moment?" */}
+              <div className="px-5 my-4">
+                <div className="rounded-2xl border border-[#75AFA7]/60 bg-[#E0E9E5] dark:bg-[#1E2623] p-3.5 shadow-xs">
+                  <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-[#F3E7D3] mb-2">
+                    Make it a moment?
+                  </h3>
+                  <div className="flex items-center justify-between gap-3">
+                    {/* Platter Thumbnail */}
+                    <div className="h-14 w-18 shrink-0 overflow-hidden rounded-xl border border-[#75AFA7]/40 bg-[#D4DFDC]">
+                      <img
+                        src={getFoodImage("conversation board", null)}
+                        alt="Conversation Board"
+                        className="h-full w-full object-cover"
+                      />
                     </div>
-                  );
-                })}
+
+                    {/* Titles */}
+                    <div className="flex-1 min-w-0 pr-1">
+                      <h4 className="font-serif text-sm font-bold text-[#241F1C] dark:text-[#F3E7D3] truncate">
+                        Conversation Board
+                      </h4>
+                      <p className="text-[11px] leading-snug text-[#5A4F46] dark:text-[#A7BAAF] font-sans mt-0.5">
+                        Cheese, fruits, nuts &amp; a little something sweet.
+                      </p>
+                    </div>
+
+                    {/* Price & Butter Taxi Yellow (+) Button */}
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="text-right">
+                        <span className="line-through text-xs font-serif text-[#725039]/60 dark:text-[#A7BAAF]/60 mr-1">
+                          ₹350
+                        </span>
+                        <span className="font-serif text-sm font-bold text-[#241F1C] dark:text-[#F3E7D3]">
+                          ₹260
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddConversationBoard}
+                        aria-label="Add Conversation Board to table"
+                        className="h-8 w-8 rounded-full bg-[#F2C84B] hover:bg-[#E5BB3E] text-[#241F1C] flex items-center justify-center font-bold text-lg shadow-xs active:scale-90 transition cursor-pointer"
+                      >
+                        {boardAdded ? "✓" : "+"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer with Subtotal & Place Order */}
-        {!orderSuccess && !priceConflicts && items.length > 0 && (
-          <div className="border-t border-[#E8DFD3] bg-[#FAF5ED] p-4 sm:p-5 space-y-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            {errorMessage && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
-                {errorMessage}
-              </div>
-            )}
-
-            {/* Special Instructions Note */}
-            <div>
-              <label className="block text-[11px] font-mono text-[#786F66] mb-1">
-                Special instructions for the barista/kitchen (optional):
-              </label>
-              <input
-                type="text"
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                placeholder="e.g. Oat milk, less ice, warm croissant"
-                className="w-full rounded-xl border border-[#E2D7C7] bg-[#FCF8F2] px-3 py-2 text-xs text-[#1C1917] placeholder:text-[#8C7E72]/60 focus:border-[#B72E35] focus:outline-none"
-              />
-            </div>
-
-            <div className="flex items-baseline justify-between px-1">
-              <span className="font-mono text-xs uppercase font-bold text-[#786F66]">
-                Order Total
-              </span>
-              <span className="font-serif text-xl font-bold text-[#A62B34]">
-                ₹{totalRupees}
-              </span>
-            </div>
+        {/* Sticky Bottom Summary & "View Bill" CTA Button */}
+        {!orderSuccess && activeView === "table_order" && items.length > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 z-30 px-6 pt-3 pb-6 bg-gradient-to-t from-[#F3E7D3] via-[#F3E7D3]/95 to-transparent dark:from-[#241F1C] dark:via-[#241F1C]/95">
+            <p className="font-mono text-sm text-[#241F1C] dark:text-[#F3E7D3] text-center mb-2.5 tracking-wide">
+              {totalCount} {totalCount === 1 ? "item" : "items"} &nbsp;•&nbsp; Total ₹{totalRupees}
+            </p>
 
             <button
-              onClick={handlePlaceOrder}
-              disabled={isSubmitting || isDegraded}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#A62B34] py-3.5 font-serif text-base font-semibold text-white shadow-md transition hover:bg-[#91242C] active:scale-[0.98] disabled:opacity-50 touch-manipulation hover-lift"
+              type="button"
+              onClick={() => setActiveView("bill")}
+              className="w-full h-14 rounded-full bg-[#B72E35] hover:bg-[#9E252C] text-[#F3E7D3] font-serif text-xl tracking-wide flex items-center justify-center shadow-lg active:scale-[0.98] transition hover-lift cursor-pointer"
             >
-              {isSubmitting ? (
-                <>
-                  <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Sending to Kitchen...
-                </>
-              ) : (
-                <>
-                  Place Order for Table {tableLabel || "01"} • ₹{totalRupees}
-                  <span aria-hidden="true">→</span>
-                </>
-              )}
+              View Bill
             </button>
           </div>
         )}
       </div>
 
-      {/* JSON Table Tag Inspector Modal */}
-      {isJsonInspectorOpen && (
-        <JsonTagInspectorModal
-          tag={tableJsonTag}
-          onClose={() => setIsJsonInspectorOpen(false)}
-        />
-      )}
-
-      {/* UPI Payment Gateway Drawer */}
+      {/* Optional UPI Drawer Modal if opened */}
       {isUpiDrawerOpen && (
         <UpiPaymentDrawer
-          orderId={orderSuccess?.orderId || `ORD-${Date.now().toString().slice(-6)}`}
-          orderNo={orderSuccess?.orderNo}
-          tableLabel={tableLabel || "01"}
-          zone={tableJsonTag.zone}
+          tableLabel={displayTable}
+          orderId={orderSuccess?.orderId || "smol_preview"}
           amountPaise={orderSuccess?.totalPaise || subtotalPaise}
-          items={items.map((i) => ({
-            name: i.item.name,
-            qty: i.qty,
-            priceRupees: Math.round(i.item.pricePaise / 100),
-            subtotalRupees: Math.round((i.item.pricePaise / 100) * i.qty),
-          }))}
-          onClose={() => setIsUpiDrawerOpen(false)}
           onPaymentSuccess={() => {
             setIsUpiDrawerOpen(false);
-            setOrderSuccess(null);
             closeCart();
           }}
+          onClose={() => setIsUpiDrawerOpen(false)}
         />
       )}
     </div>

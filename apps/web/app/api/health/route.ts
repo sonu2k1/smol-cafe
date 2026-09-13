@@ -13,7 +13,7 @@ export async function GET() {
   try {
     const startTime = performance.now();
     // Quick query to check database connectivity
-    const { error } = await supabase.from("categories").select("id").limit(1);
+    const { error } = await supabase.from("locations").select("id").limit(1);
     const dbLatencyMs = Math.round(performance.now() - startTime);
 
     if (error) {
