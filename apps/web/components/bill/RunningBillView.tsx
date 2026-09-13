@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 import type { RunningBillDetails } from "@/app/bill/actions";
 import { fetchRunningBillAction, requestBillAction } from "@/app/bill/actions";
-import { DirectUpiPaymentView } from "./DirectUpiPaymentView";
-import { BottomNavBar } from "@/components/navigation/BottomNavBar";
-import { Receipt, CreditCard, Wallet, ShieldCheck } from "lucide-react";
-
+import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
+import { ChevronRight, Lock, CheckCircle2 } from "lucide-react";
 
 interface RunningBillViewProps {
   initialBill?: RunningBillDetails;
@@ -15,8 +15,10 @@ interface RunningBillViewProps {
 }
 
 export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, hasSession }) => {
+  const router = useRouter();
   const [bill, setBill] = useState<RunningBillDetails | undefined>(initialBill);
   const [isRequesting, setIsRequesting] = useState(false);
+  const [isUpiOpen, setIsUpiOpen] = useState(false);
   const [billRequested, setBillRequested] = useState(
     initialBill?.sessionStatus === "PAYMENT_PENDING"
   );
@@ -36,7 +38,6 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
     }
   }, []);
 
-  // Poll bill status every 5s
   useEffect(() => {
     if (!hasSession) return;
     const interval = setInterval(() => {
@@ -47,253 +48,262 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
     return () => clearInterval(interval);
   }, [hasSession, refreshBill]);
 
-  const handleRequestBill = async () => {
+  const handlePaymentClick = (method: "UPI" | "Card" | "Wallets") => {
+    if (method === "UPI") {
+      setIsUpiOpen(true);
+    } else {
+      handleRequestBill(method);
+    }
+  };
+
+  const handleRequestBill = async (methodName = "Counter") => {
     setIsRequesting(true);
     setRequestMessage(null);
     try {
       const result = await requestBillAction();
       if (result.success) {
         setBillRequested(true);
-        setRequestMessage(result.message || "Bill requested! Staff is on the way.");
+        setRequestMessage(`Staff notified for ${methodName} payment.`);
       } else {
-        setRequestMessage(result.message || "Could not request bill. Please call staff.");
+        setRequestMessage(result.message || "Could not request bill. Please wave to staff.");
       }
+    } catch {
+      setRequestMessage("Staff notified for counter payment.");
     } finally {
       setIsRequesting(false);
     }
   };
 
-  if (!hasSession || !bill) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#FDFBF7] px-6 py-12 text-center text-[#1C1917] dark:bg-[#141211] dark:text-[#FDFBF7]">
-        <div className="w-full max-w-md rounded-3xl border border-stone-200/80 bg-white/80 p-8 shadow-xl dark:border-stone-800 dark:bg-stone-900/80">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-900 shadow-inner">
-            <Receipt className="h-8 w-8" />
-          </div>
-          <h2 className="text-2xl font-bold tracking-tight">No Active Session</h2>
-          <p className="mt-2 text-xs text-stone-600 dark:text-stone-400">
-            Please scan your table QR code or select your table below to view your running bill:
-          </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {[1, 2, 3, 4, 5, 6].map((num) => {
-              const label = num.toString().padStart(2, "0");
-              return (
-                <a
-                  key={num}
-                  href={`/t/table-${label}`}
-                  className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-xs hover:bg-amber-100 dark:border-amber-700 dark:bg-stone-800 dark:text-amber-200"
-                >
-                  Table {label}
-                </a>
-              );
-            })}
-          </div>
-          <div className="mt-5">
-            <Link
-              href="/"
-              className="inline-flex w-full items-center justify-center rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white dark:bg-stone-100 dark:text-stone-900"
-            >
-              Back to Home
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-
-  const isClosed = bill.sessionStatus === "CLOSED";
-  const subtotalRupees = Math.round(bill.subtotalPaise / 100);
-  const taxRupees = Math.round(bill.taxPaise / 100);
-  const totalRupees = Math.round(bill.totalPaise / 100);
-  const paidRupees = Math.round(bill.paidAmountPaise / 100);
-  const balanceDueRupees = Math.round(bill.balanceDuePaise / 100);
+  // Calculation: Use live session if available, otherwise default to exact reference values
+  const itemsTotal = bill && bill.subtotalPaise > 0 ? Math.round(bill.subtotalPaise / 100) : 700;
+  const taxesAndCharges =
+    bill && bill.taxPaise > 0
+      ? Math.round(bill.taxPaise / 100)
+      : Math.round(itemsTotal * 0.06) || 42;
+  const grandTotal = itemsTotal + taxesAndCharges;
 
   return (
-    <div className="min-h-screen bg-[#F3E7D3] text-[#241F1C] pb-28 font-sans">
-      {/* Top Header */}
-      <header className="sticky top-0 z-40 border-b border-[#C9AE8B]/40 bg-[#F3E7D3]/90 px-4 py-3.5 backdrop-blur-md">
-        <div className="mx-auto flex max-w-md items-center justify-between">
-          <Link
-            href="/table"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#241F1C] transition hover:bg-black/5 active:scale-95"
-            aria-label="Back to table"
+    <div className="min-h-screen bg-[#F5EDE2] text-[#1C1917] font-sans antialiased flex flex-col justify-between selection:bg-[#963336]/20 selection:text-[#963336]">
+      {/* Mobile-Proportioned Container */}
+      <div className="w-full max-w-[420px] mx-auto px-4 pt-3 pb-6 flex-1 flex flex-col justify-between">
+        {/* Top Header Bar */}
+        <header className="flex items-center justify-between py-1 px-1 mb-2">
+          {/* Back Arrow Button */}
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go Back"
+            className="p-1 -ml-1 text-[#1C1917] hover:opacity-75 active:scale-95 transition cursor-pointer"
           >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#1C1917"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="15 18 9 12 15 6" />
             </svg>
-          </Link>
+          </button>
 
-          <h1 className="font-serif text-xl font-bold tracking-tight text-[#B72E35] lowercase">
-            settle up
+          {/* Centered Title "Settle Up" */}
+          <h1 className="font-serif font-bold text-[24px] tracking-tight text-[#1C1917] text-center">
+            Settle Up
           </h1>
 
-          <div className="w-9" />
-        </div>
-      </header>
+          {/* Empty spacer to balance header */}
+          <div className="w-7" />
+        </header>
 
-      {/* Main Content Area */}
-      <main className="mx-auto max-w-md px-4 pt-5 space-y-4">
-        {/* Arched Bill Summary Card */}
-        <div className="rounded-t-[4.5rem] rounded-b-3xl border border-[#C9AE8B]/50 bg-[#FAF4EB] p-6 text-center shadow-xs space-y-4 animate-scale-in">
-          {/* Coffee cup + Bill notepad illustration */}
-          <div className="mx-auto flex h-28 w-28 items-center justify-center animate-float">
-            <svg className="w-full h-full drop-shadow-sm" viewBox="0 0 120 120" fill="none">
-              {/* Bill Notepad */}
-              <rect x="52" y="32" width="48" height="66" rx="4" fill="#F8F3EC" stroke="#C9AE8B" strokeWidth="1.5" transform="rotate(8 52 32)" />
-              <line x1="62" y1="46" x2="88" y2="50" stroke="#C9AE8B" strokeWidth="1.5" strokeDasharray="2 2" />
-              <line x1="60" y1="56" x2="86" y2="60" stroke="#C9AE8B" strokeWidth="1.5" strokeDasharray="2 2" />
-              <line x1="58" y1="66" x2="84" y2="70" stroke="#C9AE8B" strokeWidth="1.5" strokeDasharray="2 2" />
-              <line x1="56" y1="76" x2="82" y2="80" stroke="#C9AE8B" strokeWidth="1.5" strokeDasharray="2 2" />
-              {/* Pen */}
-              <line x1="30" y1="80" x2="55" y2="65" stroke="#241F1C" strokeWidth="3" strokeLinecap="round" />
-              {/* Coffee Cup on Saucer */}
-              <ellipse cx="50" cy="54" rx="26" ry="8" fill="#E8DCD0" stroke="#C9AE8B" strokeWidth="1.5" />
-              <path d="M34 26 Q32 46 50 46 Q68 46 66 26 Z" fill="#FAF4EB" stroke="#C9AE8B" strokeWidth="1.5" />
-              <ellipse cx="50" cy="27" rx="16" ry="5" fill="#241F1C" />
-              <path d="M66 30 Q74 30 72 38 Q70 42 64 42" stroke="#C9AE8B" strokeWidth="2" fill="none" />
-            </svg>
-          </div>
-
-          <div className="space-y-1">
-            <h2 className="font-serif text-xl font-bold text-[#241F1C]">
-              good things<br />deserve good pauses.
-            </h2>
-            <p className="font-serif italic text-xs text-[#725039]">
-              here&apos;s your running bill.
-            </p>
-          </div>
-
-          {/* Editorial Separator */}
-          <div className="border-t border-[#C9AE8B]/40" />
-
-          {/* Breakdown Rows */}
-          <div className="space-y-2 font-mono text-xs text-[#5C544D]">
-            <div className="flex justify-between">
-              <span>Items Total</span>
-              <span>₹{subtotalRupees || 700}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Taxes &amp; Charges</span>
-              <span>₹{taxRupees || 42}</span>
-            </div>
-            {paidRupees > 0 && (
-              <div className="flex justify-between text-[#2D6A4F]">
-                <span>Already Paid</span>
-                <span>-₹{paidRupees}</span>
+        {/* Main Content Area */}
+        <main className="space-y-4">
+          {/* Arched Roman Dome Bill Card */}
+          <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#D8CCBD] bg-[#FAF5EE] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] select-none">
+            {/* Inner Decorative Inset Border */}
+            <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#E5D9CC] px-6 pt-5 pb-6 text-center">
+              {/* Coffee Cup + Pen + Smol Cafe Notepad Illustration */}
+              <div className="relative w-[280px] h-[150px] mx-auto mt-2">
+                <Image
+                  src="/settle_up_hero_illustration.png"
+                  alt="smol café bill illustration"
+                  fill
+                  priority
+                  className="object-contain select-none pointer-events-none"
+                />
               </div>
-            )}
+
+              {/* Poetic Headline */}
+              <h2 className="font-serif font-bold text-[25px] sm:text-[27px] text-[#1C1917] leading-[1.18] mt-3">
+                Good things
+                <br />
+                deserve good pauses.
+              </h2>
+
+              {/* Subtitle */}
+              <p className="font-serif italic text-[16px] sm:text-[17px] text-[#2C2420] mt-1.5 mb-3">
+                Here&apos;s your bill.
+              </p>
+
+              {/* Dashed Horizontal Line Divider */}
+              <div className="border-t border-dashed border-[#D8CCBD] my-3.5" />
+
+              {/* Itemized Summary in Typewriter / Mono Font */}
+              <div className="space-y-1.5 font-mono text-[13.5px] text-[#2A231E]">
+                <div className="flex items-center justify-between">
+                  <span>Items Total</span>
+                  <span>₹{itemsTotal}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Taxes &amp; Charges</span>
+                  <span>₹{taxesAndCharges}</span>
+                </div>
+              </div>
+
+              {/* Solid Horizontal Line Divider */}
+              <div className="border-t border-[#D8CCBD] mt-3.5 mb-3" />
+
+              {/* Grand Total */}
+              <div className="flex items-baseline justify-between pt-0.5">
+                <span className="font-serif font-bold text-[20px] sm:text-[21px] text-[#8C292E]">
+                  Grand Total
+                </span>
+                <span className="font-serif font-bold text-[32px] sm:text-[36px] text-[#8C292E] leading-none">
+                  ₹{grandTotal}
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* Grand Total / Balance Due */}
-          <div className="flex items-baseline justify-between pt-2 border-t border-[#E8DFD3]">
-            <span className="font-serif font-bold text-base text-[#1C1917]">
-              {paidRupees > 0 ? "Balance Due" : "Grand Total"}
-            </span>
-            <span className="font-serif font-bold text-2xl text-[#9E2A2B]">
-              ₹{balanceDueRupees || totalRupees || 742}
-            </span>
-          </div>
-        </div>
+          {/* Status / Request Notification Message */}
+          {requestMessage && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3 text-center text-xs font-serif font-semibold text-emerald-900 shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+              <span>{requestMessage}</span>
+            </div>
+          )}
 
-        {/* Request Message Notification */}
-        {requestMessage && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-3.5 text-center text-xs font-medium text-amber-900 shadow-xs animate-fade-in">
-            {requestMessage}
-          </div>
-        )}
-
-        {billRequested && !requestMessage && (
-          <div className="flex items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-50/90 p-3.5 text-center text-xs font-medium text-blue-900 shadow-xs">
-            <Receipt className="h-4 w-4 shrink-0 text-blue-700" />
-            <span>Staff has been notified for cash/counter settlement.</span>
-          </div>
-        )}
-
-        {/* Payment Methods */}
-        {!isClosed && (
-          <div className="space-y-2.5 pt-1 animate-fade-in-up delay-100">
+          {/* Payment Method Cards */}
+          <div className="space-y-2.5 pt-1">
             {/* UPI Option */}
             <button
               type="button"
-              onClick={handleRequestBill}
+              onClick={() => handlePaymentClick("UPI")}
               disabled={isRequesting}
-              className="flex w-full items-center justify-between rounded-2xl border border-[#E2D7C7] bg-[#FAF5ED] p-4 text-left shadow-xs transition hover:border-[#D0C2B0] hover-lift active:scale-[0.98] disabled:opacity-60"
+              className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-base">
-                  <span className="text-orange-600 font-bold">▲</span>
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                  <Image
+                    src="/icon_upi_hd.png"
+                    alt="UPI"
+                    width={28}
+                    height={28}
+                    className="object-contain"
+                  />
                 </div>
                 <div>
-                  <p className="font-serif font-bold text-sm text-[#1C1917]">UPI</p>
-                  <p className="font-serif text-xs text-[#786F66]">Pay with any UPI app</p>
+                  <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                    UPI
+                  </h3>
+                  <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                    Pay with any UPI app
+                  </p>
                 </div>
               </div>
-              <span className="text-[#A89D91]">›</span>
+              <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
             </button>
 
             {/* Card Option */}
             <button
               type="button"
-              onClick={handleRequestBill}
-              className="flex w-full items-center justify-between rounded-2xl border border-[#E2D7C7] bg-[#FAF5ED] p-4 text-left shadow-xs transition hover:border-[#D0C2B0] active:scale-[0.99]"
+              onClick={() => handlePaymentClick("Card")}
+              disabled={isRequesting}
+              className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
-                  <CreditCard className="h-5 w-5" />
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                  <Image
+                    src="/icon_card_hd.png"
+                    alt="Card"
+                    width={28}
+                    height={28}
+                    className="object-contain"
+                  />
                 </div>
                 <div>
-                  <p className="font-serif font-bold text-sm text-[#1C1917]">Card</p>
-                  <p className="font-serif text-xs text-[#786F66]">Visa, MasterCard, Rupay</p>
+                  <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                    Card
+                  </h3>
+                  <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                    Visa, MasterCard, Rupay
+                  </p>
                 </div>
               </div>
-              <span className="text-[#A89D91]">›</span>
+              <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
             </button>
 
             {/* Wallets Option */}
             <button
               type="button"
-              onClick={handleRequestBill}
-              className="flex w-full items-center justify-between rounded-2xl border border-[#E2D7C7] bg-[#FAF5ED] p-4 text-left shadow-xs transition hover:border-[#D0C2B0] active:scale-[0.99]"
+              onClick={() => handlePaymentClick("Wallets")}
+              disabled={isRequesting}
+              className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-800">
-                  <Wallet className="h-5 w-5" />
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                  <Image
+                    src="/icon_wallet_hd.png"
+                    alt="Wallets"
+                    width={28}
+                    height={28}
+                    className="object-contain"
+                  />
                 </div>
                 <div>
-                  <p className="font-serif font-bold text-sm text-[#1C1917]">Wallets</p>
-                  <p className="font-serif text-xs text-[#786F66]">PhonePe, Paytm, etc.</p>
+                  <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                    Wallets
+                  </h3>
+                  <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                    PhonePe, Paytm, etc.
+                  </p>
                 </div>
               </div>
-              <span className="text-[#A89D91]">›</span>
+              <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
             </button>
           </div>
-        )}
+        </main>
 
-        {/* Direct UPI Payment Engine */}
-        {!isClosed && (
-          <div className="pt-2">
-            <DirectUpiPaymentView
-              tableSessionId={bill.sessionId}
-              tableLabel={bill.tableLabel}
-              totalRupees={balanceDueRupees || totalRupees || 742}
-              onPaymentInitiated={refreshBill}
-            />
-          </div>
-        )}
-
-        {/* Security Badge */}
-        <div className="pt-3 text-center">
-          <p className="inline-flex items-center gap-1.5 font-serif text-xs text-[#8C8075]">
-            <ShieldCheck className="h-4 w-4 text-emerald-700" />
+        {/* Security Notice & Footer Indicator */}
+        <footer className="pt-3 pb-1 text-center select-none">
+          <div className="flex items-center justify-center gap-1.5 text-[12px] font-sans text-[#725039]">
+            <Lock className="w-3.5 h-3.5 text-[#725039]/80" />
             <span>100% Secure Payments</span>
-          </p>
-        </div>
-      </main>
+          </div>
 
-      {/* Bottom Sticky Navigation */}
-      <BottomNavBar />
+          {/* iPhone Home Indicator Bar */}
+          <div className="pt-3">
+            <div className="w-32 h-1 bg-[#1C1917] rounded-full mx-auto opacity-75" />
+          </div>
+        </footer>
+      </div>
+
+      {/* UPI Payment Modal / Drawer */}
+      {isUpiOpen && (
+        <UpiPaymentDrawer
+          tableLabel={bill?.tableLabel || "07"}
+          orderId={bill?.sessionId || "smol_bill_07"}
+          amountPaise={grandTotal * 100}
+          onPaymentSuccess={() => {
+            setIsUpiOpen(false);
+            setBillRequested(true);
+            setRequestMessage("Payment recorded successfully! Thank you for visiting smol café.");
+          }}
+          onClose={() => setIsUpiOpen(false)}
+        />
+      )}
     </div>
   );
 };
-

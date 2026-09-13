@@ -29,6 +29,8 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
     pathname?.startsWith("/orders") ||
     pathname?.startsWith("/bill") ||
     pathname?.startsWith("/cart") ||
+    pathname === "/table" ||
+    pathname?.startsWith("/table") ||
     pathname?.startsWith("/profile");
 
   const isStaffWorkspace =

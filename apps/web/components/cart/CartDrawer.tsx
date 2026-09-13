@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { placeOrderAction, type ChangedItemDiff } from "@/app/menu/actions";
 import { useNetworkHealth } from "@/hooks/useNetworkHealth";
@@ -10,6 +11,7 @@ import { broadcastSyncEvent } from "@/lib/sync-events";
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
 import { getFoodImage } from "@/lib/food-images";
 import type { MenuItemWithDetails } from "@/lib/queries/menu";
+import { TableArchedCard } from "@/components/table/TableArchedCard";
 import {
   Menu as MenuIcon,
   Users,
@@ -20,6 +22,9 @@ import {
   Trash2,
   ArrowLeft,
   ChevronRight,
+  Plus,
+  Check,
+  Lock,
 } from "lucide-react";
 
 interface CartDrawerProps {
@@ -48,6 +53,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
   const [priceConflicts, setPriceConflicts] = useState<ChangedItemDiff[] | null>(null);
   const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
   const [boardAdded, setBoardAdded] = useState(false);
+  const [requestMessage, setRequestMessage] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState<{
     orderNo: number;
     orderId: string;
@@ -56,7 +62,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
   } | null>(null);
 
   const displayTable = tableLabel || "07";
-  const totalRupees = Math.round(subtotalPaise / 100);
+  const itemsTotal = items.reduce(
+    (sum, it) => sum + Math.round((it.item.pricePaise / 100) * it.qty),
+    0
+  );
+  const taxesAndCharges = Math.round(itemsTotal * 0.06);
+  const grandTotal = itemsTotal + taxesAndCharges;
+  const totalRupees = itemsTotal;
 
   // Group items by category: COFFEE, CHAI, FOOD
   const groupedItems = useMemo(() => {
@@ -199,35 +211,73 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
     >
       {/* Mobile-first Phone Modal / Drawer Frame matching user mockup */}
       <div
-        className="relative flex h-[92vh] sm:h-[88vh] w-full max-w-lg sm:max-w-[425px] flex-col rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-[#C9AE8B]/60 bg-[#F3E7D3] dark:bg-[#241F1C] text-[#241F1C] dark:text-[#F3E7D3] shadow-2xl overflow-hidden animate-fade-in-up"
+        className="relative flex h-[92vh] sm:h-[88vh] w-full max-w-lg sm:max-w-[425px] flex-col rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-[#D8CCBD] bg-[#F4ECE1] text-[#1C1917] shadow-2xl overflow-hidden animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Navigation Bar */}
-        <div className="sticky top-0 z-20 flex items-center justify-between px-6 pt-5 pb-3 bg-[#F3E7D3]/95 dark:bg-[#241F1C]/95 backdrop-blur-xs border-b border-[#C9AE8B]/20">
-          <button
-            type="button"
-            onClick={closeCart}
-            aria-label="Open navigation menu"
-            className="flex h-8 w-8 items-center justify-center text-[#241F1C] dark:text-[#F3E7D3] hover:opacity-75 transition active:scale-95"
-          >
-            <MenuIcon className="h-6 w-6 stroke-[2]" />
-          </button>
+        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3.5 pb-2 bg-[#F4ECE1] border-b border-[#E8DFD3]/40">
+          {activeView === "bill" ? (
+            <button
+              type="button"
+              onClick={() => setActiveView("table_order")}
+              aria-label="Back to table order"
+              className="p-1 -ml-1 text-[#1C1917] hover:opacity-75 active:scale-95 transition cursor-pointer"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#1C1917"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={closeCart}
+              aria-label="Close cart"
+              className="p-1 -ml-1 text-[#1C1917] hover:opacity-75 transition active:scale-95 cursor-pointer"
+            >
+              <svg
+                width="24"
+                height="20"
+                viewBox="0 0 24 20"
+                fill="none"
+                stroke="#1C1917"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              >
+                <line x1="2" y1="3" x2="22" y2="3" />
+                <line x1="2" y1="10" x2="22" y2="10" />
+                <line x1="2" y1="17" x2="22" y2="17" />
+              </svg>
+            </button>
+          )}
 
-          <h2 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3]">
-            Your Table
+          <h2 className="font-serif text-[24px] font-bold tracking-tight text-[#1C1917] text-center">
+            {activeView === "bill" ? "Settle Up" : "Your Table"}
           </h2>
 
-          <button
-            type="button"
-            onClick={closeCart}
-            className="font-serif text-base font-semibold text-[#B72E35] hover:opacity-85 transition active:scale-95"
-          >
-            Add more
-          </button>
+          {activeView === "bill" ? (
+            <div className="w-7" />
+          ) : (
+            <button
+              type="button"
+              onClick={closeCart}
+              className="font-serif text-[15px] font-medium text-[#8C292E] hover:opacity-85 transition active:scale-95 cursor-pointer"
+            >
+              Add more
+            </button>
+          )}
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto pb-28">
+        <div className="flex-1 overflow-y-auto pb-24">
           {orderSuccess ? (
             /* Order Success View */
             <div className="p-6 text-center space-y-4 animate-fade-in">
@@ -238,23 +288,23 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                 <span className="inline-block rounded-md bg-amber-100 px-2.5 py-0.5 font-mono text-[10px] font-bold text-amber-900 uppercase">
                   CONFIRMED WITH KITCHEN
                 </span>
-                <h3 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3] mt-1">
+                <h3 className="font-serif text-2xl font-bold text-[#241F1C] mt-2">
                   Order #{orderSuccess.orderNo} Placed!
                 </h3>
-                <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] max-w-xs mx-auto mt-1">
-                  Your table order is actively being prepared.
+                <p className="font-serif italic text-xs text-[#725039] mt-1">
+                  Our baristas and kitchen team are preparing your order.
                 </p>
               </div>
 
               {/* Table PIN Plaque */}
-              <div className="rounded-3xl border-2 border-[#F2C84B] bg-[#FFF8E7] dark:bg-[#2A231E] p-4 text-center shadow-md">
+              <div className="rounded-3xl border-2 border-[#F2C84B] bg-[#FFF8E7] p-4 text-center shadow-md">
                 <span className="block font-mono text-[10px] uppercase font-bold text-[#725039] tracking-wider">
                   TABLE VERIFICATION PIN
                 </span>
                 <span className="block font-mono text-3xl font-black text-[#B72E35] tracking-widest mt-0.5">
                   {orderSuccess.verificationCode || "4821"}
                 </span>
-                <p className="text-[10px] font-mono text-[#725039] dark:text-[#C9AE8B] mt-1">
+                <p className="text-[10px] font-mono text-[#725039] mt-1">
                   Table {displayTable} • Instant Verification
                 </p>
               </div>
@@ -281,281 +331,372 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
               </div>
             </div>
           ) : activeView === "bill" ? (
-            /* Bill Breakdown View */
-            <div className="p-6 space-y-4 animate-fade-in">
-              <div className="flex items-center justify-between pb-3 border-b border-[#C9AE8B]/30">
-                <button
-                  type="button"
-                  onClick={() => setActiveView("table_order")}
-                  className="inline-flex items-center gap-1.5 font-serif text-sm text-[#725039] hover:text-[#B72E35]"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Back to Table
-                </button>
-                <span className="font-mono text-xs text-[#725039]">TABLE {displayTable}</span>
-              </div>
+            /* Settle Up / Bill View inside same popup matching user design */
+            <div className="p-4 sm:p-5 space-y-4 animate-fade-in">
+              {/* Arched Roman Dome Bill Card */}
+              <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#D8CCBD] bg-[#FAF5EE] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] select-none">
+                {/* Inner Decorative Inset Border */}
+                <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#E5D9CC] px-5 pt-4 pb-5 text-center">
+                  {/* Coffee Cup + Pen + Smol Cafe Notepad Illustration */}
+                  <div className="relative w-[260px] h-[140px] mx-auto mt-2">
+                    <Image
+                      src="/settle_up_hero_illustration.png"
+                      alt="smol café bill illustration"
+                      fill
+                      priority
+                      className="object-contain select-none pointer-events-none"
+                    />
+                  </div>
 
-              {/* Receipt Breakdown */}
-              <div className="rounded-2xl border border-[#C9AE8B]/50 bg-[#FAF4EB] dark:bg-[#2A231E] p-4 shadow-xs space-y-3">
-                <h4 className="font-serif text-lg font-bold text-[#241F1C] dark:text-[#F3E7D3] border-b border-[#C9AE8B]/30 pb-2">
-                  Bill Summary
-                </h4>
-                <div className="space-y-2 text-sm">
-                  {items.map(({ item, qty }) => (
-                    <div key={item.id} className="flex justify-between font-serif">
-                      <span>
-                        {qty} × {item.name}
-                      </span>
-                      <span className="font-mono">
-                        ₹{Math.round((item.pricePaise / 100) * qty)}
-                      </span>
+                  {/* Poetic Headline */}
+                  <h2 className="font-serif font-bold text-[24px] sm:text-[26px] text-[#1C1917] leading-[1.18] mt-3">
+                    Good things
+                    <br />
+                    deserve good pauses.
+                  </h2>
+
+                  {/* Subtitle */}
+                  <p className="font-serif italic text-[15px] sm:text-[16px] text-[#2C2420] mt-1.5 mb-3">
+                    Here&apos;s your bill.
+                  </p>
+
+                  {/* Dashed Horizontal Line Divider */}
+                  <div className="border-t border-dashed border-[#D8CCBD] my-3.5" />
+
+                  {/* Itemized Summary in Typewriter / Mono Font */}
+                  <div className="space-y-1.5 font-mono text-[13.5px] text-[#2A231E]">
+                    <div className="flex items-center justify-between">
+                      <span>Items Total</span>
+                      <span>₹{itemsTotal}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex items-center justify-between">
+                      <span>Taxes &amp; Charges</span>
+                      <span>₹{taxesAndCharges}</span>
+                    </div>
+                  </div>
 
-                <div className="border-t border-[#C9AE8B]/30 pt-3 space-y-1.5 text-xs text-[#725039] dark:text-[#C9AE8B]">
-                  <div className="flex justify-between">
-                    <span>Subtotal</span>
-                    <span className="font-mono">₹{totalRupees}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>GST (5% included)</span>
-                    <span className="font-mono">₹{Math.round(totalRupees * 0.05)}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-[#C9AE8B]/30 pt-2 font-serif text-base font-bold text-[#241F1C] dark:text-[#F3E7D3]">
-                    <span>Total Payable</span>
-                    <span className="font-mono">₹{totalRupees}</span>
+                  {/* Solid Horizontal Line Divider */}
+                  <div className="border-t border-[#D8CCBD] mt-3.5 mb-3" />
+
+                  {/* Grand Total */}
+                  <div className="flex items-baseline justify-between pt-0.5">
+                    <span className="font-serif font-bold text-[19px] sm:text-[20px] text-[#8C292E]">
+                      Grand Total
+                    </span>
+                    <span className="font-serif font-bold text-[30px] sm:text-[34px] text-[#8C292E] leading-none">
+                      ₹{grandTotal}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Special Instructions Note */}
-              <div>
-                <label className="block text-[11px] font-mono text-[#725039] mb-1">
-                  Notes for barista / kitchen:
-                </label>
-                <input
-                  type="text"
-                  value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
-                  placeholder="e.g. Less sweet, extra hot, no onions..."
-                  className="w-full rounded-xl border border-[#C9AE8B]/60 bg-[#FAF4EB] px-3 py-2 text-xs font-serif text-[#241F1C] focus:border-[#B72E35] focus:outline-hidden"
-                />
-              </div>
-
-              {errorMessage && (
-                <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-800">
-                  {errorMessage}
+              {/* Status / Request Notification Message */}
+              {requestMessage && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3 text-center text-xs font-serif font-semibold text-emerald-900 shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                  <span>{requestMessage}</span>
                 </div>
               )}
 
-              {/* Primary Action Button */}
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={handlePlaceOrder}
-                className="w-full h-14 rounded-full bg-[#B72E35] hover:bg-[#9E252C] text-[#F3E7D3] font-serif text-lg tracking-wide flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition hover-lift disabled:opacity-50"
-              >
-                {isSubmitting ? "Sending to Kitchen..." : "Confirm & Send to Kitchen"}
-              </button>
+              {/* Payment Method Cards */}
+              <div className="space-y-2.5 pt-1">
+                {/* UPI Option */}
+                <button
+                  type="button"
+                  onClick={() => setIsUpiDrawerOpen(true)}
+                  className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                      <Image
+                        src="/icon_upi_hd.png"
+                        alt="UPI"
+                        width={28}
+                        height={28}
+                        className="object-contain"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                        UPI
+                      </h3>
+                      <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                        Pay with any UPI app
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
+                </button>
+
+                {/* Card Option */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequestMessage("Staff notified for Card payment at table.");
+                    setTimeout(() => setRequestMessage(null), 4000);
+                  }}
+                  className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                      <Image
+                        src="/icon_card_hd.png"
+                        alt="Card"
+                        width={28}
+                        height={28}
+                        className="object-contain"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                        Card
+                      </h3>
+                      <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                        Visa, MasterCard, Rupay
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
+                </button>
+
+                {/* Wallets Option */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequestMessage("Staff notified for Wallet payment.");
+                    setTimeout(() => setRequestMessage(null), 4000);
+                  }}
+                  className="w-full rounded-[1.25rem] border border-[#D8CCBD] bg-[#FAF5EE] p-3.5 flex items-center justify-between hover:bg-[#F4ECE1] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                      <Image
+                        src="/icon_wallet_hd.png"
+                        alt="Wallets"
+                        width={28}
+                        height={28}
+                        className="object-contain"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="font-sans font-bold text-[15.5px] text-[#1C1917] leading-tight">
+                        Wallets
+                      </h3>
+                      <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                        Amazon Pay, Mobikwik &amp; more
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-[#8C7E72]" />
+                </button>
+              </div>
+
+              {/* 100% Secure Payments Assurance */}
+              <div className="pt-2 pb-2 text-center">
+                <div className="inline-flex items-center gap-1.5 font-mono text-[11px] text-[#8C7E72]">
+                  <Lock className="w-3.5 h-3.5 text-[#8C7E72]" />
+                  <span>100% Secure Payments</span>
+                </div>
+              </div>
             </div>
           ) : items.length === 0 ? (
             /* Empty Table Order */
             <div className="p-12 text-center space-y-3">
               <span className="block font-serif text-5xl">☕</span>
-              <p className="font-serif text-lg font-bold text-[#241F1C] dark:text-[#F3E7D3]">
+              <p className="font-serif text-lg font-bold text-[#241F1C]">
                 Your table is empty
               </p>
-              <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
+              <p className="font-serif italic text-xs text-[#725039]">
                 Explore our artisanal brews, sandwiches &amp; comfort bowls.
               </p>
               <button
                 type="button"
                 onClick={closeCart}
-                className="mt-3 inline-flex rounded-full bg-[#B72E35] px-6 py-2.5 font-serif text-sm font-semibold text-[#F3E7D3] shadow-xs"
+                className="mt-3 inline-flex rounded-full bg-[#963336] px-6 py-2.5 font-serif text-sm font-semibold text-white shadow-xs cursor-pointer"
               >
                 Browse Menu
               </button>
             </div>
           ) : (
-            /* Main "Your Table" View matching mockup 1:1 */
-            <div>
-              {/* Arched Table Header Plaque */}
-              <div className="relative mx-5 mt-3 pt-6 pb-4 text-center rounded-t-[3.5rem] border-t border-x border-[#C9AE8B]/40 bg-[#FAF4EB]/60 dark:bg-[#2A231E]/60 shadow-2xs">
-                <span className="block font-mono text-[11px] uppercase tracking-[0.25em] font-semibold text-[#725039] dark:text-[#C9AE8B]">
-                  TABLE
-                </span>
-                <span className="block font-serif text-5xl font-bold text-[#241F1C] dark:text-[#F3E7D3] mt-0.5 tracking-tight">
-                  {displayTable}
-                </span>
-                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#3A6059] px-3.5 py-0.5 text-xs text-white shadow-xs font-sans">
-                  <Users className="h-3 w-3" />
-                  <span>2 Guests</span>
-                </div>
-              </div>
+            /* Main "Your Table" View matching exact Image 1 design */
+            <div className="px-3 sm:px-4 pt-1">
+              <TableArchedCard
+                tableNumber={displayTable}
+                guestCount={2}
+              >
+                {/* Categorized Item List */}
+                <div className="w-full">
+                  {groupedItems.map(({ key, items: categoryItems }, groupIdx) => (
+                    <div key={key} className="w-full">
+                      {/* Category Header Bar */}
+                      <div className={`px-4 py-1.5 bg-[#FAF5EE] ${groupIdx > 0 ? "border-t" : ""} border-b border-[#E8DFD3]`}>
+                        <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-[#382E28]">
+                          {key}
+                        </span>
+                      </div>
 
-              {/* Grouped Category Sections */}
-              <div className="border-t border-[#C9AE8B]/40">
-                {groupedItems.map(({ key, items: categoryItems }) => (
-                  <div key={key}>
-                    {/* Category Header Row */}
-                    <div className="bg-[#EBE0CF]/50 dark:bg-[#2A231E] border-t border-b border-[#C9AE8B]/30 px-6 py-1.5 font-mono text-[11px] uppercase tracking-widest font-semibold text-[#725039] dark:text-[#C9AE8B]">
-                      {key}
-                    </div>
+                      {/* Items in this Category */}
+                      <div className="divide-y divide-[#EBE3D7]">
+                        {categoryItems.map(({ item, qty }) => {
+                          const unitRupees = Math.round(item.pricePaise / 100);
+                          const note = getCustomizationNote({ item, qty });
+                          const isActionOpen = activeActionItemId === item.id;
 
-                    {/* Category Items */}
-                    <div className="divide-y divide-[#C9AE8B]/20">
-                      {categoryItems.map(({ item, qty }) => {
-                        const unitRupees = Math.round(item.pricePaise / 100);
-                        const note = getCustomizationNote({ item, qty });
-                        const isActionOpen = activeActionItemId === item.id;
+                          return (
+                            <div key={item.id} className="transition-colors hover:bg-[#F5EDE1]/60">
+                              <div className="px-4 py-2 flex items-start justify-between gap-2">
+                                {/* Left: Quantity + Details */}
+                                <div className="flex items-start gap-2.5 min-w-0 pr-2">
+                                  <span className="font-serif font-bold text-[16px] text-[#1C1917] w-4 shrink-0 text-left pt-0.5">
+                                    {qty}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <h4 className="font-serif font-bold text-[15.5px] text-[#1C1917] leading-tight whitespace-pre-line">
+                                      {item.name.replace(/\s*\([^)]*\)/, "")}
+                                    </h4>
+                                    {note && (
+                                      <p className="font-mono text-[11.5px] text-[#332A24] mt-0.5 tracking-tight">
+                                        • {note}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
 
-                        return (
-                          <div key={item.id} className="transition-colors hover:bg-[#FAF4EB]/40">
-                            <div className="flex items-start justify-between px-6 py-3.5">
-                              {/* Left: Quantity + Title + Customization */}
-                              <div className="flex items-start gap-3.5 flex-1 min-w-0 pr-2">
-                                <span className="font-serif text-lg font-bold text-[#241F1C] dark:text-[#F3E7D3] w-5 shrink-0 pt-0.5">
-                                  {qty}
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-serif text-[15.5px] font-bold text-[#241F1C] dark:text-[#F3E7D3] leading-snug">
-                                    {item.name.replace(/\s*\([^)]*\)/, "")}
-                                  </h4>
-                                  {note && (
-                                    <p className="font-mono text-xs text-[#725039] dark:text-[#C9AE8B] mt-0.5">
-                                      • {note}
-                                    </p>
-                                  )}
+                                {/* Right: Price + "•••" Options Button */}
+                                <div className="flex items-center gap-3 shrink-0 pt-0.5">
+                                  <span className="font-serif font-medium text-[15.5px] text-[#1C1917] tracking-tight">
+                                    ₹{unitRupees * qty}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setActiveActionItemId(isActionOpen ? null : item.id)
+                                    }
+                                    aria-label="Item options"
+                                    className="text-[#1C1917] text-[18px] font-bold tracking-widest px-1 py-0.5 hover:opacity-60 active:scale-90 transition cursor-pointer"
+                                  >
+                                    •••
+                                  </button>
                                 </div>
                               </div>
 
-                              {/* Right: Price + Three Dots Action */}
-                              <div className="flex items-center gap-3 shrink-0 pt-0.5">
-                                <span className="font-serif text-base font-semibold text-[#241F1C] dark:text-[#F3E7D3]">
-                                  ₹{unitRupees * qty}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setActiveActionItemId(isActionOpen ? null : item.id)
-                                  }
-                                  aria-label="Item options"
-                                  className="text-[#241F1C] dark:text-[#F3E7D3] hover:text-[#B72E35] px-1 py-0.5 text-base tracking-widest font-bold transition active:scale-90"
-                                >
-                                  •••
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Expandable Mini Stepper Controls when user taps '•••' */}
-                            {isActionOpen && (
-                              <div className="flex items-center justify-between bg-[#EFE4D2]/60 dark:bg-[#1E1916] px-6 py-2 border-t border-[#C9AE8B]/20 animate-fade-in">
-                                <span className="font-mono text-xs text-[#725039]">
-                                  Adjust quantity:
-                                </span>
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center rounded-xl border border-[#C9AE8B]/60 bg-[#FAF4EB] px-2 py-0.5 shadow-2xs">
+                              {/* Expandable Stepper Controls when user taps '•••' */}
+                              {isActionOpen && (
+                                <div className="flex items-center justify-between bg-[#F5EDE1] px-4 py-2 border-t border-[#E8DFD3]">
+                                  <span className="text-xs font-mono text-[#725039]">Adjust quantity:</span>
+                                  <div className="flex items-center gap-2.5">
                                     <button
                                       type="button"
                                       onClick={() => updateQty(item.id, -1)}
-                                      className="h-6 w-6 text-sm font-bold text-[#725039] active:scale-90"
+                                      className="h-6 w-6 rounded-full border border-[#D8CCBD] bg-white font-mono text-xs font-bold text-[#1C1917] flex items-center justify-center hover:bg-stone-50"
                                     >
                                       −
                                     </button>
-                                    <span className="w-6 text-center font-mono text-xs font-bold text-[#241F1C]">
+                                    <span className="font-mono text-xs font-bold text-[#1C1917] min-w-4 text-center">
                                       {qty}
                                     </span>
                                     <button
                                       type="button"
                                       onClick={() => updateQty(item.id, 1)}
-                                      className="h-6 w-6 text-sm font-bold text-[#725039] active:scale-90"
+                                      className="h-6 w-6 rounded-full border border-[#D8CCBD] bg-white font-mono text-xs font-bold text-[#1C1917] flex items-center justify-center hover:bg-stone-50"
                                     >
                                       +
                                     </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeItem(item.id)}
+                                      className="p-1 text-[#963336] hover:bg-red-50 rounded-full transition ml-1"
+                                      aria-label="Remove item"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
                                   </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => removeItem(item.id)}
-                                    aria-label="Remove item"
-                                    className="p-1.5 text-[#B72E35] hover:bg-red-50 rounded-full transition"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Upsell Card: "Make it a moment?" */}
-              <div className="px-5 my-4">
-                <div className="rounded-2xl border border-[#75AFA7]/60 bg-[#E0E9E5] dark:bg-[#1E2623] p-3.5 shadow-xs">
-                  <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-[#F3E7D3] mb-2">
-                    Make it a moment?
-                  </h3>
-                  <div className="flex items-center justify-between gap-3">
-                    {/* Platter Thumbnail */}
-                    <div className="h-14 w-18 shrink-0 overflow-hidden rounded-xl border border-[#75AFA7]/40 bg-[#D4DFDC]">
-                      <img
-                        src={getFoodImage("conversation board", null)}
-                        alt="Conversation Board"
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-
-                    {/* Titles */}
-                    <div className="flex-1 min-w-0 pr-1">
-                      <h4 className="font-serif text-sm font-bold text-[#241F1C] dark:text-[#F3E7D3] truncate">
-                        Conversation Board
-                      </h4>
-                      <p className="text-[11px] leading-snug text-[#5A4F46] dark:text-[#A7BAAF] font-sans mt-0.5">
-                        Cheese, fruits, nuts &amp; a little something sweet.
-                      </p>
-                    </div>
-
-                    {/* Price & Butter Taxi Yellow (+) Button */}
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <div className="text-right">
-                        <span className="line-through text-xs font-serif text-[#725039]/60 dark:text-[#A7BAAF]/60 mr-1">
-                          ₹350
-                        </span>
-                        <span className="font-serif text-sm font-bold text-[#241F1C] dark:text-[#F3E7D3]">
-                          ₹260
-                        </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleAddConversationBoard}
-                        aria-label="Add Conversation Board to table"
-                        className="h-8 w-8 rounded-full bg-[#F2C84B] hover:bg-[#E5BB3E] text-[#241F1C] flex items-center justify-center font-bold text-lg shadow-xs active:scale-90 transition cursor-pointer"
-                      >
-                        {boardAdded ? "✓" : "+"}
-                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Upsell Card: "Make it a moment?" matching Image 1 */}
+                <div className="p-3">
+                  <div className="rounded-[1.4rem] border border-[#BCC9BD] bg-gradient-to-br from-[#DFE5DE] via-[#D7E1D6] to-[#CCD7CB] p-3 shadow-xs transition-all">
+                    <h3 className="font-serif font-semibold text-[16px] text-[#1C1917] mb-1.5">
+                      Make it a moment?
+                    </h3>
+
+                    <div className="flex items-center justify-between gap-2">
+                      {/* Left: Platter Illustration */}
+                      <div className="shrink-0 -ml-1 flex items-center justify-center">
+                        <Image
+                          src="/conversation_board_clean.png"
+                          alt="Conversation Board"
+                          width={100}
+                          height={64}
+                          className="w-[100px] h-[64px] object-contain select-none pointer-events-none"
+                        />
+                      </div>
+
+                      {/* Center: Title & Description */}
+                      <div className="flex-1 min-w-0 pr-1">
+                        <h4 className="font-serif font-bold text-[13.5px] text-[#1C1917] leading-snug truncate">
+                          Conversation Board
+                        </h4>
+                        <p className="font-mono text-[10.5px] text-[#374438] leading-tight mt-0.5">
+                          Cheese, fruits, nuts &amp; a little something sweet.
+                        </p>
+                      </div>
+
+                      {/* Right: Price & Golden Button */}
+                      <div className="flex flex-col items-end gap-1.5 shrink-0 pl-1">
+                        <div className="flex items-center gap-1 font-serif text-right">
+                          <span className="line-through font-mono text-[11px] text-[#617062]">
+                            ₹350
+                          </span>
+                          <span className="font-serif font-bold text-[13.5px] text-[#1C1917]">
+                            ₹260
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleAddConversationBoard}
+                          className={`w-9 h-9 rounded-full border border-[#231F1D] flex items-center justify-center transition-all duration-200 active:scale-90 shadow-xs cursor-pointer ${
+                            boardAdded || items.some((i) => i.item.id === "conversation_board")
+                              ? "bg-emerald-700 text-white border-emerald-900"
+                              : "bg-[#EBB974] text-[#1C1917] hover:bg-[#DEAB65]"
+                          }`}
+                          aria-label="Add Conversation Board"
+                        >
+                          {boardAdded || items.some((i) => i.item.id === "conversation_board") ? (
+                            <Check className="w-4 h-4 stroke-[2.5]" />
+                          ) : (
+                            <Plus className="w-4 h-4 stroke-[2.5]" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </TableArchedCard>
             </div>
           )}
         </div>
 
-        {/* Sticky Bottom Summary & "View Bill" CTA Button */}
+        {/* Sticky Bottom Summary & "View Bill" CTA Button matching Image 1 */}
         {!orderSuccess && activeView === "table_order" && items.length > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 z-30 px-6 pt-3 pb-6 bg-gradient-to-t from-[#F3E7D3] via-[#F3E7D3]/95 to-transparent dark:from-[#241F1C] dark:via-[#241F1C]/95">
-            <p className="font-mono text-sm text-[#241F1C] dark:text-[#F3E7D3] text-center mb-2.5 tracking-wide">
+          <div className="sticky bottom-0 left-0 right-0 z-30 px-5 pt-2 pb-5 bg-gradient-to-t from-[#F4ECE1] via-[#F4ECE1]/95 to-transparent">
+            <p className="font-serif text-[15px] font-medium text-[#1C1917] text-center mb-2 tracking-wide">
               {totalCount} {totalCount === 1 ? "item" : "items"} &nbsp;•&nbsp; Total ₹{totalRupees}
             </p>
 
             <button
               type="button"
               onClick={() => setActiveView("bill")}
-              className="w-full h-14 rounded-full bg-[#B72E35] hover:bg-[#9E252C] text-[#F3E7D3] font-serif text-xl tracking-wide flex items-center justify-center shadow-lg active:scale-[0.98] transition hover-lift cursor-pointer"
+              className="w-full rounded-full bg-[#963336] hover:bg-[#832B2E] text-white font-serif text-[17.5px] font-medium py-3.5 shadow-sm active:scale-[0.99] transition duration-150 cursor-pointer text-center block"
             >
               View Bill
             </button>
@@ -568,7 +709,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
         <UpiPaymentDrawer
           tableLabel={displayTable}
           orderId={orderSuccess?.orderId || "smol_preview"}
-          amountPaise={orderSuccess?.totalPaise || subtotalPaise}
+          amountPaise={orderSuccess?.totalPaise || (grandTotal > 0 ? grandTotal * 100 : subtotalPaise)}
           onPaymentSuccess={() => {
             setIsUpiDrawerOpen(false);
             closeCart();
