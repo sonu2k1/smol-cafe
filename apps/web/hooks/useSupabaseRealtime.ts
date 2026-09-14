@@ -66,7 +66,12 @@ export function useSupabaseRealtime({
       )
       .subscribe((status: string) => {
         if (status === "SUBSCRIBED") {
-          // Connected
+          // Connected - trigger refresh to reconcile any events missed during connection
+          if (onDataRef.current) {
+            onDataRef.current({ eventType: "SUBSCRIBED" });
+          }
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn(`[Realtime] Channel for ${table} status: ${status}, will reconcile.`);
         }
       });
 

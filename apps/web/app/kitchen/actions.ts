@@ -1,7 +1,8 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, isMockDatabase } from "@/lib/supabase/admin";
+import { broadcastSyncEvent } from "@/lib/sync-events";
 import type { OrderStatus } from "@smol-cafe/db";
 import { generateRequestId, logger } from "@/lib/observability/logger";
 import { recordKdsHeartbeat, evaluateKdsSilence } from "@/lib/observability/alerts";
@@ -52,12 +53,16 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
   recordKdsHeartbeat();
 
   try {
-    // 1. Fetch active confirmed orders only (orders must be confirmed by cashier first)
+    // 1. Fetch active orders across all 4 KDS phases: New, Preparing, Ready, and recent Completed
+    const activeStatuses = isMockDatabase()
+      ? ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED", "PREPARING", "READY", "SERVED", "COMPLETED"]
+      : ["SUBMITTED", "ACCEPTED", "PREPARING", "READY", "SERVED"];
+
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select("*")
-      .in("status", ["CONFIRMED", "ACCEPTED", "PREPARING", "READY"])
-      .order("submitted_at", { ascending: true });
+      .in("status", activeStatuses)
+      .order("created_at", { ascending: true });
 
     if (ordersError || !orders) {
       logger.error("Error fetching kitchen orders", {
@@ -103,21 +108,21 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
         }
 
         for (const s of sessions || []) {
-          const label = tableMap.get(s.table_id) || "Counter";
-          tableLabelMap.set(s.id, { label, tableId: s.table_id });
+          if (s.table_id && tableMap.has(s.table_id)) {
+            tableLabelMap.set(s.id, {
+              label: tableMap.get(s.table_id)!,
+              tableId: s.table_id,
+            });
+          }
         }
       }
     }
 
-    // 3. Fetch Order Items
-    const { data: orderItems, error: itemsError } = await supabase
+    // 3. Fetch order items for ticket breakdown
+    const { data: orderItems } = await supabase
       .from("order_items")
       .select("*")
       .in("order_id", orderIds);
-
-    if (itemsError) {
-      console.error("Error fetching order items for kitchen:", itemsError);
-    }
 
     const itemsByOrder = new Map<string, KitchenOrderItem[]>();
     for (const item of (orderItems as Array<{
@@ -134,7 +139,7 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
         id: item.id,
         name: item.name_snapshot,
         qty: item.qty,
-        itemStatus: item.item_status,
+        itemStatus: item.item_status || "PENDING",
       });
     }
 
@@ -173,9 +178,11 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
  */
 export async function transitionOrderStatusAction(
   orderId: string,
-  fromStatus: OrderStatus,
-  toStatus: OrderStatus
+  fromStatusOrTarget: OrderStatus,
+  targetStatus?: OrderStatus
 ): Promise<TransitionOrderResult> {
+  const fromStatus = targetStatus ? fromStatusOrTarget : undefined;
+  const toStatus = targetStatus || fromStatusOrTarget;
   const requestId = generateRequestId();
   const startTime = Date.now();
   const supabase = createAdminClient();
@@ -185,7 +192,7 @@ export async function transitionOrderStatusAction(
     // 1. Fetch current order status to prevent concurrent double-processing
     const { data: currentOrder, error: fetchErr } = await supabase
       .from("orders")
-      .select("status")
+      .select("status, accepted_at")
       .eq("id", orderId)
       .single();
 
@@ -202,14 +209,48 @@ export async function transitionOrderStatusAction(
       };
     }
 
-    if (currentOrder.status !== fromStatus) {
+    // Idempotent success if already in target status
+    if (currentOrder.status === toStatus) {
+      return {
+        success: true,
+        currentStatus: toStatus,
+      };
+    }
+
+    // Define valid 4-phase transition state machine
+    const isAllowedTransition = (curr: string, target: OrderStatus): boolean => {
+      // Phase 1 (New) -> Phase 2 (Preparing)
+      if (
+        ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED"].includes(curr) &&
+        target === "PREPARING"
+      ) {
+        return true;
+      }
+      // Phase 2 (Preparing) -> Phase 3 (Ready)
+      if (
+        ["PREPARING", "ACCEPTED", "CONFIRMED", "SUBMITTED"].includes(curr) &&
+        target === "READY"
+      ) {
+        return true;
+      }
+      // Phase 3 (Ready) -> Phase 4 (Complete)
+      if (
+        ["READY", "PREPARING", "ACCEPTED", "SUBMITTED"].includes(curr) &&
+        (target === "SERVED" || target === "COMPLETED")
+      ) {
+        return true;
+      }
+      return fromStatus ? curr === fromStatus : true;
+    };
+
+    if (!isAllowedTransition(currentOrder.status, toStatus)) {
       logger.warn(
-        `Status transition conflict: Expected ${fromStatus}, found ${currentOrder.status}`,
+        `Status transition conflict: Current ${currentOrder.status} cannot transition to ${toStatus}`,
         {
           requestId,
           orderId,
           action: "transitionOrderStatus",
-          data: { expected: fromStatus, actual: currentOrder.status },
+          data: { expected: fromStatus, actual: currentOrder.status, target: toStatus },
         }
       );
       return {
@@ -220,15 +261,18 @@ export async function transitionOrderStatusAction(
       };
     }
 
+    const normalizedToStatus: OrderStatus =
+      (toStatus as string) === "COMPLETED" ? "SERVED" : toStatus;
+
     // 2. Prepare timestamp updates
     const updatePayload: Record<string, unknown> = {
-      status: toStatus,
+      status: normalizedToStatus,
       updated_at: nowIso,
     };
 
-    if (toStatus === "ACCEPTED") updatePayload.accepted_at = nowIso;
-    if (toStatus === "READY") updatePayload.ready_at = nowIso;
-    if (toStatus === "SERVED") updatePayload.served_at = nowIso;
+    if (normalizedToStatus === "PREPARING") updatePayload.accepted_at = currentOrder.accepted_at || nowIso;
+    if (normalizedToStatus === "READY") updatePayload.ready_at = nowIso;
+    if (normalizedToStatus === "SERVED") updatePayload.served_at = nowIso;
 
     // 3. Update orders row
     const { error: updateErr } = await supabase
@@ -254,7 +298,7 @@ export async function transitionOrderStatusAction(
     await supabase.from("order_status_history").insert({
       order_id: orderId,
       from_status: fromStatus,
-      to_status: toStatus,
+      to_status: normalizedToStatus,
       actor_type: "STAFF",
       notes: `Transitioned via KDS [${requestId}]`,
       created_at: nowIso,
@@ -281,7 +325,8 @@ export async function transitionOrderStatusAction(
 
     return {
       success: true,
-      message: `Order moved to ${toStatus}`,
+      currentStatus: normalizedToStatus,
+      message: `Order moved to ${normalizedToStatus}`,
     };
   } catch (error) {
     const durationMs = Date.now() - startTime;

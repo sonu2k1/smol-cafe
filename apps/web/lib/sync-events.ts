@@ -4,6 +4,8 @@
  * and Admin views using BroadcastChannel and localStorage events.
  */
 
+import { createClient } from "@/lib/supabase/client";
+
 export type SyncEventType =
   | "ORDER_PLACED"
   | "ORDER_CONFIRMED"
@@ -25,9 +27,61 @@ export interface SyncPayload {
 
 const CHANNEL_NAME = "smol_orders_channel";
 const STORAGE_KEY = "smol_sync_event";
+const SUPABASE_BROADCAST_CHANNEL = "smol_orders_live";
+
+// Set of active event listeners across the application
+const syncListeners = new Set<(event: SyncPayload) => void>();
+
+// Singleton Supabase broadcast channel reference
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let globalSupabaseChannel: any = null;
+
+function getOrInitSupabaseChannel() {
+  if (typeof window === "undefined") return null;
+  if (!globalSupabaseChannel) {
+    try {
+      const supabase = createClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (supabase && typeof (supabase as any).channel === "function") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const channel = (supabase as any).channel(SUPABASE_BROADCAST_CHANNEL, {
+          config: { broadcast: { self: true } },
+        });
+
+        // Register broadcast listener BEFORE subscribing
+        channel.on(
+          "broadcast",
+          { event: "sync" },
+          ({ payload }: { payload: SyncPayload }) => {
+            if (payload && payload.type) {
+              syncListeners.forEach((listener) => {
+                try {
+                  listener(payload);
+                } catch (err) {
+                  console.error("Error in sync listener:", err);
+                }
+              });
+            }
+          }
+        );
+
+        channel.subscribe((status: string) => {
+          if (status === "SUBSCRIBED") {
+            // Connected to broadcast mesh
+          }
+        });
+
+        globalSupabaseChannel = channel;
+      }
+    } catch {
+      // Supabase client unavailable
+    }
+  }
+  return globalSupabaseChannel;
+}
 
 /**
- * Broadcasts an event across all open tabs and windows.
+ * Broadcasts an event across all open tabs, windows, and external devices via Supabase Realtime.
  */
 export function broadcastSyncEvent(event: SyncPayload): void {
   if (typeof window === "undefined") return;
@@ -37,7 +91,16 @@ export function broadcastSyncEvent(event: SyncPayload): void {
     timestamp: Date.now(),
   };
 
-  // 1. BroadcastChannel for active tabs
+  // 1. Dispatch locally to all registered listeners in current page
+  syncListeners.forEach((listener) => {
+    try {
+      listener(payload);
+    } catch {
+      // ignore
+    }
+  });
+
+  // 2. BroadcastChannel for active tabs in same origin
   try {
     if ("BroadcastChannel" in window) {
       const bc = new BroadcastChannel(CHANNEL_NAME);
@@ -48,23 +111,30 @@ export function broadcastSyncEvent(event: SyncPayload): void {
     // BroadcastChannel error ignored
   }
 
-  // 2. LocalStorage trigger for cross-window / background tabs
+  // 3. LocalStorage trigger for cross-window / background tabs in same origin
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // LocalStorage error ignored
   }
 
-  // 3. CustomEvent for current window listeners
+  // 4. Supabase Realtime Broadcast Channel for cross-device & cross-port sync (localhost:3000 <-> localhost:3001)
   try {
-    window.dispatchEvent(new CustomEvent("smol_sync", { detail: payload }));
+    const sbChannel = getOrInitSupabaseChannel();
+    if (sbChannel && typeof sbChannel.send === "function") {
+      sbChannel.send({
+        type: "broadcast",
+        event: "sync",
+        payload,
+      }).catch(() => {});
+    }
   } catch {
-    // CustomEvent error ignored
+    // Supabase broadcast error ignored
   }
 }
 
 /**
- * Subscribes to real-time sync events across tabs and windows.
+ * Subscribes to real-time sync events across tabs, windows, ports, and devices.
  */
 export function subscribeToSyncEvents(
   callback: (event: SyncPayload) => void
@@ -72,6 +142,12 @@ export function subscribeToSyncEvents(
   if (typeof window === "undefined") {
     return () => {};
   }
+
+  // Register in local listener set
+  syncListeners.add(callback);
+
+  // Initialize Supabase WebSocket broadcast channel
+  getOrInitSupabaseChannel();
 
   let bc: BroadcastChannel | null = null;
   try {
@@ -98,21 +174,13 @@ export function subscribeToSyncEvents(
     }
   };
 
-  const customEventHandler = (e: Event) => {
-    const customEvent = e as CustomEvent<SyncPayload>;
-    if (customEvent.detail) {
-      callback(customEvent.detail);
-    }
-  };
-
   window.addEventListener("storage", storageHandler);
-  window.addEventListener("smol_sync", customEventHandler);
 
   return () => {
+    syncListeners.delete(callback);
     if (bc) {
       bc.close();
     }
     window.removeEventListener("storage", storageHandler);
-    window.removeEventListener("smol_sync", customEventHandler);
   };
 }

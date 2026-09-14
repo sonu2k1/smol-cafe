@@ -1,5 +1,5 @@
 import React from "react";
-import { getTableSessionCookie } from "@/lib/session";
+import { getTableSessionCookie, isValidUuid } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TableClientView, type TableItemView } from "@/components/table/TableClientView";
 
@@ -15,7 +15,7 @@ interface PageProps {
 export default async function TableViewPage({ searchParams }: PageProps) {
   const resolvedParams = searchParams ? await searchParams : undefined;
   const session = await getTableSessionCookie();
-  const tableLabel = resolvedParams?.table || "07";
+  const tableLabel = resolvedParams?.table || session?.tableLabel || "01";
   const supabase = createAdminClient();
 
   let orderItems: TableItemView[] = [];
@@ -23,7 +23,7 @@ export default async function TableViewPage({ searchParams }: PageProps) {
   let totalItemsCount = 0;
   let guestCount = 2;
 
-  if (session?.sessionId && !resolvedParams?.table) {
+  if (session?.sessionId && isValidUuid(session.sessionId) && !resolvedParams?.table) {
     // 1. Fetch Session details (guest count)
     const { data: sessionData } = await supabase
       .from("table_sessions")

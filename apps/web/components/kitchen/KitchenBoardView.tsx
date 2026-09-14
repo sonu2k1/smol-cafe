@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import type { KitchenTicket } from "@/app/kitchen/actions";
 import {
   fetchKitchenOrdersAction,
@@ -11,7 +12,7 @@ import type { OrderStatus } from "@smol-cafe/db";
 import { KitchenTicketCard } from "./KitchenTicketCard";
 import { EtaAccuracyReview } from "./EtaAccuracyReview";
 import { KitchenMenuManager } from "./KitchenMenuManager";
-import { Bell, BellOff, AlertTriangle, ChefHat, RefreshCw, LogOut, Coffee, UtensilsCrossed } from "lucide-react";
+import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
@@ -28,7 +29,12 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [showEtaAnalytics, setShowEtaAnalytics] = useState(false);
   const [currentView, setCurrentView] = useState<"TICKETS" | "MENU_STOCK">("TICKETS");
+  const [mounted, setMounted] = useState(false);
   const prevOrderCountRef = useRef(initialOrders.length);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sound chime for incoming orders
   const playChime = useCallback(() => {
@@ -137,10 +143,14 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
 
   // Group tickets strictly into 4 columns per specification:
   // NEW -> PREPARING -> READY -> COMPLETED
-  const newOrders = orders.filter((o) => o.status === "SUBMITTED" || o.status === "ACCEPTED");
+  const newOrders = orders.filter((o) =>
+    ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED"].includes(o.status)
+  );
   const preparingOrders = orders.filter((o) => o.status === "PREPARING");
   const readyOrders = orders.filter((o) => o.status === "READY");
-  const completedOrders = orders.filter((o) => o.status === "SERVED");
+  const completedOrders = orders.filter((o) =>
+    ["SERVED", "COMPLETED", "CLOSED"].includes(o.status)
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F3E7D3] dark:bg-[#241F1C] text-[#241F1C] dark:text-[#F3E7D3] font-sans transition-colors duration-200">
@@ -148,8 +158,21 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
       <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB]/95 dark:bg-[#1D1815]/95 px-5 sm:px-6 py-3.5 backdrop-blur-md transition-colors duration-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#B72E35] text-white shadow-xs">
-              <ChefHat className="h-5 w-5" />
+            <div className="relative h-11 w-8 shrink-0 select-none">
+              <Image
+                src="/kitchen-logo.png"
+                alt="smol café kitchen logo"
+                fill
+                priority
+                className="object-contain drop-shadow-xs dark:hidden block"
+              />
+              <Image
+                src="/kitchen-logo-dark.png"
+                alt="smol café kitchen logo night mode"
+                fill
+                priority
+                className="object-contain drop-shadow-[0_0_8px_rgba(168,85,247,0.4)] hidden dark:block"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -229,8 +252,8 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   isRefreshing ? "scale-125 opacity-70" : "animate-pulse"
                 }`}
               />
-              <span className="hidden sm:inline">
-                live · {lastRefreshedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              <span className="hidden sm:inline" suppressHydrationWarning>
+                live · {mounted ? lastRefreshedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "--:--:--"}
               </span>
             </div>
 

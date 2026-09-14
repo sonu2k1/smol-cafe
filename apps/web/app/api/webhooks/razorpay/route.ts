@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateRequestId, logger } from "@/lib/observability/logger";
@@ -19,7 +18,7 @@ export async function POST(req: Request) {
         action: "razorpayWebhook",
       });
       recordWebhookFailure("Missing signature header");
-      return NextResponse.json({ error: "Missing x-razorpay-signature header" }, { status: 400 });
+      return Response.json({ error: "Missing x-razorpay-signature header" }, { status: 400 });
     }
 
     const webhookSecret =
@@ -44,48 +43,57 @@ export async function POST(req: Request) {
             requestId,
             action: "razorpayWebhook",
           });
-          recordWebhookFailure("Invalid signature");
-          return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
+          recordWebhookFailure("Invalid signature HMAC");
+          return Response.json({ error: "Invalid signature" }, { status: 401 });
         }
       } catch {
-        recordWebhookFailure("Signature verification failure");
-        return NextResponse.json({ error: "Signature verification failed" }, { status: 400 });
+        recordWebhookFailure("Signature timing evaluation failed");
+        return Response.json({ error: "Signature check error" }, { status: 401 });
       }
     }
 
-    // 2. Parse Event Payload
-    const event = JSON.parse(rawBody);
-    const eventId = event.id || event.event_id || `evt_${Date.now()}`;
-    const eventType = event.event || "unknown";
+    const payload = JSON.parse(rawBody);
+    const eventId = payload.event_id || payload.id || `evt_${Date.now()}`;
+    const paymentEntity = payload.payload?.payment?.entity;
 
-    logger.info(`Received Razorpay webhook event ${eventType} (${eventId})`, {
-      requestId,
-      action: "razorpayWebhook",
-      data: { eventId, eventType },
-    });
+    if (!paymentEntity) {
+      return Response.json({ received: true, ignored: true });
+    }
 
-    // 3. Atomic Database Processing with Deduplication
+    const paymentAttemptId = paymentEntity.notes?.payment_attempt_id;
+    const razorpayPaymentId = paymentEntity.id;
+    const capturedAmountPaise = paymentEntity.amount;
+
+    if (!paymentAttemptId) {
+      logger.warn("Razorpay webhook received with missing payment_attempt_id in notes", {
+        requestId,
+        action: "razorpayWebhook",
+        data: { razorpayPaymentId },
+      });
+      return Response.json({ received: true, warning: "missing_attempt_id" });
+    }
+
     const supabase = createAdminClient();
 
-    const { data: rpcResult, error: rpcError } = await supabase.rpc("process_razorpay_webhook", {
+    // Execute idempotent payment webhook ingestion RPC
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("handle_razorpay_webhook_event", {
       p_event_id: eventId,
-      p_event_type: eventType,
-      p_payload: event,
+      p_payment_attempt_id: paymentAttemptId,
+      p_gateway_payment_id: razorpayPaymentId,
+      p_captured_amount_paise: capturedAmountPaise,
     });
 
     const durationMs = Date.now() - startTime;
 
     if (rpcError) {
-      logger.error("Error executing process_razorpay_webhook RPC", {
+      logger.error("RPC handle_razorpay_webhook_event failed", {
         requestId,
         action: "razorpayWebhook",
         durationMs,
-        data: { error: rpcError.message, eventId, eventType },
+        data: { error: rpcError.message, eventId },
       });
-      recordWebhookFailure(rpcError.message, eventId);
-      captureAppException(rpcError, { requestId });
-      // Still return 200 to prevent Razorpay from infinite retry loops if internal issue is logged
-      return NextResponse.json({ status: "error", message: "RPC error" }, { status: 200 });
+      recordWebhookFailure(rpcError.message);
+      return Response.json({ error: "Failed to process webhook" }, { status: 500 });
     }
 
     const result = rpcResult as {
@@ -102,7 +110,7 @@ export async function POST(req: Request) {
       data: { status: result.status, eventId },
     });
 
-    return NextResponse.json({
+    return Response.json({
       received: true,
       status: result.status,
       message: result.message,
@@ -118,6 +126,6 @@ export async function POST(req: Request) {
     recordWebhookFailure(String(error));
     captureAppException(error, { requestId });
 
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

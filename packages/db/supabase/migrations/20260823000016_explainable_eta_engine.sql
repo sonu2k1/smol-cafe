@@ -135,7 +135,7 @@ RETURNS TRIGGER AS $$
 DECLARE
   v_actual_prep INTEGER;
 BEGIN
-  IF NEW.status IN ('SERVED', 'COMPLETED') AND (OLD.status IS NULL OR OLD.status NOT IN ('SERVED', 'COMPLETED')) THEN
+  IF NEW.status = 'SERVED' AND (OLD.status IS NULL OR OLD.status != 'SERVED') THEN
     NEW.served_at := COALESCE(NEW.served_at, now());
     v_actual_prep := EXTRACT(EPOCH FROM (NEW.served_at - NEW.created_at))::INTEGER;
     NEW.actual_prep_seconds := v_actual_prep;

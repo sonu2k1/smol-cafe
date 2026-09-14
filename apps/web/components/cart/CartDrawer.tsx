@@ -1,30 +1,31 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { placeOrderAction, type ChangedItemDiff } from "@/app/menu/actions";
 import { useNetworkHealth } from "@/hooks/useNetworkHealth";
-import { createTableJsonTag } from "@/lib/table-tag";
 import { broadcastSyncEvent } from "@/lib/sync-events";
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
+import {
+  PostPaymentCelebrationModal,
+  type PostPaymentCelebrationModalProps,
+} from "@/components/payment/PostPaymentCelebrationModal";
+import { bypassPaymentAction } from "@/app/bill/actions";
 import { getFoodImage } from "@/lib/food-images";
 import type { MenuItemWithDetails } from "@/lib/queries/menu";
 import { TableArchedCard } from "@/components/table/TableArchedCard";
 import {
-  Menu as MenuIcon,
-  Users,
   CheckCircle2,
-  AlertTriangle,
-  Sparkles,
   CreditCard,
   Trash2,
-  ArrowLeft,
   ChevronRight,
   Plus,
   Check,
   Lock,
+  Zap,
+  Clock,
 } from "lucide-react";
 
 interface CartDrawerProps {
@@ -65,6 +66,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
   const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
   const [boardAdded, setBoardAdded] = useState(false);
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
+  const [isBypassing, setIsBypassing] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<PostPaymentCelebrationModalProps | null>(null);
   const [orderSuccess, setOrderSuccess] = useState<{
     orderNo: number;
     orderId: string;
@@ -213,6 +216,108 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
     }
   };
 
+  const handleTestBypassPayment = async () => {
+    if (isBypassing) return;
+    setIsBypassing(true);
+    setErrorMessage(null);
+
+    try {
+      let finalOrderId = orderSuccess?.orderId;
+      let finalOrderNo = orderSuccess?.orderNo;
+      let finalTotalPaise = orderSuccess?.totalPaise || grandTotal * 100;
+
+      // 1. If cart has items not yet placed into orders, place the order first
+      if (items.length > 0 && !orderSuccess) {
+        const idempotencyKey = crypto.randomUUID();
+        const orderPayload = items.map((cartItem) => ({
+          menu_item_id: cartItem.item.id,
+          expected_unit_price_paise: cartItem.item.pricePaise,
+          qty: cartItem.qty,
+        }));
+
+        const result = await placeOrderAction(orderPayload, idempotencyKey, undefined, instructions);
+        if (result.success && result.orderId) {
+          finalOrderId = result.orderId;
+          finalOrderNo = result.orderNo;
+          finalTotalPaise = result.totalPaise || grandTotal * 100;
+
+          broadcastSyncEvent({
+            type: "ORDER_PLACED",
+            orderId: result.orderId,
+            orderNo: result.orderNo,
+            tableLabel: displayTable,
+            timestamp: Date.now(),
+          });
+        }
+      }
+
+      // 2. Call bypassPaymentAction to settle backend session and bill
+      const bypassRes = await bypassPaymentAction({
+        tableLabel: displayTable,
+        amountPaise: finalTotalPaise,
+      });
+
+      const transactionId = bypassRes.transactionId || `TEST-BYPASS-${Date.now().toString().slice(-6)}`;
+
+      // 3. Broadcast payment completed event for Kitchen / Cashier / POS sync
+      broadcastSyncEvent({
+        type: "PAYMENT_COMPLETED",
+        orderId: finalOrderId || `ORD-${Date.now().toString().slice(-6)}`,
+        orderNo: finalOrderNo,
+        tableLabel: displayTable,
+        status: "PAID",
+        timestamp: Date.now(),
+        metadata: {
+          transactionId,
+          amountPaise: finalTotalPaise,
+          paymentMethod: "TEST_BYPASS",
+          appName: "Pre-Prod Test Bypass",
+        },
+      });
+
+      const currentItemsSnapshot =
+        items.length > 0
+          ? items.map((i) => ({
+              name: i.item.name,
+              qty: i.qty,
+              priceRupees: Math.round(i.item.pricePaise / 100),
+              subtotalRupees: Math.round((i.item.pricePaise / 100) * i.qty),
+            }))
+          : [
+              {
+                name: "Artisanal Table Order",
+                qty: 1,
+                priceRupees: Math.round(finalTotalPaise / 100),
+                subtotalRupees: Math.round(finalTotalPaise / 100),
+              },
+            ];
+
+      // 4. Clear cart items
+      clearCart();
+
+      // 5. Trigger post-payment celebration modal
+      setCelebrationData({
+        orderId: finalOrderId || `ORD-${Date.now().toString().slice(-6)}`,
+        orderNo: finalOrderNo,
+        tableLabel: displayTable,
+        zone: "Indoor Cozy",
+        totalRupees: Math.round(finalTotalPaise / 100),
+        items: currentItemsSnapshot,
+        transactionId,
+        appName: "Test Bypass Gateway",
+        onClose: () => {
+          setCelebrationData(null);
+          closeCart();
+        },
+      });
+    } catch (err) {
+      console.error("Test bypass payment failed:", err);
+      setErrorMessage("Test bypass failed. Please try again.");
+    } finally {
+      setIsBypassing(false);
+    }
+  };
+
   if (!isCartOpen) return null;
 
   return (
@@ -326,13 +431,24 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
               </div>
 
               <div className="pt-3 space-y-2.5">
+                <Link
+                  href="/orders"
+                  onClick={() => {
+                    setOrderSuccess(null);
+                    closeCart();
+                  }}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 font-serif text-base font-bold text-[#F3E7D3] shadow-md transition hover:bg-[#9E252C] active:scale-[0.98]"
+                >
+                  <Clock className="h-4 w-4" />
+                  Track Kitchen Prep Live →
+                </Link>
                 <button
                   type="button"
                   onClick={() => setIsUpiDrawerOpen(true)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 font-serif text-base font-bold text-[#F3E7D3] shadow-md transition hover:bg-[#9E252C] active:scale-[0.98]"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#C9AE8B] bg-[#FAF4EB] py-3 font-serif text-sm font-bold text-[#725039] shadow-xs transition hover:bg-[#EAE0D2] active:scale-[0.98]"
                 >
                   <CreditCard className="h-4 w-4" />
-                  Pay Now via UPI Gateway →
+                  Pay Now via UPI Gateway
                 </button>
                 <button
                   type="button"
@@ -340,7 +456,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                     setOrderSuccess(null);
                     closeCart();
                   }}
-                  className="w-full rounded-full border border-[#C9AE8B]/60 bg-[#FAF4EB] py-3 font-serif text-sm font-semibold text-[#241F1C] transition hover:bg-[#EAE0D2]"
+                  className="w-full rounded-full border border-[#C9AE8B]/40 bg-transparent py-2.5 font-serif text-xs font-semibold text-[#8C6D53] transition hover:bg-[#EAE0D2]/50"
                 >
                   Back to Menu
                 </button>
@@ -517,6 +633,34 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
+                </button>
+
+                {/* Pre-Production Test Bypass Button */}
+                <button
+                  type="button"
+                  onClick={handleTestBypassPayment}
+                  disabled={isBypassing}
+                  className="w-full rounded-[1.25rem] border-2 border-dashed border-amber-600/70 dark:border-amber-400/60 bg-amber-500/10 dark:bg-amber-400/10 p-3.5 flex items-center justify-between hover:bg-amber-500/20 dark:hover:bg-amber-400/20 active:scale-[0.99] transition shadow-xs cursor-pointer text-left group"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-amber-500/20 dark:bg-amber-400/20 border border-amber-500/30 text-amber-700 dark:text-amber-300">
+                      <Zap className="w-5 h-5 fill-amber-500/40 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
+                          Bypass Payment
+                        </h3>
+                        <span className="rounded-full bg-amber-600 text-white dark:bg-amber-500 dark:text-black font-mono text-[9px] font-extrabold px-2 py-0.5 uppercase tracking-wide">
+                          Test Mode
+                        </span>
+                      </div>
+                      <p className="font-sans text-[12px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
+                        {isBypassing ? "Settling test transaction..." : "Pre-production test • Bypass & mark paid"}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-amber-600 dark:text-amber-400 group-hover:translate-x-0.5 transition" />
                 </button>
               </div>
 
@@ -744,6 +888,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
             closeCart();
           }}
           onClose={() => setIsUpiDrawerOpen(false)}
+        />
+      )}
+
+      {/* Post-Payment Celebration Modal if test bypass triggered */}
+      {celebrationData && (
+        <PostPaymentCelebrationModal
+          {...celebrationData}
         />
       )}
     </div>

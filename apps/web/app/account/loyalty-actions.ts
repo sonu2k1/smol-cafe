@@ -40,7 +40,7 @@ export async function getLoyaltyAccountAction(): Promise<LoyaltyAccountDetails> 
 
   try {
     // 1. Fetch loyalty account
-    let { data: account } = await admin
+    const { data: account } = await admin
       .from("loyalty_accounts")
       .select("*")
       .eq("profile_id", profileId)

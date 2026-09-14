@@ -19,10 +19,11 @@ interface StatusCopy {
 function getStatusCopy(status: string): StatusCopy {
   switch (status) {
     case "PENDING_CONFIRMATION":
+    case "SUBMITTED":
     case "DRAFT":
       return {
-        title: "Waiting for Confirmation",
-        subtitle: "Order sent to Cashier Queue. You can still modify items or instructions.",
+        title: "Order Received",
+        subtitle: "Order placed and logged in café system. Kitchen notified.",
         badgeColor:
           "bg-[#F2C84B]/20 text-[#725039] border-[#C9AE8B]",
       };

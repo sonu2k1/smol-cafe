@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getTableSessionCookie } from "@/lib/session";
+import { getTableSessionCookie, isValidUuid } from "@/lib/session";
 import type { Profile, OrderStatus } from "@smol-cafe/db";
 
 export interface AuthActionResult {
@@ -361,14 +361,17 @@ export async function getCustomerOrderHistoryAction(): Promise<{
       `
       );
 
+    const isSessionUuid = isValidUuid(sessionId);
     if (customerId) {
       query = query.eq("customer_id", customerId);
-    } else if (phone && sessionId) {
+    } else if (phone && sessionId && isSessionUuid) {
       query = query.or(`customer_phone.eq.${phone},customer_phone.eq.${formattedPhone},table_session_id.eq.${sessionId}`);
     } else if (phone) {
       query = query.or(`customer_phone.eq.${phone},customer_phone.eq.${formattedPhone}`);
-    } else if (sessionId) {
+    } else if (sessionId && isSessionUuid) {
       query = query.eq("table_session_id", sessionId);
+    } else {
+      return { orders: [] };
     }
 
     const { data: orders, error: ordersErr } = await query.order("submitted_at", { ascending: false });

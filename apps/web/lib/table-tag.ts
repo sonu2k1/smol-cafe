@@ -57,7 +57,7 @@ export function createTableJsonTag(
     guest_count: guestCount,
     qr_hash: `smol-qr-t${cleanLabel}-${Math.random().toString(36).substring(2, 8)}`,
     service_mode: "DINE_IN",
-    session_id: sessionId || `sess_${cleanLabel}_${Date.now()}`,
+    session_id: sessionId || crypto.randomUUID(),
     created_at: new Date().toISOString(),
     device_fingerprint: "mobile-web-client",
   };

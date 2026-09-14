@@ -29,9 +29,18 @@ export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, on
     if (isUpdating) return;
 
     let nextStatus: OrderStatus | null = null;
-    if (ticket.status === "SUBMITTED" || ticket.status === "ACCEPTED") nextStatus = "PREPARING";
-    else if (ticket.status === "PREPARING") nextStatus = "READY";
-    else if (ticket.status === "READY") nextStatus = "SERVED";
+    if (
+      ticket.status === "SUBMITTED" ||
+      ticket.status === "PENDING_CONFIRMATION" ||
+      ticket.status === "CONFIRMED" ||
+      ticket.status === "ACCEPTED"
+    ) {
+      nextStatus = "PREPARING";
+    } else if (ticket.status === "PREPARING") {
+      nextStatus = "READY";
+    } else if (ticket.status === "READY") {
+      nextStatus = "SERVED";
+    }
 
     if (!nextStatus) return;
 
@@ -58,7 +67,7 @@ export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, on
 
   // Status mapping for display
   const displayStatus =
-    ticket.status === "SUBMITTED" || ticket.status === "ACCEPTED"
+    ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED"].includes(ticket.status)
       ? "NEW"
       : ticket.status === "PREPARING"
         ? "PREPARING"
@@ -110,12 +119,15 @@ export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, on
         <div className="flex items-center justify-between mt-2.5 px-0.5 font-mono text-xs text-[#725039] dark:text-[#C9AE8B]">
           <div className="flex items-center gap-1">
             <span className="text-[#8C6D53] dark:text-stone-500">time:</span>
-            <span>{orderTimeFormatted}</span>
+            <span suppressHydrationWarning>{orderTimeFormatted}</span>
           </div>
 
-          <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${timerBadgeStyle}`}>
+          <div
+            suppressHydrationWarning
+            className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${timerBadgeStyle}`}
+          >
             <span>⏱</span>
-            <span>{elapsedMinutes}m timer</span>
+            <span suppressHydrationWarning>{elapsedMinutes}m timer</span>
           </div>
         </div>
 

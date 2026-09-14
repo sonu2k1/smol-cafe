@@ -45,7 +45,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
   const [isJsonInspectorOpen, setIsJsonInspectorOpen] = useState(false);
   const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
 
-  const tableJsonTag = createTableJsonTag(tableLabel, locationName);
+  const tableJsonTag = createTableJsonTag(tableLabel || "01");
 
   const refreshOrders = useCallback(async () => {
     try {
@@ -58,7 +58,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
     }
   }, []);
 
-  // Listen to broadcast custom events from Cart checkout
+  // 1. Cross-Interface & Cross-Port Supabase Broadcast Subscription
   useEffect(() => {
     const unsub = subscribeToSyncEvents(() => {
       refreshOrders();
@@ -66,27 +66,29 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
     return () => unsub();
   }, [refreshOrders]);
 
-  // Supabase Realtime WebSocket subscription for Customer Order Status Updates
+  // 2. Supabase Realtime WebSocket subscription for Customer Order Status Updates
   useSupabaseRealtime({
     table: "orders",
     onData: () => {
       refreshOrders();
     },
-    enabled: hasSession,
+    enabled: true,
   });
 
-  // 3-Second Polling Timer Fallback
+  // 3. 2-Second Polling Timer & Window Focus Revalidation for Guaranteed Realtime Sync
   useEffect(() => {
-    if (!hasSession) return;
+    const handleFocus = () => refreshOrders();
+    window.addEventListener("focus", handleFocus);
 
     const intervalId = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        refreshOrders();
-      }
-    }, 3000);
+      refreshOrders();
+    }, 2000);
 
-    return () => clearInterval(intervalId);
-  }, [hasSession, refreshOrders]);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [refreshOrders]);
 
   if (!hasSession) {
     return (
@@ -128,12 +130,44 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
 
 
   const latestOrder = orders[0];
+  const hasOrders = orders.length > 0;
 
   const orderNumberStr = latestOrder
     ? `#SMOL ${latestOrder.orderNo.toString().padStart(4, "0")}`
-    : "#SMOL 0427";
+    : "NO ACTIVE ORDER";
 
-  const firstItemName = latestOrder?.items[0]?.name || "Pour Over Coffee";
+  const firstItemName = latestOrder?.items[0]?.name || (hasOrders ? "Order" : "Artisanal Coffee");
+
+  // Dynamic Headline, Subtitle, and ETA based on actual order status
+  let heroHeadline = `Brewing Your ${firstItemName}`;
+  let heroSubtitle = "single-origin South Indian estate beans";
+  let heroEta = "⏱ 8-10 mins";
+
+  if (latestOrder) {
+    if (latestOrder.status === "SERVED" || latestOrder.status === "COMPLETED") {
+      heroHeadline = `${firstItemName} Served!`;
+      heroSubtitle = "Delivered to your table. Hope you enjoyed it!";
+      heroEta = "✓ Delivered";
+    } else if (latestOrder.status === "READY") {
+      heroHeadline = `${firstItemName} is Ready!`;
+      heroSubtitle = "Piping hot! Your server is bringing it over, or collect at brew bar.";
+      heroEta = "🔔 Ready Now";
+    } else if (latestOrder.status === "PREPARING") {
+      heroHeadline = `Crafting Your ${firstItemName}`;
+      heroSubtitle = "Coffee is brewing and food is freshly on the kitchen grill.";
+      heroEta = latestOrder.etaMinMinutes
+        ? `⏱ ${latestOrder.etaMinMinutes}-${latestOrder.etaMaxMinutes || 10} mins`
+        : "⏱ 5-8 mins";
+    } else {
+      heroHeadline = `Order Received: ${firstItemName}`;
+      heroSubtitle = "Logged into café kitchen queue. Chef notified.";
+      heroEta = "⏱ 8-12 mins";
+    }
+  } else {
+    heroHeadline = "No Active Orders Placed";
+    heroSubtitle = "Select your favourite brews & bakes from our menu.";
+    heroEta = "—";
+  }
 
   return (
     <div className="min-h-screen bg-[#F3E7D3] dark:bg-[#151110] text-[#241F1C] dark:text-[#FAF4EB] pb-28 font-serif transition-colors duration-200">
@@ -213,10 +247,10 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
           {/* Headline & Subtitle */}
           <div className="mt-4 space-y-1">
             <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#241F1C] dark:text-[#F3E7D3] tracking-tight">
-              Brewing Your {firstItemName}
+              {heroHeadline}
             </h2>
             <p className="font-serif italic text-xs text-[#7A583E] dark:text-[#C9AE8B]">
-              single-origin South Indian estate beans
+              {heroSubtitle}
             </p>
           </div>
 
@@ -238,7 +272,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
                 EST. READY TIME
               </span>
               <span className="block font-mono text-sm font-bold text-[#B72E35] dark:text-[#FF6B6B] mt-1 tracking-wider">
-                ⏱ 8-10 mins
+                {heroEta}
               </span>
             </div>
           </div>
@@ -347,7 +381,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
         </div>
 
         {/* Active Ticket Progression Cards */}
-        {orders.length > 0 && (
+        {orders.length > 0 ? (
           <div className="pt-3 space-y-3">
             <h4 className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#786F66] dark:text-[#C9AE8B]">
               Detailed Round Timeline
@@ -356,6 +390,45 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
               {orders.map((order) => (
                 <OrderCard key={order.id} order={order} />
               ))}
+            </div>
+          </div>
+        ) : (
+          <div className="pt-2">
+            <div className="rounded-3xl border border-dashed border-[#C9AE8B]/60 dark:border-stone-800 bg-[#FAF4EB]/60 dark:bg-stone-900/40 p-6 text-center space-y-3">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-950/50 text-2xl">
+                ☕
+              </div>
+              <h3 className="font-serif text-lg font-bold text-[#241F1C] dark:text-white">
+                No orders placed yet
+              </h3>
+              <p className="font-serif italic text-xs text-[#7A583E] dark:text-[#C9AE8B] max-w-xs mx-auto">
+                Ready for your coffee ritual? Browse our artisanal brews and fresh bakery treats.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
+                <Link
+                  href="/menu"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#B72E35] px-6 py-2.5 font-serif text-xs font-bold text-white shadow-md hover:bg-[#91242C] transition active:scale-95"
+                >
+                  <span>Browse Menu &amp; Order →</span>
+                </Link>
+              </div>
+
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-mono text-[#7A583E] dark:text-[#C9AE8B]">
+                <span>Testing another table?</span>
+                {["01", "02", "03", "04"].map((num) => (
+                  <a
+                    key={num}
+                    href={`/t/table-${num}`}
+                    className={`rounded-lg px-2.5 py-1 border text-xs font-bold transition ${
+                      tableLabel === num
+                        ? "bg-[#B72E35] text-white border-[#B72E35]"
+                        : "bg-white/80 dark:bg-stone-800 border-[#C9AE8B]/50 hover:bg-[#F3E7D3] text-[#241F1C] dark:text-white"
+                    }`}
+                  >
+                    Table {num}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         )}

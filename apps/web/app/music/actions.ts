@@ -1,6 +1,6 @@
 "use server";
 
-import { getTableSessionCookie } from "@/lib/session";
+import { getTableSessionCookie, isValidUuid } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { SongRequest, SongRequestStatus, MusicSession } from "@smol-cafe/db";
 
@@ -33,7 +33,7 @@ export interface StaffJukeboxData {
  */
 export async function fetchJukeboxQueueAction(): Promise<CustomerJukeboxData> {
   const session = await getTableSessionCookie();
-  if (!session || !session.sessionId || !session.locationId) {
+  if (!session || !session.sessionId || !session.locationId || !isValidUuid(session.sessionId)) {
     return {
       success: false,
       hasSession: false,
@@ -138,7 +138,7 @@ export async function submitSongRequestAction(
   artist: string
 ): Promise<{ success: boolean; message?: string }> {
   const session = await getTableSessionCookie();
-  if (!session || !session.sessionId || !session.locationId) {
+  if (!session || !session.sessionId || !session.locationId || !isValidUuid(session.sessionId)) {
     return { success: false, message: "Please scan a table QR code to request songs." };
   }
 
@@ -175,7 +175,7 @@ export async function castSongVoteAction(
   requestId: string
 ): Promise<{ success: boolean; voteCount?: number; message?: string }> {
   const session = await getTableSessionCookie();
-  if (!session || !session.sessionId) {
+  if (!session || !session.sessionId || !isValidUuid(session.sessionId)) {
     return { success: false, message: "Please scan your table QR code to vote." };
   }
 

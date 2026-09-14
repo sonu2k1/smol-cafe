@@ -92,9 +92,13 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
     refreshData();
   };
 
-  // Poll pending orders and tables every 3 seconds + real-time event listener
+  // Poll pending orders and tables every 3 seconds + real-time event listener + window focus revalidation
   useEffect(() => {
     refreshData();
+
+    const handleFocus = () => refreshData();
+    window.addEventListener("focus", handleFocus);
+
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshData();
@@ -107,6 +111,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
 
     return () => {
       clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
       unsubscribe();
     };
   }, [refreshData]);

@@ -1,6 +1,6 @@
 "use server";
 
-import { getTableSessionCookie } from "@/lib/session";
+import { getTableSessionCookie, isValidUuid } from "@/lib/session";
 import { resolveQrToken } from "@/app/t/actions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { OrderStatus } from "@smol-cafe/db";
@@ -48,16 +48,17 @@ export interface FetchOrdersResult {
 export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
   let session = await getTableSessionCookie();
 
-  if (!session || !session.sessionId) {
-    const defaultRes = await resolveQrToken("table-01", true);
-    if (defaultRes.success && defaultRes.session) {
+  if (!session || !session.sessionId || !isValidUuid(session.sessionId)) {
+    const tableToken = session?.tableLabel ? `table-${session.tableLabel}` : "table-01";
+    const defaultRes = await resolveQrToken(tableToken, false);
+    if (defaultRes.success && defaultRes.session && isValidUuid(defaultRes.session.sessionId)) {
       session = defaultRes.session;
     }
   }
 
-  if (!session || !session.sessionId) {
+  if (!session || !session.sessionId || !isValidUuid(session.sessionId)) {
     return {
-      success: false,
+      success: true,
       hasSession: false,
       orders: [],
       message: "No active table session found. Please scan your table QR.",
@@ -68,13 +69,38 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
 
   try {
     // 1. Fetch Orders for this table session
-    const { data: orders, error: ordersError } = await supabase
+    let { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select("*")
       .eq("table_session_id", session.sessionId)
       .order("order_no", { ascending: false });
 
-    if (ordersError || !orders) {
+    // Fallback: If no orders found for this exact session (e.g., session was restarted, regenerated, or settled),
+    // retrieve recent orders for this dining table from the past 2 hours
+    if ((!orders || orders.length === 0) && session.tableId && isValidUuid(session.tableId)) {
+      const { data: recentSessions } = await supabase
+        .from("table_sessions")
+        .select("id")
+        .eq("table_id", session.tableId)
+        .order("opened_at", { ascending: false })
+        .limit(5);
+
+      if (recentSessions && recentSessions.length > 0) {
+        const sessionIds = recentSessions.map((s) => s.id);
+        const { data: tableOrders } = await supabase
+          .from("orders")
+          .select("*")
+          .in("table_session_id", sessionIds)
+          .order("order_no", { ascending: false })
+          .limit(10);
+
+        if (tableOrders && tableOrders.length > 0) {
+          orders = tableOrders;
+        }
+      }
+    }
+
+    if (ordersError && (!orders || orders.length === 0)) {
       console.error("Error fetching orders:", ordersError);
       return {
         success: false,
@@ -86,7 +112,7 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
       };
     }
 
-    if (orders.length === 0) {
+    if (!orders || orders.length === 0) {
       return {
         success: true,
         hasSession: true,
