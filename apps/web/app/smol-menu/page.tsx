@@ -43,6 +43,7 @@ export default async function SmolMenuPage({ searchParams }: SmolMenuPageProps) 
       categories={categories}
       tableLabel={session?.tableLabel}
       locationName={session?.locationName || "Rishikesh"}
+      guestName={session?.guestName}
     />
   );
 }

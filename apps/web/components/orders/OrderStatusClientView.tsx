@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { fetchActiveOrdersAction, type CustomerOrderDetails } from "@/app/orders/actions";
 import { OrderCard } from "./OrderCard";
 import { ConversationDeckModal } from "./ConversationDeckModal";
@@ -12,51 +13,57 @@ import { subscribeToSyncEvents } from "@/lib/sync-events";
 import { createTableJsonTag } from "@/lib/table-tag";
 import { JsonTagInspectorModal } from "@/components/table/JsonTagInspectorModal";
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 
 interface OrderStatusClientViewProps {
   initialOrders: CustomerOrderDetails[];
   tableLabel?: string;
   locationName?: string;
   hasSession: boolean;
+  guestName?: string;
 }
 
 export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
   initialOrders,
   tableLabel = "01",
-  locationName = "Smol Café",
+  locationName = "Rishikesh",
   hasSession,
+  guestName = "",
 }) => {
   const [orders, setOrders] = useState<CustomerOrderDetails[]>(initialOrders);
+  const [currentGuestName, setCurrentGuestName] = useState(guestName);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("smol_guest_name");
+      if (saved && !currentGuestName) {
+        setCurrentGuestName(saved);
+      }
+    }
+  }, [currentGuestName]);
   const [isDeckOpen, setIsDeckOpen] = useState(false);
   const [isJsonInspectorOpen, setIsJsonInspectorOpen] = useState(false);
   const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
 
-  const tableJsonTag = createTableJsonTag(tableLabel);
+  const tableJsonTag = createTableJsonTag(tableLabel, locationName);
 
   const refreshOrders = useCallback(async () => {
     try {
-      const orderRes = await fetchActiveOrdersAction();
-      if (orderRes.success) {
-        setOrders(orderRes.orders);
+      const res = await fetchActiveOrdersAction();
+      if (res.success) {
+        setOrders(res.orders);
       }
     } catch (err) {
-      console.error("Error polling orders:", err);
+      console.error("Failed to refresh active orders:", err);
     }
   }, []);
 
-  // Cross-interface Real-Time Sync Event Listener (Kitchen ↔ Cashier ↔ Customer)
+  // Listen to broadcast custom events from Cart checkout
   useEffect(() => {
-    const unsubscribe = subscribeToSyncEvents((event) => {
-      if (
-        event.type === "STATUS_CHANGED" ||
-        event.type === "ORDER_CONFIRMED" ||
-        event.type === "ORDER_PLACED" ||
-        event.type === "PAYMENT_COMPLETED"
-      ) {
-        refreshOrders();
-      }
+    const unsub = subscribeToSyncEvents(() => {
+      refreshOrders();
     });
-    return unsubscribe;
+    return () => unsub();
   }, [refreshOrders]);
 
   // Supabase Realtime WebSocket subscription for Customer Order Status Updates
@@ -85,7 +92,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#FDFBF7] px-6 py-12 text-center text-[#1C1917] dark:bg-[#141211] dark:text-[#FDFBF7]">
         <div className="w-full max-w-md rounded-3xl border border-stone-200/80 bg-white/80 p-8 shadow-xl dark:border-stone-800 dark:bg-stone-900/80">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-3xl">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-3xl">
             🪑
           </div>
           <h2 className="text-2xl font-bold tracking-tight">No Active Table Session</h2>
@@ -129,92 +136,122 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
   const firstItemName = latestOrder?.items[0]?.name || "Pour Over Coffee";
 
   return (
-    <div className="min-h-screen bg-[#F3E7D3] text-[#241F1C] pb-28 font-serif">
+    <div className="min-h-screen bg-[#F3E7D3] dark:bg-[#151110] text-[#241F1C] dark:text-[#FAF4EB] pb-28 font-serif transition-colors duration-200">
       {/* Top Header */}
-      <header className="sticky top-0 z-40 border-b border-[#C9AE8B]/40 bg-[#F3E7D3]/95 px-5 py-3.5 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-[#C9AE8B]/40 dark:border-white/10 bg-[#F3E7D3]/95 dark:bg-[#181412]/95 px-5 py-3.5 backdrop-blur-md transition-colors duration-200">
         <div className="mx-auto flex max-w-md items-start justify-between">
           <div>
-            <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-[#B72E35]">
+            <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-[#B72E35] dark:text-[#FF5B52]">
               4. ORDER STATUS
             </span>
-            <h1 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] lowercase">
-              your order
+            <h1 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] dark:text-[#FAF4EB] lowercase">
+              {currentGuestName ? `${currentGuestName}'s order` : "your order"}
             </h1>
-            <p className="font-serif italic text-xs text-[#725039]">
-              {tableLabel ? `Table ${tableLabel} • ${locationName.toLowerCase()}` : "brewing happiness"}
+            <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
+              {tableLabel
+                ? `Table ${tableLabel}${currentGuestName ? ` • Guest: ${currentGuestName}` : ""} • ${locationName.toLowerCase()}`
+                : "brewing happiness"}
             </p>
           </div>
 
-          <div className="pt-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#75AFA7]/25 border border-[#75AFA7]/40 px-3 py-0.5 text-[10px] font-mono font-bold tracking-wider text-[#1C463F] shadow-xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#1C463F] animate-pulse" />
+          <div className="flex items-center gap-2 pt-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#75AFA7]/25 dark:bg-[#75AFA7]/20 border border-[#75AFA7]/40 px-3 py-0.5 text-[10px] font-mono font-bold tracking-wider text-[#1C463F] dark:text-[#75C7BC] shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#1C463F] dark:bg-[#75C7BC] animate-pulse" />
               LIVE
             </span>
+            <ThemeToggle variant="icon" />
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="mx-auto max-w-md px-4 pt-4 space-y-5">
-        {/* Black Arched Hero Status Card */}
-        <div className="relative overflow-hidden rounded-t-[5.5rem] rounded-b-3xl border-t-2 border-[#B72E35] bg-[#141517] p-6 text-center text-white shadow-2xl animate-scale-in">
-          {/* Top Red Ambient Neon Glow */}
-          <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-20 bg-[#B72E35]/25 rounded-full blur-xl pointer-events-none animate-pulse-glow" />
+        {/* Arched Hero Status Card (Light Mode Warm Cream / Dark Mode Obsidian) */}
+        <div className="relative overflow-hidden rounded-t-[5.5rem] rounded-b-3xl border-t-4 border-[#B72E35] dark:border-t-2 border-x border-b border-[#C9AE8B]/40 dark:border-x-0 dark:border-b-0 bg-[#FAF4EB] dark:bg-[#141517] p-6 text-center text-[#241F1C] dark:text-white shadow-[0_16px_36px_rgba(74,46,27,0.08)] dark:shadow-2xl animate-scale-in transition-colors duration-200">
+          {/* Top Red Ambient Glow */}
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-20 bg-[#B72E35]/15 dark:bg-[#B72E35]/25 rounded-full blur-xl pointer-events-none animate-pulse-glow" />
 
-          {/* smol café Badge Logo in Center */}
-          <div className="relative mx-auto mt-2 inline-flex items-center justify-center rounded-2xl border border-white/20 bg-[#B72E35] px-4 py-2 shadow-lg shadow-red-950/50 hover-lift">
-            <div className="text-center leading-none">
-              <span className="block font-serif text-xs font-black tracking-wider text-white uppercase">
-                SMOL
-              </span>
-              <span className="block font-serif text-sm font-black italic text-white lowercase">
-                café
-              </span>
+          {/* smol café Door Logo with Moving/Floating Animation */}
+          <div className="relative mx-auto mt-1 flex flex-col items-center justify-center">
+            {/* Ambient Back Glow for Logo */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -inset-3 rounded-full bg-[#B72E35]/25 dark:bg-[#A855F7]/35 blur-xl animate-pulse-glow"
+            />
+
+            {/* Light Mode Floating Logo */}
+            <div className="relative block dark:hidden animate-logo-moving-light">
+              <Image
+                src="/logo-transparent.png"
+                alt="smol café"
+                width={52}
+                height={78}
+                className="h-16 w-auto object-contain drop-shadow-[0_6px_14px_rgba(183,46,53,0.3)] transition-transform"
+                priority
+              />
             </div>
+
+            {/* Dark Mode Floating Neon Logo */}
+            <div className="relative hidden dark:block animate-logo-moving-dark">
+              <Image
+                src="/table-header-logo-dark-v2.png"
+                alt="smol café"
+                width={52}
+                height={78}
+                className="h-16 w-auto object-contain transition-transform"
+                priority
+              />
+            </div>
+
+            {/* Dynamic Ground Shadow (shrinks as logo floats up) */}
+            <div
+              aria-hidden="true"
+              className="mt-1 h-1.5 w-10 rounded-full bg-[#725039]/20 dark:bg-black/40 blur-[2px] animate-logo-shadow pointer-events-none"
+            />
           </div>
 
           {/* Headline & Subtitle */}
           <div className="mt-4 space-y-1">
-            <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#F3E7D3] tracking-tight">
+            <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#241F1C] dark:text-[#F3E7D3] tracking-tight">
               Brewing Your {firstItemName}
             </h2>
-            <p className="font-serif italic text-xs text-[#C9AE8B]">
+            <p className="font-serif italic text-xs text-[#7A583E] dark:text-[#C9AE8B]">
               single-origin South Indian estate beans
             </p>
           </div>
 
-          {/* 2 Dark Metric Tiles */}
+          {/* 2 Metric Tiles */}
           <div className="mt-5 grid grid-cols-2 gap-2.5">
             {/* Order Number */}
-            <div className="rounded-2xl border border-white/10 bg-[#0C0D0E] p-3 text-center">
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#C9AE8B]/70">
+            <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#F4ECE1]/80 dark:bg-[#0C0D0E] p-3 text-center shadow-xs transition-colors">
+              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#7A583E] dark:text-[#C9AE8B]/70">
                 YOUR ORDER NO.
               </span>
-              <span className="block font-mono text-sm font-bold text-[#F2C84B] mt-1 tracking-wider">
+              <span className="block font-mono text-sm font-bold text-[#8C5E1A] dark:text-[#F2C84B] mt-1 tracking-wider">
                 {orderNumberStr}
               </span>
             </div>
 
             {/* Ready Time */}
-            <div className="rounded-2xl border border-white/10 bg-[#0C0D0E] p-3 text-center">
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#C9AE8B]/70">
+            <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#F4ECE1]/80 dark:bg-[#0C0D0E] p-3 text-center shadow-xs transition-colors">
+              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#7A583E] dark:text-[#C9AE8B]/70">
                 EST. READY TIME
               </span>
-              <span className="block font-mono text-sm font-bold text-[#FF6B6B] mt-1 tracking-wider">
+              <span className="block font-mono text-sm font-bold text-[#B72E35] dark:text-[#FF6B6B] mt-1 tracking-wider">
                 ⏱ 8-10 mins
               </span>
             </div>
           </div>
 
           {/* Table Zone Tag & UPI Payment CTA */}
-          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+          <div className="mt-4 pt-3 border-t border-[#C9AE8B]/30 dark:border-white/10 flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => setIsJsonInspectorOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-mono text-[#F3E7D3]/80 hover:bg-white/10 transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/50 dark:border-white/15 bg-[#F4ECE1] dark:bg-white/5 px-2.5 py-1.5 text-[11px] font-mono text-[#5A3825] dark:text-[#F3E7D3]/80 hover:bg-[#EDE1D2] dark:hover:bg-white/10 shadow-xs transition"
               title="Inspect JSON Table Tag"
             >
-              <Tag className="h-3 w-3 text-[#F2C84B]" />
+              <Tag className="h-3 w-3 text-[#8C5E1A] dark:text-[#F2C84B]" />
               <span>{tableJsonTag.zone} • Tag</span>
             </button>
 
@@ -234,8 +271,8 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
         {/* Another Round While You Wait */}
         <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between">
-            <h3 className="font-serif text-sm font-bold text-[#241F1C]">
-              another round? <span className="font-normal text-[#725039]">while you wait</span>
+            <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-[#FAF4EB]">
+              another round? <span className="font-normal text-[#725039] dark:text-[#C9AE8B]">while you wait</span>
             </h3>
             <span className="text-[#F2C84B] text-xs">✧</span>
           </div>
@@ -243,12 +280,12 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
           {/* Horizontal Scroller Cards */}
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
             {/* Card 1: Smol Espresso */}
-            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 bg-[#FAF4EB] p-3 shadow-xs flex flex-col justify-between h-24">
-              <p className="font-serif font-bold text-xs text-[#241F1C] truncate">
+            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3 shadow-xs flex flex-col justify-between h-24">
+              <p className="font-serif font-bold text-xs text-[#241F1C] dark:text-[#FAF4EB] truncate">
                 smol espresso
               </p>
               <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-xs text-[#B72E35]">₹120</span>
+                <span className="font-serif font-bold text-xs text-[#B72E35] dark:text-[#FF5B52]">₹120</span>
                 <Link
                   href="/smol-menu"
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-[#B72E35] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
@@ -259,12 +296,12 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             </div>
 
             {/* Card 2: Jaggery Latte */}
-            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 bg-[#FAF4EB] p-3 shadow-xs flex flex-col justify-between h-24">
-              <p className="font-serif font-bold text-xs text-[#241F1C] truncate">
+            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3 shadow-xs flex flex-col justify-between h-24">
+              <p className="font-serif font-bold text-xs text-[#241F1C] dark:text-[#FAF4EB] truncate">
                 jaggery latte
               </p>
               <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-xs text-[#B72E35]">₹150</span>
+                <span className="font-serif font-bold text-xs text-[#B72E35] dark:text-[#FF5B52]">₹150</span>
                 <Link
                   href="/smol-menu"
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-[#B72E35] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
@@ -275,12 +312,12 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             </div>
 
             {/* Card 3: Triple Decker */}
-            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 bg-[#FAF4EB] p-3 shadow-xs flex flex-col justify-between h-24">
-              <p className="font-serif font-bold text-xs text-[#241F1C] truncate">
+            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3 shadow-xs flex flex-col justify-between h-24">
+              <p className="font-serif font-bold text-xs text-[#241F1C] dark:text-[#FAF4EB] truncate">
                 triple decker
               </p>
               <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-xs text-[#B72E35]">₹140</span>
+                <span className="font-serif font-bold text-xs text-[#B72E35] dark:text-[#FF5B52]">₹140</span>
                 <Link
                   href="/smol-menu"
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-[#B72E35] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
@@ -312,7 +349,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
         {/* Active Ticket Progression Cards */}
         {orders.length > 0 && (
           <div className="pt-3 space-y-3">
-            <h4 className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#786F66]">
+            <h4 className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#786F66] dark:text-[#C9AE8B]">
               Detailed Round Timeline
             </h4>
             <div className="space-y-3">

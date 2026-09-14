@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   setTableSessionCookie,
   clearTableSessionCookie,
+  getTableSessionCookie,
   type TableSessionData,
 } from "@/lib/session";
 import type { TableQrToken, DiningTable, TableSession } from "@smol-cafe/db";
@@ -31,7 +32,9 @@ function hashToken(rawToken: string): string {
  */
 export async function resolveQrToken(
   rawToken: string,
-  setCookie = true
+  setCookie = true,
+  guestName?: string,
+  guestPhone?: string
 ): Promise<ResolveQrResult> {
   if (!rawToken || typeof rawToken !== "string") {
     return {
@@ -57,6 +60,11 @@ export async function resolveQrToken(
   }
 
   try {
+    // Check existing cookie for guest details if not supplied
+    const existingCookie = await getTableSessionCookie().catch(() => null);
+    const finalGuestName = guestName || existingCookie?.guestName;
+    const finalGuestPhone = guestPhone || existingCookie?.guestPhone;
+
     // 1. Query table_qr_tokens by hash or plain token
     const { data: qrTokens, error: qrError } = await supabase
       .from("table_qr_tokens")
@@ -77,6 +85,8 @@ export async function resolveQrToken(
           openedAt: new Date().toISOString(),
           customerSessionId: `cust_${tableLabel}_${Date.now()}`,
           verificationCode: "4821",
+          guestName: finalGuestName,
+          guestPhone: finalGuestPhone,
         };
         if (setCookie) {
           await setTableSessionCookie(sessionData);
@@ -220,6 +230,8 @@ export async function resolveQrToken(
       openedAt,
       customerSessionId,
       verificationCode,
+      guestName: finalGuestName,
+      guestPhone: finalGuestPhone,
     };
 
     if (setCookie) {
@@ -240,16 +252,60 @@ export async function resolveQrToken(
   }
 }
 
+/**
+ * Server Action: Onboards guest with Name & Phone number, updates table session,
+ * and enables redirecting to /home instead of menu.
+ */
+export async function onboardGuestAndRedirectAction(formData: FormData): Promise<{ success: boolean; error?: string }> {
+  const token = (formData.get("tableToken") as string) || "table-01";
+  const guestName = (formData.get("guestName") as string || "").trim();
+  const guestPhone = (formData.get("guestPhone") as string || "").trim();
+
+  if (!guestName || guestName.length < 2) {
+    return { success: false, error: "Please enter your name." };
+  }
+  const cleanDigits = guestPhone.replace(/\D/g, "");
+  if (!cleanDigits || cleanDigits.length < 10) {
+    return { success: false, error: "Please enter a valid 10-digit mobile number." };
+  }
+
+  const result = await resolveQrToken(token, true, guestName, cleanDigits);
+
+  if (!result.success) {
+    return { success: false, error: result.message || "Failed to start table session." };
+  }
+
+  // Upsert profile record so order history & loyalty rewards immediately associate with this phone
+  try {
+    const supabase = createAdminClient();
+    const formattedPhone = cleanDigits.startsWith("+") ? cleanDigits : `+91${cleanDigits}`;
+    await supabase.from("profiles").upsert(
+      {
+        id: `prof_${cleanDigits}`,
+        display_name: guestName,
+        phone: formattedPhone,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "phone" }
+    );
+  } catch (err) {
+    console.warn("Could not upsert profile during onboarding:", err);
+  }
+
+  return { success: true };
+}
 
 /**
- * Server Action: Activates table session from form action and redirects to /menu.
+ * Server Action: Activates table session from form action and redirects to /home.
  */
 export async function activateTableAndRedirectAction(formData: FormData): Promise<void> {
   const token = formData.get("tableToken") as string;
+  const guestName = (formData.get("guestName") as string || "").trim();
+  const guestPhone = (formData.get("guestPhone") as string || "").trim();
   if (token) {
-    await resolveQrToken(token);
+    await resolveQrToken(token, true, guestName || undefined, guestPhone || undefined);
   }
-  redirect("/menu");
+  redirect("/home");
 }
 
 /**

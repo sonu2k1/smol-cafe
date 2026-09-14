@@ -12,6 +12,8 @@ export interface TableSessionData {
   openedAt: string;
   customerSessionId?: string;
   verificationCode?: string;
+  guestName?: string;
+  guestPhone?: string;
 }
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "smol-cafe-secret-session-key-2026";

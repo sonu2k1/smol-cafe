@@ -2,6 +2,8 @@ import Image from "next/image";
 import { resolveQrToken, clearTableSession, activateTableAndRedirectAction } from "../actions";
 import { AlertTriangle } from "lucide-react";
 import { TableActionBar } from "@/components/table/TableActionBar";
+import { TableGuestOnboardingForm } from "@/components/table/TableGuestOnboardingForm";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 
 interface PageProps {
   params: Promise<{ tableToken: string }>;
@@ -68,56 +70,99 @@ export default async function TableEntryPage({ params }: PageProps) {
   // - walnut: #725039
   // - biscuit: #C9AE8B
   return (
-    <div className="min-h-screen bg-[#F3E7D3] dark:bg-[#241F1C] text-[#241F1C] dark:text-[#F3E7D3] flex flex-col justify-between items-center px-6 py-6 sm:py-10 transition-colors duration-200 select-none">
-      <div className="w-full max-w-sm flex flex-col items-center flex-1 justify-center space-y-3 sm:space-y-4">
-        {/* Top Brand Door Logo & Tagline (smol cherry #B72E35) */}
-        <div className="pt-2 sm:pt-4">
-          <Image
-            src="/table-header-logo.png"
-            alt="smol café - Good Coffee Brighter Days"
-            width={112}
-            height={164}
-            className="w-24 sm:w-28 h-auto object-contain select-none"
-            priority
+    <div className="relative min-h-screen bg-[#F3E7D3] dark:bg-[#151110] text-[#241F1C] dark:text-[#FAF4EB] flex flex-col justify-between items-center px-6 py-6 sm:py-8 transition-colors duration-200 select-none">
+      {/* Floating Theme Toggle (Day / Night switch) */}
+      <div className="absolute top-4 right-4 z-40">
+        <ThemeToggle variant="icon" />
+      </div>
 
-          />
+      <div className="w-full max-w-sm flex flex-col items-center flex-1 justify-center space-y-3 sm:space-y-4">
+        {/* Top Brand Door Logo & Tagline with Dynamic Moving Animations */}
+        <div className="pt-2 sm:pt-4 flex flex-col items-center">
+          <div className="relative transition-transform duration-300 hover:scale-105 cursor-pointer flex flex-col items-center">
+            {/* Day Mode Logo: Clean Arched Red Door with Gentle Floating Bob */}
+            <Image
+              src="/table-header-logo.png"
+              alt="smol café - Good Coffee Brighter Days"
+              width={112}
+              height={164}
+              className="w-24 sm:w-28 h-auto object-contain select-none dark:hidden animate-logo-moving-light drop-shadow-[0_8px_16px_rgba(114,80,57,0.18)]"
+              priority
+            />
+            {/* Night Mode Logo: Glowing Neon Violet Door & Tagline with Moving Levitation + Breathing Neon Glow */}
+            <Image
+              src="/table-header-logo-dark.png?v=6"
+              alt="smol café - Good Company Brighter Days"
+              width={198}
+              height={244}
+              className="w-24 sm:w-28 h-auto object-contain select-none hidden dark:block animate-logo-moving-dark"
+              priority
+            />
+          </div>
         </div>
 
         {/* Hand-drawn Architectural Door Illustration on Transparent Cutout */}
         <div className="relative w-full max-w-[340px] sm:max-w-[370px] mx-auto">
+          {/* Day Mode Gate (Clean Architectural Door Cutout) */}
           <Image
-            src={displayTableNumber === "07" ? "/table-door-07-transparent.png" : "/table-door-blank-transparent.png"}
+            src="/table-door-blank-transparent.png?v=8"
             alt={`Table ${displayTableNumber}`}
             width={384}
             height={322}
-            className="w-full h-auto object-contain select-none pointer-events-none"
+            className="w-full h-auto object-contain select-none pointer-events-none dark:hidden"
             priority
-
           />
-          {/* Dynamic Table Placard overlay when not static 07 */}
-          {displayTableNumber !== "07" && (
-            <div
-              className="absolute flex flex-col items-center justify-center text-center pointer-events-none select-none"
-              style={{
-                top: "50%",
-                left: "40.2%",
-                transform: "translate(-50%, -50%)",
-                width: "22%",
-                height: "28%",
-              }}
-            >
-              <span className="text-[10px] sm:text-[11px] font-sans font-semibold tracking-[0.16em] text-[#241F1C] uppercase">
-                TABLE
-              </span>
-              <span className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-[#241F1C] leading-none mt-1">
-                {displayTableNumber}
-              </span>
-            </div>
-          )}
+          {/* Night Mode Gate (Clean Glowing Neon Violet & Obsidian Door Cutout) */}
+          <Image
+            src="/table-door-blank-purple.png?v=8"
+            alt={`Table ${displayTableNumber}`}
+            width={592}
+            height={588}
+            className="w-full h-auto object-contain select-none pointer-events-none hidden dark:block drop-shadow-[0_0_24px_rgba(117,76,255,0.25)]"
+            priority
+          />
+
+          {/* Day Mode Dynamic Table Placard overlay for ALL tables */}
+          <div
+            className="absolute flex flex-col items-center justify-center text-center pointer-events-none select-none dark:hidden"
+            style={{
+              top: "50%",
+              left: "40.2%",
+              transform: "translate(-50%, -50%)",
+              width: "22%",
+              height: "28%",
+            }}
+          >
+            <span className="text-[10px] sm:text-[11px] font-sans font-semibold tracking-[0.16em] text-[#241F1C] uppercase">
+              TABLE
+            </span>
+            <span className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-[#241F1C] leading-none mt-1">
+              {displayTableNumber}
+            </span>
+          </div>
+
+          {/* Night Mode Dynamic Placard overlay for ALL tables */}
+          <div
+            className="absolute hidden dark:flex flex-col items-center justify-center text-center pointer-events-none select-none"
+            style={{
+              top: "56.9%",
+              left: "42.2%",
+              transform: "translate(-50%, -50%)",
+              width: "20%",
+              height: "30%",
+            }}
+          >
+            <span className="text-[10px] sm:text-[11px] font-sans font-semibold tracking-[0.18em] text-[#C4B5FD] uppercase drop-shadow-[0_0_8px_rgba(196,181,253,0.6)]">
+              TABLE
+            </span>
+            <span className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-[#E9D5FF] leading-none mt-1 drop-shadow-[0_0_12px_rgba(233,213,255,0.85)]">
+              {displayTableNumber}
+            </span>
+          </div>
         </div>
 
         {/* Headline: EB Garamond, espresso ink + smol cherry (#B72E35) */}
-        <h1 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3] pt-1">
+        <h1 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-[#241F1C] dark:text-[#FAF4EB] pt-1">
           You&apos;re at <span className="text-[#B72E35] dark:text-[#F2C84B]">Table {displayTableNumber}</span>
         </h1>
 
@@ -128,8 +173,8 @@ export default async function TableEntryPage({ params }: PageProps) {
             alt="coffee bean divider"
             width={162}
             height={31}
-            className="h-3.5 sm:h-4 w-auto object-contain select-none dark:invert"
-
+            className="h-3.5 sm:h-4 w-auto object-contain select-none dark:invert opacity-90"
+            priority
           />
         </div>
 
@@ -139,20 +184,16 @@ export default async function TableEntryPage({ params }: PageProps) {
           <p>Scan, sip &amp; stay awhile.</p>
         </div>
 
-        {/* Primary CTA: View Menu in smol cherry (#B72E35) */}
-        <form action={activateTableAndRedirectAction} className="w-full max-w-[280px] sm:max-w-xs pt-4">
-          <input type="hidden" name="tableToken" value={tableToken} />
-          <button
-            type="submit"
-            className="w-full flex items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 px-8 text-base font-medium text-white shadow-md shadow-[#B72E35]/25 transition hover:bg-[#9B242A] active:scale-[0.98] cursor-pointer"
-          >
-            <span>View Menu</span>
-            <span aria-hidden="true" className="text-lg leading-none">→</span>
-          </button>
-        </form>
+        {/* Onboarding Flow: Name & Phone Number -> Navigates to /home */}
+        <TableGuestOnboardingForm
+          tableToken={tableToken}
+          tableLabel={displayTableNumber}
+          initialGuestName={result.session?.guestName || ""}
+          initialGuestPhone={result.session?.guestPhone || ""}
+        />
       </div>
 
-      {/* Interactive Bottom Actions: NEED HELP? | CALL A BARISTA */}
+      {/* Interactive Bottom Actions: NEED HELP? | CALL STAFF */}
       <TableActionBar tableNumber={displayTableNumber} />
     </div>
   );

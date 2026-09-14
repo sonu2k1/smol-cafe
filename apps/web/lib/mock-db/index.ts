@@ -86,6 +86,9 @@ export interface MockOrder {
   tax_snapshot: number;
   total_snapshot: number;
   idempotency_key: string;
+  customer_id?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -622,6 +625,9 @@ export class MockSupabaseClient {
         qty: number;
       }>;
       const rewardId = params.p_reward_id as string | undefined;
+      const customerName = (params.p_customer_name as string) || null;
+      const customerPhone = (params.p_customer_phone as string) || null;
+      const profileId = (params.p_profile_id as string) || (customerPhone ? `prof_${customerPhone.replace(/\D/g, "")}` : null);
 
       // 1. Idempotency Check
       const existing = mockStore.orders.find((o) => o.idempotency_key === idempotencyKey);
@@ -746,6 +752,9 @@ export class MockSupabaseClient {
         tax_snapshot: taxPaise,
         total_snapshot: totalPaise,
         idempotency_key: idempotencyKey,
+        customer_id: profileId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
         version: 1,
         created_at: now,
         updated_at: now,
@@ -753,6 +762,33 @@ export class MockSupabaseClient {
 
       mockStore.orders.push(newOrder);
       mockStore.order_items.push(...orderItemRecords);
+
+      // Link / credit loyalty points to phone
+      if (customerPhone) {
+        const cleanDigits = customerPhone.replace(/\D/g, "");
+        const formattedPhone = cleanDigits.startsWith("+") ? cleanDigits : `+91${cleanDigits}`;
+        let prof = mockStore.profiles.find((p) => p.phone === formattedPhone || p.phone === cleanDigits || p.phone.includes(cleanDigits));
+        if (!prof) {
+          prof = {
+            id: `prof_${cleanDigits}`,
+            phone: formattedPhone,
+            full_name: customerName || "Sonu",
+            current_balance_cached: 50, // 50 welcome points
+            created_at: now,
+          };
+          mockStore.profiles.push(prof);
+        }
+        const earned = Math.max(1, Math.floor(totalPaise / 1000));
+        prof.current_balance_cached += earned;
+        mockStore.loyalty_ledger.push({
+          id: `ll_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          profile_id: prof.id,
+          points_change: earned,
+          reason: `Earned from Order #${orderNo}`,
+          reference_order_id: orderId,
+          created_at: now,
+        });
+      }
 
       mockStore.order_status_history.push({
         id: `osh_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,

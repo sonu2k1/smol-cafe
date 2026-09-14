@@ -96,7 +96,7 @@ export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, on
               #{ticket.orderNo || ticket.id.slice(-4)}
             </span>
             <span className="rounded-lg border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#F3E7D3] dark:bg-[#241F1C] px-2 py-0.5 font-mono text-xs font-semibold text-[#B72E35] dark:text-[#F2C84B]">
-              table {ticket.tableLabel}
+              table {ticket.tableLabel}{ticket.guestName ? ` • ${ticket.guestName}` : ""}
             </span>
           </div>
 

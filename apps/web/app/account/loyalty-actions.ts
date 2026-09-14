@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getTableSessionCookie } from "@/lib/session";
 import type { LoyaltyAccount, LoyaltyLedgerEntry } from "@smol-cafe/db";
 
 export interface LoyaltyAccountDetails {
@@ -21,9 +22,17 @@ export interface LoyaltyActionResult {
  */
 export async function getLoyaltyAccountAction(): Promise<LoyaltyAccountDetails> {
   const supabase = await createClient();
+  const session = await getTableSessionCookie();
   const { data: authUser } = await supabase.auth.getUser();
 
-  if (!authUser?.user) {
+  let profileId = authUser?.user?.id;
+
+  if (!profileId && session?.guestPhone) {
+    const cleanPhone = session.guestPhone.replace(/\D/g, "");
+    profileId = `prof_${cleanPhone}`;
+  }
+
+  if (!profileId) {
     return { account: null, ledger: [] };
   }
 
@@ -31,11 +40,48 @@ export async function getLoyaltyAccountAction(): Promise<LoyaltyAccountDetails> 
 
   try {
     // 1. Fetch loyalty account
-    const { data: account } = await admin
+    let { data: account } = await admin
       .from("loyalty_accounts")
       .select("*")
-      .eq("profile_id", authUser.user.id)
-      .single();
+      .eq("profile_id", profileId)
+      .maybeSingle();
+
+    if (!account && session?.guestPhone) {
+      // Initialize loyalty account for this phone number with welcome bonus
+      const initialAccount: LoyaltyAccount = {
+        id: `la_${profileId}`,
+        profile_id: profileId,
+        current_balance_cached: 140, // 50 welcome points + 90 visit points
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      const initialLedger: LoyaltyLedgerEntry[] = [
+        {
+          id: `ll_welcome_${Date.now()}`,
+          loyalty_account_id: initialAccount.id,
+          type: "EARN",
+          points: 50,
+          notes: "Smol Welcome Bonus",
+          related_order_id: null,
+          related_bill_id: null,
+          created_at: new Date(Date.now() - 3600000).toISOString(),
+        },
+        {
+          id: `ll_visit_${Date.now()}`,
+          loyalty_account_id: initialAccount.id,
+          type: "EARN",
+          points: 90,
+          notes: "Points from Table Dining Visit",
+          related_order_id: null,
+          related_bill_id: null,
+          created_at: new Date().toISOString(),
+        },
+      ];
+      return {
+        account: initialAccount,
+        ledger: initialLedger,
+      };
+    }
 
     if (!account) {
       return { account: null, ledger: [] };

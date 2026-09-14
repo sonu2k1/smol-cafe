@@ -61,11 +61,14 @@ body {
 
 /* Blinking Red Status Dot (Smol Cherry #B72E35) */
 @keyframes redDotBlink {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
     box-shadow: 0 0 10px #B72E35, 0 0 18px #B72E35;
   }
+
   50% {
     opacity: 0.25;
     transform: scale(0.8);
@@ -81,6 +84,7 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -95,6 +99,7 @@ body {
     opacity: 0;
     transform: translateY(12px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -106,6 +111,7 @@ body {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -117,6 +123,7 @@ body {
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -127,25 +134,32 @@ body {
   from {
     transform: translateX(100%);
   }
+
   to {
     transform: translateX(0);
   }
 }
 
 @keyframes floatSlow {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0px) rotate(0deg);
   }
+
   50% {
     transform: translateY(-5px) rotate(1deg);
   }
 }
 
 @keyframes pulseGlow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.6;
     transform: scale(1.08);
@@ -156,6 +170,7 @@ body {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -166,10 +181,12 @@ body {
     opacity: 0.2;
     transform: translateY(0) scaleX(1);
   }
+
   50% {
     opacity: 0.7;
     transform: translateY(-6px) scaleX(1.1);
   }
+
   100% {
     opacity: 0;
     transform: translateY(-12px) scaleX(1.2);
@@ -180,6 +197,7 @@ body {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -189,12 +207,15 @@ body {
   0% {
     transform: scale(1);
   }
+
   40% {
     transform: scale(1.15);
   }
+
   70% {
     transform: scale(0.95);
   }
+
   100% {
     transform: scale(1);
   }
@@ -233,21 +254,86 @@ body {
   animation: popBounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+@keyframes logoBobFloat {
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-6px) rotate(0.8deg);
+  }
+}
+
+@keyframes neonBreathingBob {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    filter: drop-shadow(0 0 14px rgba(117, 76, 255, 0.5)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+  }
+  50% {
+    transform: translateY(-7px) rotate(-0.8deg);
+    filter: drop-shadow(0 0 28px rgba(117, 76, 255, 0.85)) drop-shadow(0 0 12px rgba(196, 181, 253, 0.7)) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.6));
+  }
+}
+
+.animate-logo-moving-light {
+  animation: logoBobFloat 3.6s ease-in-out infinite;
+}
+
+.animate-logo-moving-dark {
+  animation: neonBreathingBob 3.6s ease-in-out infinite;
+}
+
+@keyframes logoShadowFloat {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleX(0.72);
+    opacity: 0.2;
+  }
+}
+
+.animate-logo-shadow {
+  animation: logoShadowFloat 3.6s ease-in-out infinite;
+}
+
 /* Stagger Animation Delays */
-.delay-50 { animation-delay: 50ms; }
-.delay-100 { animation-delay: 100ms; }
-.delay-150 { animation-delay: 150ms; }
-.delay-200 { animation-delay: 200ms; }
-.delay-250 { animation-delay: 250ms; }
-.delay-300 { animation-delay: 300ms; }
+.delay-50 {
+  animation-delay: 50ms;
+}
+
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-150 {
+  animation-delay: 150ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}
+
+.delay-250 {
+  animation-delay: 250ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
 
 /* Interactive Hover/Active utilities */
 .hover-lift {
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
 }
+
 .hover-lift:hover {
   transform: translateY(-2px);
 }
+
 .hover-lift:active {
   transform: scale(0.98);
 }
@@ -257,10 +343,13 @@ body {
    ══════════════════════════════════════════════════════════════════════════ */
 
 @keyframes glowPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     box-shadow: 0 0 8px rgba(183, 46, 53, 0.4);
   }
+
   50% {
     opacity: 0.7;
     box-shadow: 0 0 16px rgba(183, 46, 53, 0.6);
@@ -268,9 +357,12 @@ body {
 }
 
 @keyframes glowPulseSlow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 4px 24px rgba(183, 46, 53, 0.25);
   }
+
   50% {
     box-shadow: 0 4px 32px rgba(183, 46, 53, 0.45);
   }
@@ -290,11 +382,13 @@ body {
     opacity: 0.7;
     filter: drop-shadow(0 0 4px currentColor);
   }
+
   50% {
     top: 14%;
     opacity: 1;
     filter: drop-shadow(0 0 10px currentColor);
   }
+
   100% {
     top: 86%;
     opacity: 0.7;
@@ -450,4 +544,3 @@ body {
     inset 0 1px 2px rgba(0, 0, 0, 0.5),
     0 1px 2px rgba(0, 0, 0, 0.3);
 }
-

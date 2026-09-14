@@ -21,6 +21,8 @@ export interface KitchenTicket {
   orderNo: number;
   tableLabel: string;
   tableId: string;
+  guestName?: string | null;
+  guestPhone?: string | null;
   status: OrderStatus;
   submittedAt: string | null;
   acceptedAt: string | null;
@@ -145,6 +147,8 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
         orderNo: o.order_no,
         tableLabel: tableInfo?.label || "Direct / Takeaway",
         tableId: tableInfo?.tableId || "",
+        guestName: (o as unknown as { customer_name?: string | null }).customer_name || null,
+        guestPhone: (o as unknown as { customer_phone?: string | null }).customer_phone || null,
         status: o.status,
         submittedAt: o.submitted_at,
         acceptedAt: o.accepted_at,

@@ -37,6 +37,8 @@ export interface FetchOrdersResult {
   orders: CustomerOrderDetails[];
   tableLabel?: string;
   locationName?: string;
+  guestName?: string;
+  guestPhone?: string;
   message?: string;
 }
 
@@ -169,6 +171,8 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
       orders: structuredOrders,
       tableLabel: session.tableLabel,
       locationName: session.locationName,
+      guestName: session.guestName,
+      guestPhone: session.guestPhone,
     };
   } catch (error) {
     console.error("Unexpected error in fetchActiveOrdersAction:", error);

@@ -118,6 +118,8 @@ export async function placeOrderAction(
       p_items: items,
       p_reward_id: rewardId || null,
       p_profile_id: profileId,
+      p_customer_name: session.guestName || null,
+      p_customer_phone: session.guestPhone || null,
     });
 
     let result = rpcResult as {
@@ -149,6 +151,8 @@ export async function placeOrderAction(
           p_items: items,
           p_reward_id: rewardId || null,
           p_profile_id: profileId,
+          p_customer_name: session.guestName || null,
+          p_customer_phone: session.guestPhone || null,
         });
         rpcResult = retry.data;
         rpcError = retry.error;

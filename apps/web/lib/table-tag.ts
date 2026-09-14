@@ -4,7 +4,7 @@
  * and session tagging for cross-interface synchronization.
  */
 
-export type TableZone = "Indoor Cozy" | "Courtyard Verandah" | "Garden Terrace" | "Brew Bar";
+export type TableZone = "Indoor Cozy" | "Courtyard Verandah" | "Garden Terrace" | "Brew Bar" | (string & {});
 
 export interface TableJsonTag {
   table_id: string;

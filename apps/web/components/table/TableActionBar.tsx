@@ -11,22 +11,22 @@ interface TableActionBarProps {
 export function TableActionBar({ tableNumber }: TableActionBarProps) {
   const router = useRouter();
   const [helpOpen, setHelpOpen] = useState(false);
-  const [baristaNotified, setBaristaNotified] = useState(false);
+  const [staffNotified, setStaffNotified] = useState(false);
 
-  const handleCallBarista = () => {
-    setBaristaNotified(true);
+  const handleCallStaff = () => {
+    setStaffNotified(true);
     setTimeout(() => {
-      setBaristaNotified(false);
+      setStaffNotified(false);
     }, 4000);
   };
 
   return (
     <div className="w-full max-w-sm pt-6 pb-2 text-center">
-      {/* Toast Notification when Barista is called */}
-      {baristaNotified && (
+      {/* Toast Notification when Staff is called */}
+      {staffNotified && (
         <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#B72E35] text-[#F3E7D3] px-4 py-2 text-xs font-mono shadow-lg animate-bounce">
           <Check className="h-3.5 w-3.5 text-[#F3E7D3]" />
-          <span>Barista alerted for Table {tableNumber}!</span>
+          <span>Staff alerted for Table {tableNumber}!</span>
         </div>
       )}
 
@@ -46,10 +46,10 @@ export function TableActionBar({ tableNumber }: TableActionBarProps) {
 
         <button
           type="button"
-          onClick={handleCallBarista}
+          onClick={handleCallStaff}
           className="underline underline-offset-4 hover:text-[#B72E35] dark:hover:text-[#F2C84B] transition-colors uppercase cursor-pointer"
         >
-          CALL A BARISTA
+          CALL STAFF
         </button>
       </div>
 
@@ -89,7 +89,7 @@ export function TableActionBar({ tableNumber }: TableActionBarProps) {
               <button
                 type="button"
                 onClick={() => {
-                  handleCallBarista();
+                  handleCallStaff();
                   setHelpOpen(false);
                 }}
                 className="w-full flex items-center justify-between rounded-xl bg-[#B72E35] text-white px-4 py-3 text-xs font-semibold shadow-xs hover:bg-[#9B242A] cursor-pointer"

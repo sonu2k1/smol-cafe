@@ -15,6 +15,7 @@ export default async function OrdersPage() {
       tableLabel={result.tableLabel}
       locationName={result.locationName}
       hasSession={result.hasSession}
+      guestName={result.guestName}
     />
   );
 }

@@ -34,6 +34,8 @@ export interface RunningBillDetails {
   paidAmountPaise: number;
   balanceDuePaise: number;
   rounds: BillOrderRound[];
+  guestName?: string;
+  guestPhone?: string;
 }
 
 export interface FetchBillResult {
@@ -175,6 +177,8 @@ export async function fetchRunningBillAction(): Promise<FetchBillResult> {
         paidAmountPaise,
         balanceDuePaise,
         rounds,
+        guestName: session.guestName,
+        guestPhone: session.guestPhone,
       },
     };
   } catch (err) {
