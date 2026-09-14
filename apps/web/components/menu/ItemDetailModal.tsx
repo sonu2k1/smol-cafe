@@ -414,15 +414,35 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
         {/* Floating / Sticky Bottom Action Button: Smol Cherry (#B72E35) with Crème (#F3E7D3) text */}
         <div className="absolute bottom-0 left-0 right-0 z-30 px-5 pt-3 pb-6 bg-gradient-to-t from-[#F3E7D3] via-[#F3E7D3]/95 to-transparent dark:from-[#241F1C] dark:via-[#241F1C]/95">
-          <button
-            type="button"
-            onClick={handleAddToCart}
-            className="w-full h-13 sm:h-14 rounded-full bg-[#B72E35] hover:bg-[#9E252C] text-[#F3E7D3] font-serif text-lg tracking-wide flex items-center justify-center gap-4 shadow-lg active:scale-[0.98] transition hover-lift cursor-pointer"
-          >
-            <span>Add to Table</span>
-            <span className="opacity-40 font-light text-base">|</span>
-            <span>₹{totalPriceRupees}</span>
-          </button>
+          {(() => {
+            const isSoldOut =
+              item.status === "SOLD_OUT" ||
+              item.status === "INACTIVE" ||
+              (item.metadata as any)?.availability === "SOLD_OUT";
+
+            return (
+              <button
+                type="button"
+                disabled={isSoldOut}
+                onClick={handleAddToCart}
+                className={`w-full h-13 sm:h-14 rounded-full font-serif text-lg tracking-wide flex items-center justify-center gap-4 shadow-lg transition ${
+                  isSoldOut
+                    ? "bg-stone-300 dark:bg-stone-800 text-stone-500 cursor-not-allowed"
+                    : "bg-[#B72E35] hover:bg-[#9E252C] text-[#F3E7D3] active:scale-[0.98] hover-lift cursor-pointer"
+                }`}
+              >
+                {isSoldOut ? (
+                  <span>86 / Sold Out Today</span>
+                ) : (
+                  <>
+                    <span>Add to Table</span>
+                    <span className="opacity-40 font-light text-base">|</span>
+                    <span>₹{totalPriceRupees}</span>
+                  </>
+                )}
+              </button>
+            );
+          })()}
         </div>
       </div>
     </div>

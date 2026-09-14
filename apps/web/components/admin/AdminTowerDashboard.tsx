@@ -24,6 +24,7 @@ import { getUpiConfig, updateMerchantConfig, type MerchantConfig } from "@/lib/u
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { JsonTagInspectorModal } from "@/components/table/JsonTagInspectorModal";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { TableManager } from "@/components/admin/TableManager";
 
 interface AdminTowerProps {
   initialMetrics?: {
@@ -584,74 +585,8 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
           </div>
         )}
 
-        {/* Tab 3: TABLES FLOOR PLAN & JSON TAGGING */}
-        {activeTab === "tables" && (
-          <div className="p-6 space-y-6 max-w-7xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-[#241F1C] dark:text-white">12 Dining Tables Floor Map</h2>
-                <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
-                  Select any table to view QR code token or inspect JSON Tag
-                </p>
-              </div>
-            </div>
-
-            {/* 12 Tables Floor Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {Array.from({ length: 12 }, (_, i) => {
-                const label = (i + 1).toString().padStart(2, "0");
-                const config = TABLE_ZONES_CONFIG[label] || { zone: "Indoor Cozy", capacity: 2 };
-                const isOccupied = ["01", "02", "04", "07", "05"].includes(label);
-
-                return (
-                  <div
-                    key={label}
-                    className={`rounded-3xl border p-4 text-left transition-all relative flex flex-col justify-between h-44 shadow-xs ${
-                      isOccupied
-                        ? "border-[#B72E35] bg-[#FAF4EB] dark:bg-[#1A1715] shadow-md ring-1 ring-[#B72E35]/40"
-                        : "border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/60 dark:bg-[#171514] opacity-90 hover:opacity-100"
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xl font-black text-[#241F1C] dark:text-white">T-{label}</span>
-                        <span
-                          className={`h-2 w-2 rounded-full ${
-                            isOccupied ? "bg-emerald-500 animate-pulse" : "bg-[#C9AE8B] dark:bg-stone-600"
-                          }`}
-                        />
-                      </div>
-                      <span className="mt-1 block text-xs font-bold text-[#B72E35] dark:text-[#F2C84B]">
-                        {config.zone}
-                      </span>
-                      <span className="text-[10px] text-[#725039] dark:text-stone-400 font-mono">
-                        Seats: {config.capacity} guests
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5 pt-2">
-                      <button
-                        onClick={() => setInspectingTag(createTableJsonTag(label))}
-                        className="w-full flex items-center justify-center gap-1 rounded-xl bg-[#F3E7D3] dark:bg-stone-800 py-1.5 text-[11px] font-mono text-[#241F1C] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 transition"
-                      >
-                        <Tag className="h-3 w-3 text-[#B72E35] dark:text-[#F2C84B]" />
-                        <span>JSON Tag</span>
-                      </button>
-
-                      <Link
-                        href={`/t/table-${label}`}
-                        className="w-full flex items-center justify-center gap-1 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 py-1.5 text-[11px] font-mono text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition"
-                      >
-                        <QrCode className="h-3 w-3" />
-                        <span>Open QR</span>
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Tab 3: TABLES & SECTIONS MANAGEMENT */}
+        {activeTab === "tables" && <TableManager />}
 
         {/* Tab 4: MENU MANAGEMENT & STOCK TOGGLE */}
         {activeTab === "menu" && (

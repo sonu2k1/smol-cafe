@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import type { KitchenTicket } from "@/app/kitchen/actions";
 import {
   fetchKitchenOrdersAction,
@@ -10,7 +11,8 @@ import {
 import type { OrderStatus } from "@smol-cafe/db";
 import { KitchenTicketCard } from "./KitchenTicketCard";
 import { EtaAccuracyReview } from "./EtaAccuracyReview";
-import { Bell, BellOff, AlertTriangle, ChefHat, RefreshCw, LogOut } from "lucide-react";
+import { KitchenMenuManager } from "./KitchenMenuManager";
+import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
@@ -26,7 +28,13 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [showEtaAnalytics, setShowEtaAnalytics] = useState(false);
+  const [currentView, setCurrentView] = useState<"TICKETS" | "MENU_STOCK">("TICKETS");
+  const [mounted, setMounted] = useState(false);
   const prevOrderCountRef = useRef(initialOrders.length);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sound chime for incoming orders
   const playChime = useCallback(() => {
@@ -135,10 +143,14 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
 
   // Group tickets strictly into 4 columns per specification:
   // NEW -> PREPARING -> READY -> COMPLETED
-  const newOrders = orders.filter((o) => o.status === "SUBMITTED" || o.status === "ACCEPTED");
+  const newOrders = orders.filter((o) =>
+    ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED"].includes(o.status)
+  );
   const preparingOrders = orders.filter((o) => o.status === "PREPARING");
   const readyOrders = orders.filter((o) => o.status === "READY");
-  const completedOrders = orders.filter((o) => o.status === "SERVED");
+  const completedOrders = orders.filter((o) =>
+    ["SERVED", "COMPLETED", "CLOSED"].includes(o.status)
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F3E7D3] dark:bg-[#241F1C] text-[#241F1C] dark:text-[#F3E7D3] font-sans transition-colors duration-200">
@@ -146,8 +158,21 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
       <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB]/95 dark:bg-[#1D1815]/95 px-5 sm:px-6 py-3.5 backdrop-blur-md transition-colors duration-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#B72E35] text-white shadow-xs">
-              <ChefHat className="h-5 w-5" />
+            <div className="relative h-11 w-8 shrink-0 select-none">
+              <Image
+                src="/kitchen-logo.png"
+                alt="smol café kitchen logo"
+                fill
+                priority
+                className="object-contain drop-shadow-xs dark:hidden block"
+              />
+              <Image
+                src="/kitchen-logo-dark.png"
+                alt="smol café kitchen logo night mode"
+                fill
+                priority
+                className="object-contain drop-shadow-[0_0_8px_rgba(168,85,247,0.4)] hidden dark:block"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -163,6 +188,32 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                 order preparation & ticket dispatch
               </p>
             </div>
+          </div>
+
+          {/* Central KDS View Switcher: Live Tickets vs Daily Menu & 86 */}
+          <div className="flex items-center gap-1 rounded-2xl bg-[#EFE7DC] dark:bg-[#151110] p-1 border border-[#C9AE8B]/30 dark:border-stone-800">
+            <button
+              onClick={() => setCurrentView("TICKETS")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer ${
+                currentView === "TICKETS"
+                  ? "bg-[#B72E35] text-white shadow-xs"
+                  : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
+              }`}
+            >
+              <Coffee className="h-3.5 w-3.5" />
+              <span>Live Tickets ({orders.filter((o) => o.status !== "SERVED").length})</span>
+            </button>
+            <button
+              onClick={() => setCurrentView("MENU_STOCK")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer ${
+                currentView === "MENU_STOCK"
+                  ? "bg-[#B72E35] text-white shadow-xs"
+                  : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
+              }`}
+            >
+              <UtensilsCrossed className="h-3.5 w-3.5" />
+              <span>Daily Menu & 86</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -201,8 +252,8 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   isRefreshing ? "scale-125 opacity-70" : "animate-pulse"
                 }`}
               />
-              <span className="hidden sm:inline">
-                live · {lastRefreshedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              <span className="hidden sm:inline" suppressHydrationWarning>
+                live · {mounted ? lastRefreshedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "--:--:--"}
               </span>
             </div>
 
@@ -256,9 +307,14 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
         )}
       </header>
 
-      {/* Kanban Board 4 Columns: NEW -> PREPARING -> READY -> COMPLETED */}
-      <main className="grid flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-4 min-w-0">
-        {/* Column 1: NEW */}
+      {currentView === "MENU_STOCK" ? (
+        <main className="flex-1 min-w-0">
+          <KitchenMenuManager />
+        </main>
+      ) : (
+        /* Kanban Board 4 Columns: NEW -> PREPARING -> READY -> COMPLETED */
+        <main className="grid flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-4 min-w-0">
+          {/* Column 1: NEW */}
         <div className="flex flex-col rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-sm transition-colors duration-200">
           <div className="mb-3 flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
             <div className="flex items-center gap-2">
@@ -382,6 +438,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
           </div>
         </div>
       </main>
+      )}
     </div>
   );
 };

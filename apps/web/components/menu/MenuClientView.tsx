@@ -11,19 +11,34 @@ import { FloatingCartBar } from "@/components/cart/FloatingCartBar";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { BottomNavBar } from "@/components/navigation/BottomNavBar";
 
+import { ThemeToggle } from "@/components/common/ThemeToggle";
+
 interface MenuClientViewProps {
   categories: CategoryWithItems[];
   tableLabel?: string;
   locationName?: string;
+  guestName?: string;
 }
 
 const MenuContentInner: React.FC<MenuClientViewProps> = ({
   categories,
   tableLabel,
   locationName = "Smol Café",
+  guestName = "",
 }) => {
   const searchParams = useSearchParams();
   const categoryParam = searchParams ? searchParams.get("category") : null;
+
+  const [currentGuestName, setCurrentGuestName] = useState(guestName);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("smol_guest_name");
+      if (saved && !currentGuestName) {
+        setCurrentGuestName(saved);
+      }
+    }
+  }, [currentGuestName]);
 
   const [activeCategoryId, setActiveCategoryId] = useState<string>("");
   const [selectedItem, setSelectedItem] = useState<MenuItemWithDetails | null>(null);
@@ -94,14 +109,14 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
     .filter((cat) => cat.items.length > 0);
 
   return (
-    <div className="min-h-screen bg-[#F3E7D3] text-[#241F1C] pb-28 font-sans">
+    <div className="min-h-screen bg-[#F3E7D3] dark:bg-[#151110] text-[#241F1C] dark:text-[#FAF4EB] pb-44 font-sans transition-colors duration-200">
       {/* Top Header */}
-      <header className="sticky top-0 z-40 border-b border-[#C9AE8B]/40 bg-[#F3E7D3]/90 px-4 py-3.5 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-[#C9AE8B]/40 dark:border-white/10 bg-[#F3E7D3]/90 dark:bg-[#181412]/90 px-4 py-3.5 backdrop-blur-md transition-colors duration-200">
         <div className="mx-auto flex max-w-md items-center justify-between">
           {/* Back Button */}
           <Link
             href="/"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#241F1C] transition hover:bg-black/5 active:scale-95"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#241F1C] dark:text-[#FAF4EB] transition hover:bg-black/5 dark:hover:bg-white/10 active:scale-95"
             aria-label="Back to home"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -111,39 +126,42 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
 
           {/* Title & Location Context */}
           <div className="text-center">
-            <h1 className="font-serif text-2xl font-bold tracking-tight text-[#B72E35] lowercase">
+            <h1 className="font-serif text-2xl font-bold tracking-tight text-[#B72E35] dark:text-[#FF5B52] lowercase">
               smol menu
             </h1>
             {tableLabel ? (
-              <p className="text-[10px] font-mono font-medium text-[#725039]">
-                table {tableLabel} • {locationName}
+              <p className="text-[10px] font-mono font-medium text-[#725039] dark:text-[#C9AE8B]">
+                table {tableLabel} • {currentGuestName || locationName}
               </p>
             ) : null}
           </div>
 
-          {/* Search Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              const el = document.getElementById("menu-search-input");
-              el?.focus();
-            }}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#241F1C] transition hover:bg-black/5 active:scale-95"
-            aria-label="Search menu"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </button>
+          {/* Right Controls: Search Toggle & Day/Night Mode Switcher */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("menu-search-input");
+                el?.focus();
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-[#241F1C] dark:text-[#FAF4EB] transition hover:bg-black/5 dark:hover:bg-white/10 active:scale-95"
+              aria-label="Search menu"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </button>
+            <ThemeToggle variant="icon" />
+          </div>
         </div>
 
         {/* Subtitle & Item Count */}
         <div className="mx-auto mt-2 flex max-w-md items-baseline justify-between px-1">
-          <p className="font-serif italic text-xs text-[#725039]">
+          <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]/80">
             what are we brewing &amp; baking today?
           </p>
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#B72E35]">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#B72E35] dark:text-[#FF5B52]">
             59 ITEMS
           </span>
         </div>
@@ -155,8 +173,8 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
             onClick={() => setActiveCategoryId("")}
             className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-serif transition-colors ${
               activeCategoryId === ""
-                ? "bg-[#B72E35] text-white font-bold shadow-xs"
-                : "border border-[#C9AE8B]/60 bg-[#FAF4EB] text-[#241F1C] hover:bg-[#EFE7DC]"
+                ? "bg-[#B72E35] text-white font-bold shadow-xs dark:bg-[#B72E35] dark:shadow-[0_0_12px_rgba(183,46,53,0.4)]"
+                : "border border-[#C9AE8B]/60 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB] hover:bg-[#EFE7DC] dark:hover:bg-[#2C2420]"
             }`}
           >
             all items
@@ -171,8 +189,8 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
                 onClick={() => handleSelectCategory(cat.id)}
                 className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-serif transition-colors lowercase ${
                   isActive
-                    ? "bg-[#B72E35] text-white font-bold shadow-xs"
-                    : "border border-[#C9AE8B]/60 bg-[#FAF4EB] text-[#241F1C] hover:bg-[#EFE7DC]"
+                    ? "bg-[#B72E35] text-white font-bold shadow-xs dark:bg-[#B72E35] dark:shadow-[0_0_12px_rgba(183,46,53,0.4)]"
+                    : "border border-[#C9AE8B]/60 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB] hover:bg-[#EFE7DC] dark:hover:bg-[#2C2420]"
                 }`}
               >
                 {cat.name}
@@ -184,8 +202,10 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
           <button
             type="button"
             onClick={() => setFilterVegOnly(!filterVegOnly)}
-            className={`shrink-0 flex items-center justify-center h-8 w-8 rounded-full border border-[#C9AE8B]/60 ${
-              filterVegOnly ? "bg-[#75AFA7] text-white border-transparent" : "bg-[#FAF4EB] text-[#241F1C]"
+            className={`shrink-0 flex items-center justify-center h-8 w-8 rounded-full border border-[#C9AE8B]/60 dark:border-white/10 ${
+              filterVegOnly
+                ? "bg-[#75AFA7] dark:bg-[#5E9B93] text-white border-transparent"
+                : "bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB]"
             }`}
             title="Filter Veg only"
           >
@@ -205,7 +225,7 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
 
         {/* Quick Table Switcher Bar for guests */}
         {!tableLabel && (
-          <div className="mx-auto mt-2.5 flex max-w-md items-center justify-between rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-1.5 text-xs text-amber-900">
+          <div className="mx-auto mt-2.5 flex max-w-md items-center justify-between rounded-xl border border-amber-200/80 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 px-3 py-1.5 text-xs text-amber-900 dark:text-amber-200">
             <span className="text-[11px] font-medium">Seated at:</span>
             <div className="flex items-center gap-1.5 overflow-x-auto">
               {[1, 2, 3, 4, 5, 6].map((num) => {
@@ -214,7 +234,7 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
                   <Link
                     key={num}
                     href={`/t/table-${label}`}
-                    className="rounded-lg border border-amber-300 bg-white px-2 py-0.5 text-[11px] font-bold shadow-xs hover:bg-amber-100"
+                    className="rounded-lg border border-amber-300 dark:border-amber-700/50 bg-white dark:bg-[#251E1A] px-2 py-0.5 text-[11px] font-bold shadow-xs hover:bg-amber-100 dark:hover:bg-amber-900/40"
                   >
                     T{label}
                   </Link>
@@ -231,16 +251,16 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
             {/* Category Section Header */}
             <div className="pt-2">
               <div className="flex items-baseline justify-between">
-                <h2 className="font-serif text-lg sm:text-xl font-bold tracking-tight text-[#1C1917] lowercase flex items-center gap-1">
+                <h2 className="font-serif text-lg sm:text-xl font-bold tracking-tight text-[#1C1917] dark:text-[#FAF4EB] lowercase flex items-center gap-1">
                   <span>{category.name}</span>
-                  <span className="text-xs text-[#A62B34]">✧</span>
+                  <span className="text-xs text-[#A62B34] dark:text-[#FF5B52]">✧</span>
                 </h2>
-                <span className="font-mono text-xs text-[#786F66]">
+                <span className="font-mono text-xs text-[#786F66] dark:text-[#C9AE8B]">
                   {category.items.length} items
                 </span>
               </div>
               {category.description && (
-                <p className="font-serif italic text-xs text-[#786F66] mt-0.5 lowercase">
+                <p className="font-serif italic text-xs text-[#786F66] dark:text-[#C9AE8B]/70 mt-0.5 lowercase">
                   {category.description}
                 </p>
               )}
@@ -256,14 +276,14 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
         ))}
 
         {filteredCategories.length === 0 && (
-          <div className="py-16 text-center text-stone-500">
+          <div className="py-16 text-center text-stone-500 dark:text-stone-400">
             <p className="text-sm font-serif">No items found matching your search.</p>
             <button
               onClick={() => {
                 setSearchQuery("");
                 setFilterVegOnly(false);
               }}
-              className="mt-3 text-xs font-semibold text-[#9B2C2C] underline"
+              className="mt-3 text-xs font-semibold text-[#9B2C2C] dark:text-[#FF5B52] underline cursor-pointer"
             >
               Clear filters
             </button>
@@ -275,7 +295,7 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
       <FloatingCartBar />
 
       {/* Cart Drawer */}
-      <CartDrawer tableLabel={tableLabel} />
+      <CartDrawer tableLabel={tableLabel} guestName={currentGuestName} />
 
       {/* Item Detail Modal */}
       {selectedItem && (

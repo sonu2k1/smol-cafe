@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getTableSessionCookie } from "@/lib/session";
+import { getTableSessionCookie, isValidUuid } from "@/lib/session";
 import type { Profile, OrderStatus } from "@smol-cafe/db";
 
 export interface AuthActionResult {
@@ -207,6 +207,28 @@ export async function getCurrentUserProfileAction(): Promise<{
   try {
     const { data: authUser } = await supabase.auth.getUser();
     if (!authUser?.user) {
+      if (session?.guestName || session?.guestPhone) {
+        const cleanDigits = session.guestPhone ? session.guestPhone.replace(/\D/g, "") : "";
+        const formattedPhone = cleanDigits ? `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}` : null;
+        return {
+          profile: {
+            id: `prof_${cleanDigits || "guest"}`,
+            display_name: session.guestName || "Sonu",
+            phone: formattedPhone,
+            email: null,
+            avatar_url: null,
+            created_at: session.openedAt || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          activeSession: session
+            ? {
+                sessionId: session.sessionId,
+                tableLabel: session.tableLabel || "Table",
+                locationName: session.locationName || "smol café",
+              }
+            : null,
+        };
+      }
       return { profile: null, activeSession: session };
     }
 
@@ -228,6 +250,28 @@ export async function getCurrentUserProfileAction(): Promise<{
         : null,
     };
   } catch {
+    if (session?.guestName || session?.guestPhone) {
+      const cleanDigits = session.guestPhone ? session.guestPhone.replace(/\D/g, "") : "";
+      const formattedPhone = cleanDigits ? `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}` : null;
+      return {
+        profile: {
+          id: `prof_${cleanDigits || "guest"}`,
+          display_name: session.guestName || "Sonu",
+          phone: formattedPhone,
+          email: null,
+          avatar_url: null,
+          created_at: session.openedAt || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        activeSession: session
+          ? {
+              sessionId: session.sessionId,
+              tableLabel: session.tableLabel || "Table",
+              locationName: session.locationName || "smol café",
+            }
+          : null,
+      };
+    }
     return {
       profile: null,
       activeSession: session
@@ -286,16 +330,22 @@ export async function getCustomerOrderHistoryAction(): Promise<{
   orders: CustomerHistoricalOrder[];
 }> {
   const supabase = await createClient();
+  const session = await getTableSessionCookie();
   const { data: authUser } = await supabase.auth.getUser();
 
-  if (!authUser?.user) {
+  const phone = session?.guestPhone ? session.guestPhone.replace(/\D/g, "") : null;
+  const formattedPhone = phone ? `+91${phone}` : null;
+  const customerId = authUser?.user?.id || null;
+  const sessionId = session?.sessionId || null;
+
+  if (!customerId && !phone && !sessionId) {
     return { orders: [] };
   }
 
   const admin = createAdminClient();
 
   try {
-    const { data: orders, error: ordersErr } = await admin
+    let query = admin
       .from("orders")
       .select(
         `
@@ -309,9 +359,22 @@ export async function getCustomerOrderHistoryAction(): Promise<{
           locations (name)
         )
       `
-      )
-      .eq("customer_id", authUser.user.id)
-      .order("submitted_at", { ascending: false });
+      );
+
+    const isSessionUuid = isValidUuid(sessionId);
+    if (customerId) {
+      query = query.eq("customer_id", customerId);
+    } else if (phone && sessionId && isSessionUuid) {
+      query = query.or(`customer_phone.eq.${phone},customer_phone.eq.${formattedPhone},table_session_id.eq.${sessionId}`);
+    } else if (phone) {
+      query = query.or(`customer_phone.eq.${phone},customer_phone.eq.${formattedPhone}`);
+    } else if (sessionId && isSessionUuid) {
+      query = query.eq("table_session_id", sessionId);
+    } else {
+      return { orders: [] };
+    }
+
+    const { data: orders, error: ordersErr } = await query.order("submitted_at", { ascending: false });
 
     if (ordersErr || !orders || orders.length === 0) {
       return { orders: [] };

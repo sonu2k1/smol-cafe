@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +17,7 @@ export async function GET() {
 
     if (error) {
       console.warn("Health check DB query error:", error);
-      return NextResponse.json(
+      return Response.json(
         {
           status: "degraded",
           dbConnected: false,
@@ -30,7 +29,7 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(
+    return Response.json(
       {
         status: "ok",
         dbConnected: true,
@@ -45,7 +44,7 @@ export async function GET() {
     );
   } catch (err) {
     console.error("Health check unexpected error:", err);
-    return NextResponse.json(
+    return Response.json(
       {
         status: "offline",
         dbConnected: false,

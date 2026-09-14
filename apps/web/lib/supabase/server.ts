@@ -27,17 +27,23 @@ export async function createClient() {
     return new MockSupabaseClient() as unknown as ReturnType<typeof createServerClient<Database>>;
   }
 
-  const cookieStore = await cookies();
+  let cookieStore: Awaited<ReturnType<typeof cookies>> | null = null;
+  try {
+    cookieStore = await cookies();
+  } catch {
+    cookieStore = null;
+  }
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
-        return cookieStore.getAll();
+        return cookieStore ? cookieStore.getAll() : [];
       },
       setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
+        if (!cookieStore) return;
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
+            cookieStore!.set(name, value, options);
           });
         } catch {
           // The `setAll` method was called from a Server Component.

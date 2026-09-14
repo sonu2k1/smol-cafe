@@ -104,14 +104,14 @@ export default function RoleSelectionPage() {
                   <>
                     <Moon className="h-3.5 w-3.5 text-[#754CFF] animate-pulse" />
                     <span className="lowercase text-[11px] font-medium tracking-wide">
-                      night <span className="text-[#F2C84B]">· espresso</span>
+                      night
                     </span>
                   </>
                 ) : (
                   <>
                     <Sun className="h-3.5 w-3.5 text-[#B72E35]" />
                     <span className="lowercase text-[11px] font-medium tracking-wide">
-                      day <span className="text-[#725039]">· crème</span>
+                      day
                     </span>
                   </>
                 )}

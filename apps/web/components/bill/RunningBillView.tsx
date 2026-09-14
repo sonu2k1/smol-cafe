@@ -1,13 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { RunningBillDetails } from "@/app/bill/actions";
-import { fetchRunningBillAction, requestBillAction } from "@/app/bill/actions";
+import { fetchRunningBillAction, requestBillAction, bypassPaymentAction } from "@/app/bill/actions";
+import { broadcastSyncEvent } from "@/lib/sync-events";
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
-import { ChevronRight, Lock, CheckCircle2 } from "lucide-react";
+import {
+  PostPaymentCelebrationModal,
+  type PostPaymentCelebrationModalProps,
+} from "@/components/payment/PostPaymentCelebrationModal";
+import { ChevronRight, Lock, CheckCircle2, Zap } from "lucide-react";
 
 interface RunningBillViewProps {
   initialBill?: RunningBillDetails;
@@ -23,6 +27,17 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
     initialBill?.sessionStatus === "PAYMENT_PENDING"
   );
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
+  const [localGuestName, setLocalGuestName] = useState(initialBill?.guestName || "");
+  const [localGuestPhone, setLocalGuestPhone] = useState(initialBill?.guestPhone || "");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedName = localStorage.getItem("smol_guest_name");
+      const savedPhone = localStorage.getItem("smol_guest_phone");
+      if (savedName && !localGuestName) setLocalGuestName(savedName);
+      if (savedPhone && !localGuestPhone) setLocalGuestPhone(savedPhone);
+    }
+  }, [localGuestName, localGuestPhone]);
 
   const refreshBill = useCallback(async () => {
     try {
@@ -82,8 +97,84 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
       : Math.round(itemsTotal * 0.06) || 42;
   const grandTotal = itemsTotal + taxesAndCharges;
 
+  const [isBypassing, setIsBypassing] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<PostPaymentCelebrationModalProps | null>(null);
+
+  const handleTestBypassPayment = async () => {
+    if (isBypassing) return;
+    setIsBypassing(true);
+    setRequestMessage(null);
+
+    try {
+      const amountPaise = grandTotal * 100;
+      const res = await bypassPaymentAction({
+        tableSessionId: bill?.sessionId,
+        tableLabel: bill?.tableLabel || "01",
+        amountPaise,
+      });
+
+      const transactionId = res.transactionId || `TEST-BYPASS-${Date.now().toString().slice(-6)}`;
+
+      broadcastSyncEvent({
+        type: "PAYMENT_COMPLETED",
+        orderId: res.orderId || bill?.sessionId || `ORD-${Date.now().toString().slice(-6)}`,
+        orderNo: res.orderNo,
+        tableLabel: bill?.tableLabel || "01",
+        status: "PAID",
+        timestamp: Date.now(),
+        metadata: {
+          transactionId,
+          amountPaise,
+          paymentMethod: "TEST_BYPASS",
+          appName: "Pre-Prod Test Bypass",
+        },
+      });
+
+      // Gather item breakdown if available
+      const itemsList =
+        bill?.rounds && bill.rounds.length > 0
+          ? bill.rounds.flatMap((r) =>
+              r.items.map((it) => ({
+                name: it.name,
+                qty: it.qty,
+                priceRupees: Math.round(it.unitPricePaise / 100),
+                subtotalRupees: Math.round(it.lineSubtotal / 100),
+              }))
+            )
+          : [
+              {
+                name: "Table Dining Order",
+                qty: 1,
+                priceRupees: grandTotal,
+                subtotalRupees: grandTotal,
+              },
+            ];
+
+      setCelebrationData({
+        orderId: res.orderId || bill?.sessionId || `ORD-${Date.now().toString().slice(-6)}`,
+        orderNo: res.orderNo,
+        tableLabel: bill?.tableLabel || "01",
+        zone: "Indoor Cozy",
+        totalRupees: grandTotal,
+        items: itemsList,
+        transactionId,
+        appName: "Test Bypass Gateway",
+        onClose: () => {
+          setCelebrationData(null);
+          refreshBill();
+          setRequestMessage("Test payment verified & settled! Bill closed.");
+        },
+      });
+    } catch (err) {
+      console.error("Test bypass payment failed:", err);
+      setRequestMessage("Test payment bypass failed. Please retry.");
+    } finally {
+      setIsBypassing(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#F3E7D3] text-[#241F1C] font-sans antialiased flex flex-col justify-between selection:bg-[#B72E35]/20 selection:text-[#B72E35]">
+    <div className="min-h-screen bg-[#F3E7D3] dark:bg-[#151110] text-[#241F1C] dark:text-[#FAF4EB] font-sans antialiased flex flex-col justify-between selection:bg-[#B72E35]/20 selection:text-[#B72E35] transition-colors duration-200">
       {/* Mobile-Proportioned Container */}
       <div className="w-full max-w-[420px] mx-auto px-4 pt-3 pb-6 flex-1 flex flex-col justify-between">
         {/* Top Header Bar */}
@@ -93,14 +184,14 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
             type="button"
             onClick={() => router.back()}
             aria-label="Go Back"
-            className="p-1 -ml-1 text-[#241F1C] hover:opacity-75 active:scale-95 transition cursor-pointer"
+            className="p-1 -ml-1 text-[#241F1C] dark:text-[#FAF4EB] hover:opacity-75 active:scale-95 transition cursor-pointer"
           >
             <svg
               width="24"
               height="24"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#241F1C"
+              stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -110,7 +201,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
           </button>
 
           {/* Centered Title "Settle Up" */}
-          <h1 className="font-serif font-bold text-[24px] tracking-tight text-[#241F1C] text-center">
+          <h1 className="font-serif font-bold text-[24px] tracking-tight text-[#241F1C] dark:text-[#FAF4EB] text-center">
             Settle Up
           </h1>
 
@@ -121,56 +212,92 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
         {/* Main Content Area */}
         <main className="space-y-4">
           {/* Arched Roman Dome Bill Card in Biscuit & Café Card */}
-          <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#C9AE8B] bg-[#FAF4EB] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] select-none">
+          <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] select-none transition-colors">
             {/* Inner Decorative Inset Border */}
-            <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#C9AE8B]/40 px-6 pt-5 pb-6 text-center">
+            <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#C9AE8B]/40 dark:border-white/10 px-6 pt-5 pb-6 text-center">
               {/* Coffee Cup + Pen + Smol Cafe Notepad Illustration */}
               <div className="relative w-[280px] h-[150px] mx-auto mt-2">
-                <Image
-                  src="/settle_up_hero_illustration.png"
-                  alt="smol café bill illustration"
-                  fill
-                  priority
-                  className="object-contain select-none pointer-events-none"
-                />
+                {/* Light Mode Illustration */}
+                <div className="relative w-full h-full block dark:hidden">
+                  <Image
+                    src="/settle_up_hero_illustration.png"
+                    alt="smol café bill illustration"
+                    fill
+                    priority
+                    className="object-contain select-none pointer-events-none"
+                  />
+                </div>
+                {/* Dark Mode Luminous Etching Illustration */}
+                <div className="relative w-full h-full hidden dark:block">
+                  <Image
+                    src="/settle_up_hero_illustration_dark.png"
+                    alt="smol café bill illustration"
+                    fill
+                    priority
+                    className="object-contain select-none pointer-events-none drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]"
+                  />
+                </div>
               </div>
 
               {/* Poetic Headline in Espresso Ink */}
-              <h2 className="font-serif font-bold text-[25px] sm:text-[27px] text-[#241F1C] leading-[1.18] mt-3">
+              <h2 className="font-serif font-bold text-[25px] sm:text-[27px] text-[#241F1C] dark:text-[#FAF4EB] leading-[1.18] mt-3">
                 Good things
                 <br />
                 deserve good pauses.
               </h2>
 
               {/* Subtitle in Walnut */}
-              <p className="font-serif italic text-[16px] sm:text-[17px] text-[#725039] mt-1.5 mb-3">
+              <p className="font-serif italic text-[16px] sm:text-[17px] text-[#725039] dark:text-[#C9AE8B] mt-1.5 mb-2">
                 Here&apos;s your bill.
               </p>
 
+              {/* Guest & Table Metadata Badge */}
+              <div className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full bg-[#EFE3D3]/70 dark:bg-white/5 border border-[#C9AE8B]/40 dark:border-white/10 text-center mb-1">
+                <span className="font-mono text-xs font-bold text-[#241F1C] dark:text-[#FAF4EB]">
+                  Table {bill?.tableLabel || "01"}
+                </span>
+                {(localGuestName || bill?.guestName) && (
+                  <>
+                    <span className="text-[#C9AE8B]">•</span>
+                    <span className="font-serif text-xs font-bold text-[#B72E35] dark:text-[#FF5B52]">
+                      {localGuestName || bill?.guestName}
+                    </span>
+                  </>
+                )}
+                {(localGuestPhone || bill?.guestPhone) && (
+                  <>
+                    <span className="text-[#C9AE8B]">•</span>
+                    <span className="font-mono text-[10px] text-[#725039] dark:text-[#C9AE8B]">
+                      +91 {(localGuestPhone || bill?.guestPhone || "").slice(-10)}
+                    </span>
+                  </>
+                )}
+              </div>
+
               {/* Dashed Horizontal Line Divider in Biscuit */}
-              <div className="border-t border-dashed border-[#C9AE8B]/60 my-3.5" />
+              <div className="border-t border-dashed border-[#C9AE8B]/60 dark:border-white/10 my-3.5" />
 
               {/* Itemized Summary in Typewriter / Mono Font */}
-              <div className="space-y-1.5 font-mono text-[13.5px] text-[#241F1C]">
+              <div className="space-y-1.5 font-mono text-[13.5px] text-[#241F1C] dark:text-[#FAF4EB]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[#725039]">Items Total</span>
+                  <span className="text-[#725039] dark:text-[#C9AE8B]">Items Total</span>
                   <span>₹{itemsTotal}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[#725039]">Taxes &amp; Charges</span>
+                  <span className="text-[#725039] dark:text-[#C9AE8B]">Taxes &amp; Charges</span>
                   <span>₹{taxesAndCharges}</span>
                 </div>
               </div>
 
               {/* Solid Horizontal Line Divider in Biscuit */}
-              <div className="border-t border-[#C9AE8B]/60 mt-3.5 mb-3" />
+              <div className="border-t border-[#C9AE8B]/60 dark:border-white/10 mt-3.5 mb-3" />
 
               {/* Grand Total in Smol Cherry */}
               <div className="flex items-baseline justify-between pt-0.5">
-                <span className="font-serif font-bold text-[20px] sm:text-[21px] text-[#B72E35]">
+                <span className="font-serif font-bold text-[20px] sm:text-[21px] text-[#B72E35] dark:text-[#FF5B52]">
                   Grand Total
                 </span>
-                <span className="font-serif font-bold text-[32px] sm:text-[36px] text-[#B72E35] leading-none">
+                <span className="font-serif font-bold text-[32px] sm:text-[36px] text-[#B72E35] dark:text-[#FF5B52] leading-none">
                   ₹{grandTotal}
                 </span>
               </div>
@@ -179,8 +306,8 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
 
           {/* Status / Request Notification Message */}
           {requestMessage && (
-            <div className="rounded-2xl border border-[#C9AE8B] bg-[#FAF4EB] p-3 text-center text-xs font-serif font-semibold text-[#241F1C] shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-[#B72E35]" />
+            <div className="rounded-2xl border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3 text-center text-xs font-serif font-semibold text-[#241F1C] dark:text-[#FAF4EB] shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-[#B72E35] dark:text-[#FF5B52]" />
               <span>{requestMessage}</span>
             </div>
           )}
@@ -192,28 +319,28 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               type="button"
               onClick={() => handlePaymentClick("UPI")}
               disabled={isRequesting}
-              className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+              className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
                   <Image
                     src="/icon_upi_hd.png"
                     alt="UPI"
                     width={28}
                     height={28}
-                    className="object-contain"
+                    className="object-contain dark:invert dark:brightness-150"
                   />
                 </div>
                 <div>
-                  <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
+                  <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
                     UPI
                   </h3>
-                  <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                  <p className="font-sans text-[12.5px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
                     Pay with any UPI app
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#725039]" />
+              <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
             </button>
 
             {/* Card Option */}
@@ -221,57 +348,84 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               type="button"
               onClick={() => handlePaymentClick("Card")}
               disabled={isRequesting}
-              className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+              className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
                   <Image
                     src="/icon_card_hd.png"
                     alt="Card"
                     width={28}
                     height={28}
-                    className="object-contain"
+                    className="object-contain dark:invert dark:brightness-150"
                   />
                 </div>
                 <div>
-                  <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
+                  <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
                     Card
                   </h3>
-                  <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                  <p className="font-sans text-[12.5px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
                     Visa, MasterCard, Rupay
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#725039]" />
+              <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
             </button>
-
             {/* Wallets Option */}
             <button
               type="button"
               onClick={() => handlePaymentClick("Wallets")}
               disabled={isRequesting}
-              className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+              className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
                   <Image
                     src="/icon_wallet_hd.png"
                     alt="Wallets"
                     width={28}
                     height={28}
-                    className="object-contain"
+                    className="object-contain dark:invert dark:brightness-150"
                   />
                 </div>
                 <div>
-                  <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
+                  <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
                     Wallets
                   </h3>
-                  <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                  <p className="font-sans text-[12.5px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
                     PhonePe, Paytm, etc.
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#725039]" />
+              <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
+            </button>
+
+            {/* Pre-Production Test Bypass Button */}
+            <button
+              type="button"
+              onClick={handleTestBypassPayment}
+              disabled={isBypassing}
+              className="w-full rounded-[1.25rem] border-2 border-dashed border-amber-600/70 dark:border-amber-400/60 bg-amber-500/10 dark:bg-amber-400/10 p-3.5 flex items-center justify-between hover:bg-amber-500/20 dark:hover:bg-amber-400/20 active:scale-[0.99] transition shadow-xs cursor-pointer text-left group"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-amber-500/20 dark:bg-amber-400/20 border border-amber-500/30 text-amber-700 dark:text-amber-300">
+                  <Zap className="w-5 h-5 fill-amber-500/40 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
+                      Bypass Payment
+                    </h3>
+                    <span className="rounded-full bg-amber-600 text-white dark:bg-amber-500 dark:text-black font-mono text-[9px] font-extrabold px-2 py-0.5 uppercase tracking-wide">
+                      Test Mode
+                    </span>
+                  </div>
+                  <p className="font-sans text-[12px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
+                    {isBypassing ? "Settling test transaction..." : "Pre-production test • Bypass & mark paid"}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-amber-600 dark:text-amber-400 group-hover:translate-x-0.5 transition" />
             </button>
           </div>
         </main>
@@ -302,6 +456,13 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
             setRequestMessage("Payment recorded successfully! Thank you for visiting smol café.");
           }}
           onClose={() => setIsUpiOpen(false)}
+        />
+      )}
+
+      {/* Post-Payment Celebration Modal if test bypass triggered */}
+      {celebrationData && (
+        <PostPaymentCelebrationModal
+          {...celebrationData}
         />
       )}
     </div>

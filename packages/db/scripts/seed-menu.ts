@@ -9,8 +9,10 @@ const rootEnvPath = path.resolve(process.cwd(), ".env");
 const localEnvPath = path.resolve(process.cwd(), ".env.local");
 const webLocalEnvPath = path.resolve(process.cwd(), "apps/web/.env.local");
 const webEnvPath = path.resolve(process.cwd(), "apps/web/.env");
+const repoRootEnvPath = path.resolve(__dirname, "../../../.env");
+const repoWebEnvPath = path.resolve(__dirname, "../../../apps/web/.env.local");
 
-[rootEnvPath, localEnvPath, webLocalEnvPath, webEnvPath].forEach((envFile) => {
+[repoRootEnvPath, repoWebEnvPath, rootEnvPath, localEnvPath, webLocalEnvPath, webEnvPath].forEach((envFile) => {
   if (fs.existsSync(envFile)) {
     dotenv.config({ path: envFile });
   }

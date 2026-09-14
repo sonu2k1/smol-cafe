@@ -12,6 +12,20 @@ export interface TableSessionData {
   openedAt: string;
   customerSessionId?: string;
   verificationCode?: string;
+  guestName?: string;
+  guestPhone?: string;
+}
+
+export function isValidUuid(id: string | null | undefined): boolean {
+  if (!id || typeof id !== "string") return false;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const isMock =
+    !supabaseUrl ||
+    supabaseUrl.includes("placeholder") ||
+    (!supabaseUrl.startsWith("http://") && !supabaseUrl.startsWith("https://"));
+  if (isMock) return true;
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "smol-cafe-secret-session-key-2026";
@@ -56,6 +70,11 @@ export function decodeSession(cookieValue: string): TableSessionData | null {
     const json = Buffer.from(base64, "base64url").toString("utf-8");
     const data = JSON.parse(json) as TableSessionData;
 
+    // Ensure sessionId is a valid UUID to prevent Postgres 22P02 errors
+    if (!isValidUuid(data.sessionId)) {
+      return null;
+    }
+
     // Ensure customerSessionId exists for order ownership validation
     if (!data.customerSessionId && data.sessionId) {
       data.customerSessionId = `cust_${data.sessionId}`;
@@ -91,16 +110,24 @@ export async function setTableSessionCookie(data: TableSessionData): Promise<voi
  * Reads and verifies the table session from cookies.
  */
 export async function getTableSessionCookie(): Promise<TableSessionData | null> {
-  const cookieStore = await cookies();
-  const cookie = cookieStore.get(TABLE_SESSION_COOKIE);
-  if (!cookie?.value) return null;
-  return decodeSession(cookie.value);
+  try {
+    const cookieStore = await cookies();
+    const cookie = cookieStore.get(TABLE_SESSION_COOKIE);
+    if (!cookie?.value) return null;
+    return decodeSession(cookie.value);
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Clears the table session cookie.
  */
 export async function clearTableSessionCookie(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(TABLE_SESSION_COOKIE);
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete(TABLE_SESSION_COOKIE);
+  } catch {
+    // Outside active request context
+  }
 }

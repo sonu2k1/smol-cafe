@@ -1,6 +1,6 @@
 "use server";
 
-import { getTableSessionCookie } from "@/lib/session";
+import { getTableSessionCookie, isValidUuid } from "@/lib/session";
 import { resolveQrToken } from "@/app/t/actions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -59,14 +59,14 @@ export async function placeOrderAction(
 
   // 1. Verify Active Table Session from Signed Cookie or fallback to default table
   let session = await getTableSessionCookie();
-  if (!session || !session.sessionId || !session.locationId) {
+  if (!session || !session.sessionId || !session.locationId || !isValidUuid(session.sessionId)) {
     const defaultRes = await resolveQrToken("table-01", true);
     if (defaultRes.success && defaultRes.session) {
       session = defaultRes.session;
     }
   }
 
-  if (!session || !session.sessionId || !session.locationId) {
+  if (!session || !session.sessionId || !session.locationId || !isValidUuid(session.sessionId)) {
     logger.warn("Order placement rejected: No active table session", {
       requestId,
       action: "placeOrder",
@@ -111,9 +111,6 @@ export async function placeOrderAction(
     let { data: rpcResult, error: rpcError } = await supabase.rpc("submit_order", {
       p_location_id: session.locationId,
       p_table_session_id: session.sessionId,
-      p_customer_session_id: session.customerSessionId || `cust_${session.sessionId}`,
-      p_verification_code: session.verificationCode || "4821",
-      p_instructions: instructions || null,
       p_idempotency_key: idempotencyKey,
       p_items: items,
       p_reward_id: rewardId || null,
@@ -142,9 +139,6 @@ export async function placeOrderAction(
         const retry = await supabase.rpc("submit_order", {
           p_location_id: session.locationId,
           p_table_session_id: session.sessionId,
-          p_customer_session_id: session.customerSessionId || `cust_${session.sessionId}`,
-          p_verification_code: session.verificationCode || "4821",
-          p_instructions: instructions || null,
           p_idempotency_key: idempotencyKey,
           p_items: items,
           p_reward_id: rewardId || null,

@@ -17,6 +17,7 @@ export default async function MenuPage() {
       categories={categories}
       tableLabel={session?.tableLabel}
       locationName={session?.locationName || "Rishikesh"}
+      guestName={session?.guestName}
     />
   );
 }

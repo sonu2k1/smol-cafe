@@ -22,6 +22,7 @@ export interface MockDiningTable {
   label: string;
   seats: number;
   active: boolean;
+  section?: string;
   created_at: string;
   updated_at: string;
 }
@@ -178,6 +179,21 @@ export const MOCK_LOCATION: MockLocation = {
   updated_at: "2026-08-01T00:00:00.000Z",
 };
 
+const DEFAULT_ZONES: Record<string, string> = {
+  "01": "Indoor Cozy",
+  "02": "Indoor Cozy",
+  "03": "Courtyard Verandah",
+  "04": "Courtyard Verandah",
+  "05": "Brew Bar",
+  "06": "Brew Bar",
+  "07": "Garden Terrace",
+  "08": "Garden Terrace",
+  "09": "Indoor Cozy",
+  "10": "Indoor Cozy",
+  "11": "Garden Terrace",
+  "12": "Courtyard Verandah",
+};
+
 // 12 Dining Tables
 export const MOCK_TABLES: MockDiningTable[] = Array.from({ length: 12 }, (_, i) => {
   const tableNum = (i + 1).toString().padStart(2, "0");
@@ -187,6 +203,7 @@ export const MOCK_TABLES: MockDiningTable[] = Array.from({ length: 12 }, (_, i) 
     label: `${tableNum}`,
     seats: i % 2 === 0 ? 4 : 2,
     active: true,
+    section: DEFAULT_ZONES[tableNum] || "Indoor Cozy",
     created_at: "2026-08-01T00:00:00.000Z",
     updated_at: "2026-08-01T00:00:00.000Z",
   };

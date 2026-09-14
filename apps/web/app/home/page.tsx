@@ -13,6 +13,8 @@ export default async function HomePage() {
     <CustomerHomeClientView
       tableLabel={session?.tableLabel || "01"}
       locationName={session?.locationName || "Rishikesh"}
+      guestName={session?.guestName}
+      guestPhone={session?.guestPhone}
     />
   );
 }

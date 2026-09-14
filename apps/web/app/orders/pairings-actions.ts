@@ -1,6 +1,6 @@
 "use server";
 
-import { getTableSessionCookie } from "@/lib/session";
+import { getTableSessionCookie, isValidUuid } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface SuggestedMenuItem {
@@ -16,6 +16,7 @@ export interface AnotherRoundResult {
   success: boolean;
   isKitchenBusy: boolean;
   hasConversationBoard: boolean;
+  boardTopic?: string;
   suggestions: SuggestedMenuItem[];
 }
 
@@ -25,7 +26,7 @@ export interface AnotherRoundResult {
  */
 export async function fetchAnotherRoundSuggestionsAction(): Promise<AnotherRoundResult> {
   const session = await getTableSessionCookie();
-  if (!session || !session.sessionId || !session.locationId) {
+  if (!session || !session.sessionId || !session.locationId || !isValidUuid(session.sessionId)) {
     return {
       success: false,
       isKitchenBusy: false,

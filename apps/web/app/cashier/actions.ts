@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, isMockDatabase } from "@/lib/supabase/admin";
 import type { OrderStatus } from "@smol-cafe/db";
 
 export interface PendingOrderItem {
@@ -44,11 +44,15 @@ export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrd
   const supabase = createAdminClient();
 
   try {
-    // 1. Fetch PENDING_CONFIRMATION orders
+    // 1. Fetch pending orders waiting for cashier review
+    const pendingStatuses = isMockDatabase()
+      ? ["PENDING_CONFIRMATION", "SUBMITTED"]
+      : ["SUBMITTED"];
+
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select("*")
-      .eq("status", "PENDING_CONFIRMATION")
+      .in("status", pendingStatuses)
       .order("submitted_at", { ascending: true });
 
     if (ordersError || !orders) {
@@ -64,7 +68,7 @@ export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrd
       .map((o) => o.table_session_id)
       .filter((id): id is string => Boolean(id));
 
-    // 2. Fetch Dining Table Labels
+    // 2. Fetch Dining Table Labels via Table Sessions
     const tableLabelMap = new Map<string, { label: string; tableId: string }>();
 
     if (sessionIds.length > 0) {
@@ -157,6 +161,7 @@ export async function confirmCashierOrderAction(
   staffName = "Cashier"
 ): Promise<ConfirmOrderResult> {
   const supabase = createAdminClient();
+  const nowIso = new Date().toISOString();
 
   try {
     const { data: rpcResult, error: rpcError } = await supabase.rpc("confirm_order_by_cashier", {
@@ -164,16 +169,43 @@ export async function confirmCashierOrderAction(
       p_staff_name: staffName,
     });
 
-    if (rpcError) {
-      console.error("RPC error in confirmCashierOrderAction:", rpcError);
+    if (!rpcError && rpcResult) {
+      const result = rpcResult as { success: boolean; order_id?: string; message?: string };
+      return {
+        success: result.success,
+        orderId: result.order_id || orderId,
+        message: result.message || "Order confirmed and sent to kitchen!",
+      };
+    }
+
+    // Direct database fallback if RPC not available
+    const { error: updateErr } = await supabase
+      .from("orders")
+      .update({
+        status: "CONFIRMED",
+        accepted_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", orderId);
+
+    if (updateErr) {
+      console.error("Failed to confirm order directly:", updateErr);
       return { success: false, message: "Failed to confirm order in database." };
     }
 
-    const result = rpcResult as { success: boolean; order_id?: string; message?: string };
+    await supabase.from("order_status_history").insert({
+      order_id: orderId,
+      from_status: "PENDING_CONFIRMATION",
+      to_status: "CONFIRMED",
+      actor_type: "STAFF",
+      notes: `Confirmed by Cashier (${staffName})`,
+      created_at: nowIso,
+    });
+
     return {
-      success: result.success,
-      orderId: result.order_id,
-      message: result.message || "Order confirmed and sent to kitchen!",
+      success: true,
+      orderId,
+      message: "Order confirmed and sent to kitchen!",
     };
   } catch (err) {
     console.error("Error in confirmCashierOrderAction:", err);
@@ -190,6 +222,7 @@ export async function rejectCashierOrderAction(
   staffName = "Cashier"
 ): Promise<ConfirmOrderResult> {
   const supabase = createAdminClient();
+  const nowIso = new Date().toISOString();
 
   try {
     const { data: rpcResult, error: rpcError } = await supabase.rpc("reject_order_by_cashier", {
@@ -198,15 +231,41 @@ export async function rejectCashierOrderAction(
       p_staff_name: staffName,
     });
 
-    if (rpcError) {
-      return { success: false, message: "Failed to reject order." };
+    if (!rpcError && rpcResult) {
+      const result = rpcResult as { success: boolean; order_id?: string; message?: string };
+      return {
+        success: result.success,
+        orderId: result.order_id || orderId,
+        message: result.message || "Order rejected.",
+      };
     }
 
-    const result = rpcResult as { success: boolean; order_id?: string; message?: string };
+    // Direct database fallback
+    const { error: updateErr } = await supabase
+      .from("orders")
+      .update({
+        status: "CANCELLED",
+        updated_at: nowIso,
+      })
+      .eq("id", orderId);
+
+    if (updateErr) {
+      return { success: false, message: "Failed to reject order in database." };
+    }
+
+    await supabase.from("order_status_history").insert({
+      order_id: orderId,
+      from_status: "PENDING_CONFIRMATION",
+      to_status: "CANCELLED",
+      actor_type: "STAFF",
+      notes: `Rejected by Cashier (${staffName}): ${reason}`,
+      created_at: nowIso,
+    });
+
     return {
-      success: result.success,
-      orderId: result.order_id,
-      message: result.message || "Order rejected.",
+      success: true,
+      orderId,
+      message: "Order cancelled by cashier.",
     };
   } catch (err) {
     console.error("Error in rejectCashierOrderAction:", err);

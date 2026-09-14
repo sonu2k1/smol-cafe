@@ -6,6 +6,19 @@ import { MockSupabaseClient } from "@/lib/mock-db";
  * that require bypassing Row Level Security (RLS).
  * Falls back seamlessly to in-memory MockSupabaseClient if credentials are placeholder.
  */
+export function isMockDatabase(): boolean {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  return (
+    !supabaseUrl ||
+    !serviceRoleKey ||
+    supabaseUrl.includes("placeholder") ||
+    serviceRoleKey.includes("placeholder") ||
+    (!supabaseUrl.startsWith("http://") && !supabaseUrl.startsWith("https://"))
+  );
+}
+
 export function createAdminClient(): SupabaseClient {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

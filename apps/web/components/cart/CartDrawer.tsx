@@ -1,37 +1,49 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import Link from "next/link";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { placeOrderAction, type ChangedItemDiff } from "@/app/menu/actions";
 import { useNetworkHealth } from "@/hooks/useNetworkHealth";
-import { createTableJsonTag } from "@/lib/table-tag";
 import { broadcastSyncEvent } from "@/lib/sync-events";
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
+import {
+  PostPaymentCelebrationModal,
+  type PostPaymentCelebrationModalProps,
+} from "@/components/payment/PostPaymentCelebrationModal";
+import { bypassPaymentAction } from "@/app/bill/actions";
 import { getFoodImage } from "@/lib/food-images";
 import type { MenuItemWithDetails } from "@/lib/queries/menu";
 import { TableArchedCard } from "@/components/table/TableArchedCard";
 import {
-  Menu as MenuIcon,
-  Users,
   CheckCircle2,
-  AlertTriangle,
-  Sparkles,
   CreditCard,
   Trash2,
-  ArrowLeft,
   ChevronRight,
   Plus,
   Check,
   Lock,
+  Zap,
+  Clock,
 } from "lucide-react";
 
 interface CartDrawerProps {
   tableLabel?: string;
+  guestName?: string;
 }
 
-export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => {
+export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guestName = "" }) => {
+  const [currentGuestName, setCurrentGuestName] = useState(guestName);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("smol_guest_name");
+      if (saved && !currentGuestName) {
+        setCurrentGuestName(saved);
+      }
+    }
+  }, [currentGuestName]);
   const {
     items,
     updateQty,
@@ -54,6 +66,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
   const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
   const [boardAdded, setBoardAdded] = useState(false);
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
+  const [isBypassing, setIsBypassing] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<PostPaymentCelebrationModalProps | null>(null);
   const [orderSuccess, setOrderSuccess] = useState<{
     orderNo: number;
     orderId: string;
@@ -202,6 +216,108 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
     }
   };
 
+  const handleTestBypassPayment = async () => {
+    if (isBypassing) return;
+    setIsBypassing(true);
+    setErrorMessage(null);
+
+    try {
+      let finalOrderId = orderSuccess?.orderId;
+      let finalOrderNo = orderSuccess?.orderNo;
+      let finalTotalPaise = orderSuccess?.totalPaise || grandTotal * 100;
+
+      // 1. If cart has items not yet placed into orders, place the order first
+      if (items.length > 0 && !orderSuccess) {
+        const idempotencyKey = crypto.randomUUID();
+        const orderPayload = items.map((cartItem) => ({
+          menu_item_id: cartItem.item.id,
+          expected_unit_price_paise: cartItem.item.pricePaise,
+          qty: cartItem.qty,
+        }));
+
+        const result = await placeOrderAction(orderPayload, idempotencyKey, undefined, instructions);
+        if (result.success && result.orderId) {
+          finalOrderId = result.orderId;
+          finalOrderNo = result.orderNo;
+          finalTotalPaise = result.totalPaise || grandTotal * 100;
+
+          broadcastSyncEvent({
+            type: "ORDER_PLACED",
+            orderId: result.orderId,
+            orderNo: result.orderNo,
+            tableLabel: displayTable,
+            timestamp: Date.now(),
+          });
+        }
+      }
+
+      // 2. Call bypassPaymentAction to settle backend session and bill
+      const bypassRes = await bypassPaymentAction({
+        tableLabel: displayTable,
+        amountPaise: finalTotalPaise,
+      });
+
+      const transactionId = bypassRes.transactionId || `TEST-BYPASS-${Date.now().toString().slice(-6)}`;
+
+      // 3. Broadcast payment completed event for Kitchen / Cashier / POS sync
+      broadcastSyncEvent({
+        type: "PAYMENT_COMPLETED",
+        orderId: finalOrderId || `ORD-${Date.now().toString().slice(-6)}`,
+        orderNo: finalOrderNo,
+        tableLabel: displayTable,
+        status: "PAID",
+        timestamp: Date.now(),
+        metadata: {
+          transactionId,
+          amountPaise: finalTotalPaise,
+          paymentMethod: "TEST_BYPASS",
+          appName: "Pre-Prod Test Bypass",
+        },
+      });
+
+      const currentItemsSnapshot =
+        items.length > 0
+          ? items.map((i) => ({
+              name: i.item.name,
+              qty: i.qty,
+              priceRupees: Math.round(i.item.pricePaise / 100),
+              subtotalRupees: Math.round((i.item.pricePaise / 100) * i.qty),
+            }))
+          : [
+              {
+                name: "Artisanal Table Order",
+                qty: 1,
+                priceRupees: Math.round(finalTotalPaise / 100),
+                subtotalRupees: Math.round(finalTotalPaise / 100),
+              },
+            ];
+
+      // 4. Clear cart items
+      clearCart();
+
+      // 5. Trigger post-payment celebration modal
+      setCelebrationData({
+        orderId: finalOrderId || `ORD-${Date.now().toString().slice(-6)}`,
+        orderNo: finalOrderNo,
+        tableLabel: displayTable,
+        zone: "Indoor Cozy",
+        totalRupees: Math.round(finalTotalPaise / 100),
+        items: currentItemsSnapshot,
+        transactionId,
+        appName: "Test Bypass Gateway",
+        onClose: () => {
+          setCelebrationData(null);
+          closeCart();
+        },
+      });
+    } catch (err) {
+      console.error("Test bypass payment failed:", err);
+      setErrorMessage("Test bypass failed. Please try again.");
+    } finally {
+      setIsBypassing(false);
+    }
+  };
+
   if (!isCartOpen) return null;
 
   return (
@@ -211,24 +327,24 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
     >
       {/* Mobile-first Phone Modal / Drawer Frame matching user mockup */}
       <div
-        className="relative flex h-[92vh] sm:h-[88vh] w-full max-w-lg sm:max-w-[425px] flex-col rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-[#C9AE8B] bg-[#F3E7D3] text-[#241F1C] shadow-2xl overflow-hidden animate-fade-in-up"
+        className="relative flex h-[92vh] sm:h-[88vh] w-full max-w-lg sm:max-w-[425px] flex-col rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-[#C9AE8B] dark:border-white/10 bg-[#F3E7D3] dark:bg-[#1A1513] text-[#241F1C] dark:text-[#FAF4EB] shadow-2xl overflow-hidden animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Navigation Bar */}
-        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3.5 pb-2 bg-[#F3E7D3] border-b border-[#C9AE8B]/40">
+        <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-3.5 pb-2 bg-[#F3E7D3] dark:bg-[#1A1513] border-b border-[#C9AE8B]/40 dark:border-white/10 transition-colors">
           {activeView === "bill" ? (
             <button
               type="button"
               onClick={() => setActiveView("table_order")}
               aria-label="Back to table order"
-              className="p-1 -ml-1 text-[#241F1C] hover:opacity-75 active:scale-95 transition cursor-pointer"
+              className="p-1 -ml-1 text-[#241F1C] dark:text-[#FAF4EB] hover:opacity-75 active:scale-95 transition cursor-pointer"
             >
               <svg
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#241F1C"
+                stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -241,14 +357,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
               type="button"
               onClick={closeCart}
               aria-label="Close cart"
-              className="p-1 -ml-1 text-[#241F1C] hover:opacity-75 transition active:scale-95 cursor-pointer"
+              className="p-1 -ml-1 text-[#241F1C] dark:text-[#FAF4EB] hover:opacity-75 transition active:scale-95 cursor-pointer"
             >
               <svg
                 width="24"
                 height="20"
                 viewBox="0 0 24 20"
                 fill="none"
-                stroke="#241F1C"
+                stroke="currentColor"
                 strokeWidth="2.2"
                 strokeLinecap="round"
               >
@@ -259,9 +375,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
             </button>
           )}
 
-          <h2 className="font-serif text-[24px] font-bold tracking-tight text-[#241F1C] text-center">
-            {activeView === "bill" ? "Settle Up" : "Your Table"}
-          </h2>
+          <div className="text-center">
+            <h2 className="font-serif text-[22px] font-bold tracking-tight text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
+              {activeView === "bill" ? "Settle Up" : "Your Table"}
+            </h2>
+            <p className="font-serif italic text-[11px] text-[#725039] dark:text-[#C9AE8B]">
+              Table {displayTable}{currentGuestName ? ` • ${currentGuestName}` : ""}
+            </p>
+          </div>
 
           {activeView === "bill" ? (
             <div className="w-7" />
@@ -269,7 +390,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
             <button
               type="button"
               onClick={closeCart}
-              className="font-serif text-[15px] font-medium text-[#B72E35] hover:opacity-85 transition active:scale-95 cursor-pointer"
+              className="font-serif text-[15px] font-medium text-[#B72E35] dark:text-[#FF5B52] hover:opacity-85 transition active:scale-95 cursor-pointer"
             >
               Add more
             </button>
@@ -292,7 +413,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                   Order #{orderSuccess.orderNo} Placed!
                 </h3>
                 <p className="font-serif italic text-xs text-[#725039] mt-1">
-                  Our baristas and kitchen team are preparing your order.
+                  Our kitchen and café staff are preparing your order.
                 </p>
               </div>
 
@@ -305,18 +426,29 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                   {orderSuccess.verificationCode || "4821"}
                 </span>
                 <p className="text-[10px] font-mono text-[#725039] mt-1">
-                  Table {displayTable} • Instant Verification
+                  Table {displayTable}{currentGuestName ? ` • Guest: ${currentGuestName}` : " • Instant Verification"}
                 </p>
               </div>
 
               <div className="pt-3 space-y-2.5">
+                <Link
+                  href="/orders"
+                  onClick={() => {
+                    setOrderSuccess(null);
+                    closeCart();
+                  }}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 font-serif text-base font-bold text-[#F3E7D3] shadow-md transition hover:bg-[#9E252C] active:scale-[0.98]"
+                >
+                  <Clock className="h-4 w-4" />
+                  Track Kitchen Prep Live →
+                </Link>
                 <button
                   type="button"
                   onClick={() => setIsUpiDrawerOpen(true)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 font-serif text-base font-bold text-[#F3E7D3] shadow-md transition hover:bg-[#9E252C] active:scale-[0.98]"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#C9AE8B] bg-[#FAF4EB] py-3 font-serif text-sm font-bold text-[#725039] shadow-xs transition hover:bg-[#EAE0D2] active:scale-[0.98]"
                 >
                   <CreditCard className="h-4 w-4" />
-                  Pay Now via UPI Gateway →
+                  Pay Now via UPI Gateway
                 </button>
                 <button
                   type="button"
@@ -324,7 +456,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                     setOrderSuccess(null);
                     closeCart();
                   }}
-                  className="w-full rounded-full border border-[#C9AE8B]/60 bg-[#FAF4EB] py-3 font-serif text-sm font-semibold text-[#241F1C] transition hover:bg-[#EAE0D2]"
+                  className="w-full rounded-full border border-[#C9AE8B]/40 bg-transparent py-2.5 font-serif text-xs font-semibold text-[#8C6D53] transition hover:bg-[#EAE0D2]/50"
                 >
                   Back to Menu
                 </button>
@@ -334,56 +466,69 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
             /* Settle Up / Bill View inside same popup matching user design */
             <div className="p-4 sm:p-5 space-y-4 animate-fade-in">
               {/* Arched Roman Dome Bill Card */}
-              <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#C9AE8B] bg-[#FAF4EB] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] select-none">
+              <div className="relative rounded-t-[13.5rem] sm:rounded-t-[14.5rem] rounded-b-[1.75rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] select-none">
                 {/* Inner Decorative Inset Border */}
-                <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#C9AE8B]/40 px-5 pt-4 pb-5 text-center">
+                <div className="rounded-t-[12.8rem] sm:rounded-t-[13.8rem] rounded-b-[1.25rem] border border-[#C9AE8B]/40 dark:border-white/10 px-5 pt-4 pb-5 text-center">
                   {/* Coffee Cup + Pen + Smol Cafe Notepad Illustration */}
                   <div className="relative w-[260px] h-[140px] mx-auto mt-2">
-                    <Image
-                      src="/settle_up_hero_illustration.png"
-                      alt="smol café bill illustration"
-                      fill
-                      priority
-                      className="object-contain select-none pointer-events-none"
-                    />
+                    {/* Light Mode Illustration */}
+                    <div className="relative w-full h-full block dark:hidden">
+                      <Image
+                        src="/settle_up_hero_illustration.png"
+                        alt="smol café bill illustration"
+                        fill
+                        priority
+                        className="object-contain select-none pointer-events-none"
+                      />
+                    </div>
+                    {/* Dark Mode Luminous Etching Illustration */}
+                    <div className="relative w-full h-full hidden dark:block">
+                      <Image
+                        src="/settle_up_hero_illustration_dark.png"
+                        alt="smol café bill illustration"
+                        fill
+                        priority
+                        className="object-contain select-none pointer-events-none drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]"
+                      />
+                    </div>
                   </div>
 
                   {/* Poetic Headline in Espresso Ink */}
-                  <h2 className="font-serif font-bold text-[24px] sm:text-[26px] text-[#241F1C] leading-[1.18] mt-3">
+                  <h2 className="font-serif font-bold text-[24px] sm:text-[26px] text-[#241F1C] dark:text-[#FAF4EB] leading-[1.18] mt-3">
                     Good things
                     <br />
                     deserve good pauses.
                   </h2>
 
                   {/* Subtitle in Walnut */}
-                  <p className="font-serif italic text-[15px] sm:text-[16px] text-[#725039] mt-1.5 mb-3">
+                  <p className="font-serif italic text-[15px] sm:text-[16px] text-[#725039] dark:text-[#C9AE8B] mt-1.5 mb-3">
                     Here&apos;s your bill.
                   </p>
 
                   {/* Dashed Horizontal Line Divider in Biscuit */}
-                  <div className="border-t border-dashed border-[#C9AE8B]/60 my-3.5" />
+                  <div className="border-t border-dashed border-[#C9AE8B]/60 dark:border-white/10 my-3.5" />
 
                   {/* Itemized Summary in Typewriter / Mono Font */}
-                  <div className="space-y-1.5 font-mono text-[13.5px] text-[#241F1C]">
+                  <div className="space-y-1.5 font-mono text-[13.5px] text-[#241F1C] dark:text-[#FAF4EB]">
                     <div className="flex items-center justify-between">
-                      <span className="text-[#725039]">Items Total</span>
+                      <span className="text-[#725039] dark:text-[#C9AE8B]">Items Total</span>
                       <span>₹{itemsTotal}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[#725039]">Taxes &amp; Charges</span>
+                      <span className="text-[#725039] dark:text-[#C9AE8B]">Taxes &amp; Charges</span>
                       <span>₹{taxesAndCharges}</span>
                     </div>
                   </div>
 
                   {/* Solid Horizontal Line Divider in Biscuit */}
-                  <div className="border-t border-[#C9AE8B]/60 mt-3.5 mb-3" />
+                  <div className="border-t border-[#C9AE8B]/60 dark:border-white/10 mt-3.5 mb-3" />
 
                   {/* Grand Total in Smol Cherry */}
                   <div className="flex items-baseline justify-between pt-0.5">
-                    <span className="font-serif font-bold text-[19px] sm:text-[20px] text-[#B72E35]">
+                    <span className="font-serif font-bold text-[19px] sm:text-[20px] text-[#B72E35] dark:text-[#FF5B52]">
                       Grand Total
                     </span>
-                    <span className="font-serif font-bold text-[30px] sm:text-[34px] text-[#B72E35] leading-none">
+                    <span className="font-serif font-bold text-[30px] sm:text-[34px] text-[#B72E35] dark:text-[#FF5B52] leading-none">
                       ₹{grandTotal}
                     </span>
                   </div>
@@ -392,8 +537,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
               {/* Status / Request Notification Message */}
               {requestMessage && (
-                <div className="rounded-2xl border border-[#C9AE8B] bg-[#FAF4EB] p-3 text-center text-xs font-serif font-semibold text-[#241F1C] shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-[#B72E35]" />
+                <div className="rounded-2xl border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3 text-center text-xs font-serif font-semibold text-[#241F1C] dark:text-[#FAF4EB] shadow-xs animate-fade-in flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#B72E35] dark:text-[#FF5B52]" />
                   <span>{requestMessage}</span>
                 </div>
               )}
@@ -404,28 +549,28 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                 <button
                   type="button"
                   onClick={() => setIsUpiDrawerOpen(true)}
-                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
                       <Image
                         src="/icon_upi_hd.png"
                         alt="UPI"
                         width={28}
                         height={28}
-                        className="object-contain"
+                        className="object-contain dark:invert dark:brightness-150"
                       />
                     </div>
                     <div>
-                      <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
+                      <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
                         UPI
                       </h3>
-                      <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                      <p className="font-sans text-[12.5px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
                         Pay with any UPI app
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#725039]" />
+                  <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
                 </button>
 
                 {/* Card Option */}
@@ -435,28 +580,28 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                     setRequestMessage("Staff notified for Card payment at table.");
                     setTimeout(() => setRequestMessage(null), 4000);
                   }}
-                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
                       <Image
                         src="/icon_card_hd.png"
                         alt="Card"
                         width={28}
                         height={28}
-                        className="object-contain"
+                        className="object-contain dark:invert dark:brightness-150"
                       />
                     </div>
                     <div>
-                      <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
+                      <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
                         Card
                       </h3>
-                      <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                      <p className="font-sans text-[12.5px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
                         Visa, MasterCard, Rupay
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#725039]" />
+                  <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
                 </button>
 
                 {/* Wallets Option */}
@@ -466,35 +611,63 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                     setRequestMessage("Staff notified for Wallet payment.");
                     setTimeout(() => setRequestMessage(null), 4000);
                   }}
-                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] bg-[#FAF4EB] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
+                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
                       <Image
                         src="/icon_wallet_hd.png"
                         alt="Wallets"
                         width={28}
                         height={28}
-                        className="object-contain"
+                        className="object-contain dark:invert dark:brightness-150"
                       />
                     </div>
                     <div>
-                      <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] leading-tight">
+                      <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
                         Wallets
                       </h3>
-                      <p className="font-sans text-[12.5px] text-[#725039] mt-0.5">
+                      <p className="font-sans text-[12.5px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
                         Amazon Pay, Mobikwik &amp; more
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#725039]" />
+                  <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
+                </button>
+
+                {/* Pre-Production Test Bypass Button */}
+                <button
+                  type="button"
+                  onClick={handleTestBypassPayment}
+                  disabled={isBypassing}
+                  className="w-full rounded-[1.25rem] border-2 border-dashed border-amber-600/70 dark:border-amber-400/60 bg-amber-500/10 dark:bg-amber-400/10 p-3.5 flex items-center justify-between hover:bg-amber-500/20 dark:hover:bg-amber-400/20 active:scale-[0.99] transition shadow-xs cursor-pointer text-left group"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-amber-500/20 dark:bg-amber-400/20 border border-amber-500/30 text-amber-700 dark:text-amber-300">
+                      <Zap className="w-5 h-5 fill-amber-500/40 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
+                          Bypass Payment
+                        </h3>
+                        <span className="rounded-full bg-amber-600 text-white dark:bg-amber-500 dark:text-black font-mono text-[9px] font-extrabold px-2 py-0.5 uppercase tracking-wide">
+                          Test Mode
+                        </span>
+                      </div>
+                      <p className="font-sans text-[12px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
+                        {isBypassing ? "Settling test transaction..." : "Pre-production test • Bypass & mark paid"}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-amber-600 dark:text-amber-400 group-hover:translate-x-0.5 transition" />
                 </button>
               </div>
 
               {/* 100% Secure Payments Assurance */}
               <div className="pt-2 pb-2 text-center">
-                <div className="inline-flex items-center gap-1.5 font-mono text-[11px] text-[#725039]">
-                  <Lock className="w-3.5 h-3.5 text-[#725039]" />
+                <div className="inline-flex items-center gap-1.5 font-mono text-[11px] text-[#725039] dark:text-[#C9AE8B]">
+                  <Lock className="w-3.5 h-3.5 text-[#725039] dark:text-[#C9AE8B]" />
                   <span>100% Secure Payments</span>
                 </div>
               </div>
@@ -503,10 +676,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
             /* Empty Table Order */
             <div className="p-12 text-center space-y-3">
               <span className="block font-serif text-5xl">☕</span>
-              <p className="font-serif text-lg font-bold text-[#241F1C]">
+              <p className="font-serif text-lg font-bold text-[#241F1C] dark:text-[#FAF4EB]">
                 Your table is empty
               </p>
-              <p className="font-serif italic text-xs text-[#725039]">
+              <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
                 Explore our artisanal brews, sandwiches &amp; comfort bowls.
               </p>
               <button
@@ -529,33 +702,33 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                   {groupedItems.map(({ key, items: categoryItems }, groupIdx) => (
                     <div key={key} className="w-full">
                       {/* Category Header Bar in Café Crème & Walnut */}
-                      <div className={`px-4 py-1.5 bg-[#F3E7D3] ${groupIdx > 0 ? "border-t" : ""} border-b border-[#C9AE8B]/40`}>
-                        <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-[#725039]">
+                      <div className={`px-4 py-1.5 bg-[#F3E7D3] dark:bg-[#151110] ${groupIdx > 0 ? "border-t" : ""} border-b border-[#C9AE8B]/40 dark:border-white/10`}>
+                        <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-[#725039] dark:text-[#C9AE8B]">
                           {key}
                         </span>
                       </div>
 
                       {/* Items in this Category with Biscuit Dividers */}
-                      <div className="divide-y divide-[#C9AE8B]/30">
+                      <div className="divide-y divide-[#C9AE8B]/30 dark:divide-white/10">
                         {categoryItems.map(({ item, qty }) => {
                           const unitRupees = Math.round(item.pricePaise / 100);
                           const note = getCustomizationNote({ item, qty });
                           const isActionOpen = activeActionItemId === item.id;
 
                           return (
-                            <div key={item.id} className="transition-colors hover:bg-[#EAE0D2]/50">
+                            <div key={item.id} className="transition-colors hover:bg-[#EAE0D2]/50 dark:hover:bg-white/5">
                               <div className="px-4 py-2 flex items-start justify-between gap-2">
                                 {/* Left: Quantity + Details */}
                                 <div className="flex items-start gap-2.5 min-w-0 pr-2">
-                                  <span className="font-serif font-bold text-[16px] text-[#241F1C] w-4 shrink-0 text-left pt-0.5">
+                                  <span className="font-serif font-bold text-[16px] text-[#241F1C] dark:text-[#FAF4EB] w-4 shrink-0 text-left pt-0.5">
                                     {qty}
                                   </span>
                                   <div className="min-w-0">
-                                    <h4 className="font-serif font-bold text-[15.5px] text-[#241F1C] leading-tight whitespace-pre-line">
+                                    <h4 className="font-serif font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight whitespace-pre-line">
                                       {item.name.replace(/\s*\([^)]*\)/, "")}
                                     </h4>
                                     {note && (
-                                      <p className="font-mono text-[11.5px] text-[#725039] mt-0.5 tracking-tight">
+                                      <p className="font-mono text-[11.5px] text-[#725039] dark:text-[#C9AE8B] mt-0.5 tracking-tight">
                                         • {note}
                                       </p>
                                     )}
@@ -564,7 +737,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
                                 {/* Right: Price + "•••" Options Button */}
                                 <div className="flex items-center gap-3 shrink-0 pt-0.5">
-                                  <span className="font-serif font-medium text-[15.5px] text-[#241F1C] tracking-tight">
+                                  <span className="font-serif font-medium text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] tracking-tight">
                                     ₹{unitRupees * qty}
                                   </span>
                                   <button
@@ -573,7 +746,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                                       setActiveActionItemId(isActionOpen ? null : item.id)
                                     }
                                     aria-label="Item options"
-                                    className="text-[#241F1C] text-[18px] font-bold tracking-widest px-1 py-0.5 hover:opacity-60 active:scale-90 transition cursor-pointer"
+                                    className="text-[#241F1C] dark:text-[#FAF4EB] text-[18px] font-bold tracking-widest px-1 py-0.5 hover:opacity-60 active:scale-90 transition cursor-pointer"
                                   >
                                     •••
                                   </button>
@@ -582,30 +755,30 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
                               {/* Expandable Stepper Controls when user taps '•••' */}
                               {isActionOpen && (
-                                <div className="flex items-center justify-between bg-[#FAF4EB] px-4 py-2 border-t border-[#C9AE8B]/40">
-                                  <span className="text-xs font-mono text-[#725039]">Adjust quantity:</span>
+                                <div className="flex items-center justify-between bg-[#FAF4EB] dark:bg-[#1A1513] px-4 py-2 border-t border-[#C9AE8B]/40 dark:border-white/10">
+                                  <span className="text-xs font-mono text-[#725039] dark:text-[#C9AE8B]">Adjust quantity:</span>
                                   <div className="flex items-center gap-2.5">
                                     <button
                                       type="button"
                                       onClick={() => updateQty(item.id, -1)}
-                                      className="h-6 w-6 rounded-full border border-[#C9AE8B] bg-[#F3E7D3] font-mono text-xs font-bold text-[#241F1C] flex items-center justify-center hover:bg-[#FAF4EB]"
+                                      className="h-6 w-6 rounded-full border border-[#C9AE8B] dark:border-white/10 bg-[#F3E7D3] dark:bg-[#28201C] font-mono text-xs font-bold text-[#241F1C] dark:text-[#FAF4EB] flex items-center justify-center hover:bg-[#FAF4EB] dark:hover:bg-[#342A25]"
                                     >
                                       −
                                     </button>
-                                    <span className="font-mono text-xs font-bold text-[#241F1C] min-w-4 text-center">
+                                    <span className="font-mono text-xs font-bold text-[#241F1C] dark:text-[#FAF4EB] min-w-4 text-center">
                                       {qty}
                                     </span>
                                     <button
                                       type="button"
                                       onClick={() => updateQty(item.id, 1)}
-                                      className="h-6 w-6 rounded-full border border-[#C9AE8B] bg-[#F3E7D3] font-mono text-xs font-bold text-[#241F1C] flex items-center justify-center hover:bg-[#FAF4EB]"
+                                      className="h-6 w-6 rounded-full border border-[#C9AE8B] dark:border-white/10 bg-[#F3E7D3] dark:bg-[#28201C] font-mono text-xs font-bold text-[#241F1C] dark:text-[#FAF4EB] flex items-center justify-center hover:bg-[#FAF4EB] dark:hover:bg-[#342A25]"
                                     >
                                       +
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => removeItem(item.id)}
-                                      className="p-1 text-[#B72E35] hover:bg-[#B72E35]/10 rounded-full transition ml-1"
+                                      className="p-1 text-[#B72E35] dark:text-[#FF5B52] hover:bg-[#B72E35]/10 rounded-full transition ml-1"
                                       aria-label="Remove item"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
@@ -623,8 +796,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
                 {/* Upsell Card: "Make it a moment?" with Dusty Pool accent & Butter Taxi button */}
                 <div className="p-3">
-                  <div className="rounded-[1.4rem] border border-[#75AFA7]/50 bg-gradient-to-br from-[#E2EBE8] via-[#DAE6E2] to-[#CEDDD8] p-3 shadow-xs transition-all">
-                    <h3 className="font-serif font-semibold text-[16px] text-[#241F1C] mb-1.5">
+                  <div className="rounded-[1.4rem] border border-[#75AFA7]/50 dark:border-white/10 bg-gradient-to-br from-[#E2EBE8] via-[#DAE6E2] to-[#CEDDD8] dark:from-[#251E1B] dark:via-[#201A18] dark:to-[#1C1715] p-3 shadow-xs transition-all">
+                    <h3 className="font-serif font-semibold text-[16px] text-[#241F1C] dark:text-[#FAF4EB] mb-1.5">
                       Make it a moment?
                     </h3>
 
@@ -642,10 +815,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
                       {/* Center: Title & Description */}
                       <div className="flex-1 min-w-0 pr-1">
-                        <h4 className="font-serif font-bold text-[13.5px] text-[#241F1C] leading-snug truncate">
+                        <h4 className="font-serif font-bold text-[13.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-snug truncate">
                           Conversation Board
                         </h4>
-                        <p className="font-mono text-[10.5px] text-[#374438] leading-tight mt-0.5">
+                        <p className="font-mono text-[10.5px] text-[#374438] dark:text-[#C9AE8B] leading-tight mt-0.5">
                           Cheese, fruits, nuts &amp; a little something sweet.
                         </p>
                       </div>
@@ -653,10 +826,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                       {/* Right: Price & Butter Taxi Button */}
                       <div className="flex flex-col items-end gap-1.5 shrink-0 pl-1">
                         <div className="flex items-center gap-1 font-serif text-right">
-                          <span className="line-through font-mono text-[11px] text-[#725039]/70">
+                          <span className="line-through font-mono text-[11px] text-[#725039]/70 dark:text-[#C9AE8B]/60">
                             ₹350
                           </span>
-                          <span className="font-serif font-bold text-[13.5px] text-[#241F1C]">
+                          <span className="font-serif font-bold text-[13.5px] text-[#241F1C] dark:text-[#FAF4EB]">
                             ₹260
                           </span>
                         </div>
@@ -664,7 +837,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
                         <button
                           type="button"
                           onClick={handleAddConversationBoard}
-                          className={`w-9 h-9 rounded-full border border-[#241F1C] flex items-center justify-center transition-all duration-200 active:scale-90 shadow-xs cursor-pointer ${
+                          className={`w-9 h-9 rounded-full border border-[#241F1C] dark:border-white/20 flex items-center justify-center transition-all duration-200 active:scale-90 shadow-xs cursor-pointer ${
                             boardAdded || items.some((i) => i.item.id === "conversation_board")
                               ? "bg-[#2E5550] text-[#F3E7D3] border-[#241F1C]"
                               : "bg-[#F2C84B] text-[#241F1C] hover:bg-[#DEB63E]"
@@ -688,8 +861,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
 
         {/* Sticky Bottom Summary & "View Bill" CTA Button in Smol Cherry */}
         {!orderSuccess && activeView === "table_order" && items.length > 0 && (
-          <div className="sticky bottom-0 left-0 right-0 z-30 px-5 pt-2 pb-5 bg-gradient-to-t from-[#F3E7D3] via-[#F3E7D3]/95 to-transparent">
-            <p className="font-serif text-[15px] font-medium text-[#241F1C] text-center mb-2 tracking-wide">
+          <div className="sticky bottom-0 left-0 right-0 z-30 px-5 pt-2 pb-5 bg-gradient-to-t from-[#F3E7D3] via-[#F3E7D3]/95 to-transparent dark:from-[#1A1513] dark:via-[#1A1513]/95 dark:to-transparent">
+            <p className="font-serif text-[15px] font-medium text-[#241F1C] dark:text-[#FAF4EB] text-center mb-2 tracking-wide">
               {totalCount} {totalCount === 1 ? "item" : "items"} &nbsp;•&nbsp; Total ₹{totalRupees}
             </p>
 
@@ -715,6 +888,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07" }) => 
             closeCart();
           }}
           onClose={() => setIsUpiDrawerOpen(false)}
+        />
+      )}
+
+      {/* Post-Payment Celebration Modal if test bypass triggered */}
+      {celebrationData && (
+        <PostPaymentCelebrationModal
+          {...celebrationData}
         />
       )}
     </div>
