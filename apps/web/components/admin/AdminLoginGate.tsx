@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Shield, Lock } from "lucide-react";
+import Image from "next/image";
+import { Lock } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 
 interface AdminLoginGateProps {
@@ -41,8 +42,21 @@ export const AdminLoginGate: React.FC<AdminLoginGateProps> = ({ onSuccess }) => 
       </div>
       <div className="w-full max-w-sm rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1D1815] p-8 shadow-2xl transition-colors duration-200">
         <div className="text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#B72E35] text-white shadow-md">
-            <Shield className="h-7 w-7" />
+          <div className="relative mx-auto mb-3 h-24 w-18 select-none">
+            <Image
+              src="/admin-logo.png"
+              alt="smol café admin logo"
+              fill
+              priority
+              className="object-contain drop-shadow-md dark:hidden block"
+            />
+            <Image
+              src="/admin-logo-dark.png"
+              alt="smol café admin logo night mode"
+              fill
+              priority
+              className="object-contain drop-shadow-[0_0_12px_rgba(168,85,247,0.6)] hidden dark:block"
+            />
           </div>
           <h2 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3] lowercase">
             admin tower

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { ActiveCashierTable } from "@/app/bill/actions";
 import {
   fetchActiveCashierTablesAction,
@@ -226,6 +227,22 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
             >
               ←
             </Link>
+            <div className="relative h-12 w-9 shrink-0 select-none">
+              <Image
+                src="/cashier-logo.png"
+                alt="smol café cashier logo"
+                fill
+                priority
+                className="object-contain drop-shadow-xs dark:hidden block"
+              />
+              <Image
+                src="/cashier-logo-dark.png"
+                alt="smol café cashier logo night mode"
+                fill
+                priority
+                className="object-contain drop-shadow-[0_0_8px_rgba(168,85,247,0.4)] hidden dark:block"
+              />
+            </div>
             <div>
               <span className="text-xl font-black tracking-tight text-[#B72E35] dark:text-[#F6AD55]">
                 smol café • Cashier Desk
