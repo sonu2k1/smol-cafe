@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   BarChart3,
   CreditCard,
@@ -161,16 +162,23 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
       {/* Sidebar Navigation */}
       <aside className="w-64 shrink-0 border-r border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] flex flex-col justify-between hidden md:flex transition-colors duration-200">
         <div className="p-5 space-y-6">
-          {/* Logo & Cafe Branding */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#B72E35] text-white font-serif font-black text-xl shadow-md">
-              s
-            </div>
-            <div>
-              <h2 className="font-serif text-lg font-black tracking-tight text-[#241F1C] dark:text-white lowercase">
-                smol tower
-              </h2>
-              <p className="font-mono text-[10px] text-[#725039] dark:text-[#C9AE8B]">Admin Control Hub</p>
+          {/* Admin Logo Showcase */}
+          <div className="flex justify-center items-center py-2 border-b border-[#C9AE8B]/30 dark:border-stone-800/60 pb-5">
+            <div className="relative h-36 w-28 shrink-0 select-none">
+              <Image
+                src="/admin-logo.png"
+                alt="smol café admin logo"
+                fill
+                priority
+                className="object-contain drop-shadow-md dark:hidden block hover:scale-105 transition-transform duration-200"
+              />
+              <Image
+                src="/admin-logo-dark.png"
+                alt="smol café admin logo night mode"
+                fill
+                priority
+                className="object-contain drop-shadow-[0_0_16px_rgba(168,85,247,0.5)] hidden dark:block hover:scale-105 transition-transform duration-200"
+              />
             </div>
           </div>
 
@@ -243,9 +251,22 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
         <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#1C1917]/95 px-6 py-4 backdrop-blur-md flex items-center justify-between transition-colors duration-200">
           <div className="flex items-center gap-3">
             <div className="flex md:hidden items-center gap-2">
-              <span className="h-7 w-7 rounded-lg bg-[#B72E35] text-white flex items-center justify-center font-bold text-xs">
-                s
-              </span>
+              <div className="relative h-9 w-7 shrink-0 select-none">
+                <Image
+                  src="/admin-logo.png"
+                  alt="smol café admin logo"
+                  fill
+                  priority
+                  className="object-contain dark:hidden block"
+                />
+                <Image
+                  src="/admin-logo-dark.png"
+                  alt="smol café admin logo night mode"
+                  fill
+                  priority
+                  className="object-contain drop-shadow-[0_0_8px_rgba(168,85,247,0.4)] hidden dark:block"
+                />
+              </div>
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight text-[#241F1C] dark:text-white capitalize">
