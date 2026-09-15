@@ -217,17 +217,19 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
   return (
     <div className="min-h-screen bg-[#F3E7D3] dark:bg-[#141211] text-[#241F1C] dark:text-[#FDFBF7] transition-colors duration-200">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#1C1917]/95 px-6 py-4 backdrop-blur-md transition-colors duration-200">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <div className="flex items-center gap-3">
+      {/* Header */}
+      <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#1C1917]/95 px-3 sm:px-6 py-2.5 sm:py-3.5 backdrop-blur-md transition-colors duration-200">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2">
+          {/* Brand Left */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Link
               href="/smol-backdoor"
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-800 text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 transition cursor-pointer"
+              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-800 text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 transition cursor-pointer shrink-0"
               title="Back to staff portal"
             >
               ←
             </Link>
-            <div className="relative h-12 w-9 shrink-0 select-none">
+            <div className="relative h-9 w-7 sm:h-11 sm:w-8 shrink-0 select-none">
               <Image
                 src="/cashier-logo.png"
                 alt="smol café cashier logo"
@@ -243,24 +245,30 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                 className="object-contain drop-shadow-[0_0_8px_rgba(168,85,247,0.4)] hidden dark:block"
               />
             </div>
-            <div>
-              <span className="text-xl font-black tracking-tight text-[#B72E35] dark:text-[#F6AD55]">
-                smol café • Cashier Desk
-              </span>
-              <span className="ml-2 rounded-md border border-[#C9AE8B]/30 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-2 py-0.5 font-mono text-[10px] text-[#725039] dark:text-stone-400">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-base sm:text-xl font-black tracking-tight text-[#B72E35] dark:text-[#F6AD55] truncate">
+                  smol café • Cashier Desk
+                </span>
+                <span className="hidden sm:inline rounded-md border border-[#C9AE8B]/30 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-2 py-0.5 font-mono text-[10px] text-[#725039] dark:text-stone-400 shrink-0">
+                  Front-Desk Queue &amp; POS
+                </span>
+              </div>
+              <p className="sm:hidden font-mono text-[10px] text-[#725039] dark:text-stone-400 truncate">
                 Front-Desk Queue &amp; POS
-              </span>
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 rounded-full border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 px-3 py-1 text-xs font-mono text-[#725039] dark:text-stone-400">
+          {/* Controls Right */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <span className="flex items-center gap-1 sm:gap-1.5 rounded-full border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 px-2 sm:px-3 py-1 text-[11px] sm:text-xs font-mono text-[#725039] dark:text-stone-400">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              Live 3s
+              <span className="hidden sm:inline">Live 3s</span>
             </span>
             <Link
               href="/smol-backdoor"
-              className="rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 px-3 py-1 text-xs font-mono text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition"
+              className="hidden sm:inline rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 px-3 py-1 text-xs font-mono text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition"
             >
               Role Portal
             </Link>
@@ -272,7 +280,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-5xl p-6 space-y-6">
+      <main className="mx-auto max-w-5xl p-4 sm:p-6 space-y-4 sm:space-y-6">
         {actionFeedback && (
           <div
             className={`rounded-2xl p-4 text-xs font-serif ${
@@ -286,20 +294,21 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
         )}
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-2 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5 overflow-x-auto scrollbar-none">
           <button
             type="button"
             onClick={() => setActiveTab("queue")}
-            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl px-3.5 sm:px-5 py-2 sm:py-2.5 text-xs font-bold transition-all cursor-pointer ${
               activeTab === "queue"
-                ? "bg-[#B72E35] text-white shadow-md"
+                ? "bg-[#B72E35] text-white shadow-md font-extrabold"
                 : "bg-[#FAF4EB] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800"
             }`}
           >
             <Bell className="h-4 w-4 shrink-0 text-[#8C6207] dark:text-[#F6AD55]" />
-            <span>Order Confirmation Queue</span>
+            <span className="hidden sm:inline">Order Confirmation Queue</span>
+            <span className="sm:hidden">Order Queue</span>
             {pendingOrders.length > 0 && (
-              <span className="rounded-full bg-white px-2 py-0.2 text-[10px] font-black text-[#B72E35] animate-bounce">
+              <span className="rounded-full bg-white px-1.5 sm:px-2 py-0.2 text-[10px] font-black text-[#B72E35] animate-bounce">
                 {pendingOrders.length}
               </span>
             )}
@@ -308,15 +317,16 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
           <button
             type="button"
             onClick={() => setActiveTab("tables")}
-            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl px-3.5 sm:px-5 py-2 sm:py-2.5 text-xs font-bold transition-all cursor-pointer ${
               activeTab === "tables"
                 ? "bg-[#F2C84B] text-[#241F1C] shadow-md font-extrabold"
                 : "bg-[#FAF4EB] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800"
             }`}
           >
             <Armchair className="h-4 w-4 shrink-0 text-[#8C6207] dark:text-amber-400" />
-            <span>Tables &amp; Settlement</span>
-            <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 px-2 py-0.2 text-[10px] font-mono text-[#725039] dark:text-stone-300">
+            <span className="hidden sm:inline">Tables &amp; Settlement</span>
+            <span className="sm:hidden">Tables</span>
+            <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 px-1.5 sm:px-2 py-0.2 text-[10px] font-mono text-[#725039] dark:text-stone-300">
               {tables.length}
             </span>
           </button>
@@ -324,14 +334,18 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
           <button
             type="button"
             onClick={() => setActiveTab("paid")}
-            className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl px-3.5 sm:px-5 py-2 sm:py-2.5 text-xs font-bold transition-all cursor-pointer ${
               activeTab === "paid"
                 ? "bg-[#75AFA7] text-white shadow-md font-extrabold"
                 : "bg-[#FAF4EB] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800"
             }`}
           >
             <Receipt className="h-4 w-4 shrink-0 text-[#245850] dark:text-emerald-400" />
-            <span>Paid Orders ({paidHistory.length})</span>
+            <span className="hidden sm:inline">Paid Orders</span>
+            <span className="sm:hidden">Paid History</span>
+            <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 px-1.5 sm:px-2 py-0.2 text-[10px] font-mono text-[#725039] dark:text-stone-300">
+              {paidHistory.length}
+            </span>
           </button>
         </div>
 
@@ -413,7 +427,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                     </div>
 
                     {/* Bottom: Total & Confirm Action */}
-                    <div className="border-t border-[#C9AE8B]/30 dark:border-stone-800 pt-3 flex items-center justify-between">
+                    <div className="border-t border-[#C9AE8B]/30 dark:border-stone-800 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div>
                         <span className="block font-mono text-[9px] uppercase font-bold text-[#8C6D53] dark:text-stone-500">
                           ORDER TOTAL
@@ -428,7 +442,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                           type="button"
                           disabled={isSubmitting}
                           onClick={() => handleRejectOrder(order.id)}
-                          className="rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 px-3 py-2 text-xs font-bold text-rose-800 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                          className="flex-1 sm:flex-none rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 px-3 py-2 text-xs font-bold text-rose-800 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition active:scale-95 disabled:opacity-50 cursor-pointer text-center"
                         >
                           Reject
                         </button>
@@ -436,10 +450,10 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                           type="button"
                           disabled={isSubmitting}
                           onClick={() => handleConfirmOrder(order.id)}
-                          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 active:scale-95 transition disabled:opacity-50 cursor-pointer"
+                          className="flex-2 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 active:scale-95 transition disabled:opacity-50 cursor-pointer text-center"
                         >
                           <Check className="h-4 w-4" />
-                          <span>Confirm &amp; Push to Kitchen</span>
+                          <span>Confirm &amp; Push</span>
                         </button>
                       </div>
                     </div>
