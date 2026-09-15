@@ -599,36 +599,47 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
         {/* TAB 3: PAID ORDERS & SETTLEMENT AUDIT */}
         {activeTab === "paid" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div>
                 <h1 className="text-xl font-extrabold tracking-tight text-[#241F1C] dark:text-white">Today&apos;s Paid Orders &amp; Audit Log</h1>
                 <p className="text-xs text-[#725039] dark:text-stone-400">
                   Closed table chits and completed payment transactions
                 </p>
               </div>
-              <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/60 px-3 py-1 font-mono text-xs font-bold text-emerald-800 dark:text-emerald-400">
-                Total: ₹{paidHistory.reduce((acc, p) => acc + p.totalRupees, 0)}
-              </span>
+              <div className="self-start sm:self-auto">
+                <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/60 px-3 py-1 font-mono text-xs font-bold text-emerald-800 dark:text-emerald-400 shadow-xs">
+                  Total: ₹{paidHistory.reduce((acc, p) => acc + p.totalRupees, 0)}
+                </span>
+              </div>
             </div>
 
-            <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
-                  <tr>
-                    <th className="p-3.5">Settlement ID</th>
-                    <th className="p-3.5">Table</th>
-                    <th className="p-3.5">Method</th>
-                    <th className="p-3.5">Amount</th>
-                    <th className="p-3.5">Settled At</th>
-                    <th className="p-3.5 text-right">Receipt</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
+            {paidHistory.length === 0 ? (
+              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-8 text-center text-[#725039] dark:text-stone-400 space-y-3 shadow-xs transition-colors">
+                <Receipt className="h-8 w-8 text-[#8C6D53] dark:text-stone-500 mx-auto" />
+                <p className="text-sm font-bold text-[#241F1C] dark:text-stone-200">No settled orders yet today</p>
+                <p className="text-xs text-[#8C6D53] dark:text-stone-500 max-w-sm mx-auto">
+                  Completed orders and cash settlements will appear here as audit logs.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Mobile View: Responsive Cards (< sm) */}
+                <div className="space-y-3 sm:hidden">
                   {paidHistory.map((rec) => (
-                    <tr key={rec.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
-                      <td className="p-3.5 font-bold text-[#241F1C] dark:text-stone-200">{rec.id}</td>
-                      <td className="p-3.5 text-[#8C6207] dark:text-[#F6AD55] font-bold">Table {rec.tableLabel}</td>
-                      <td className="p-3.5">
+                    <div
+                      key={rec.id}
+                      className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-xs transition-colors space-y-3"
+                    >
+                      {/* Top Row: Settlement ID, Table, and Payment Method */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-[#241F1C] dark:text-stone-200 bg-[#F3E7D3] dark:bg-stone-800 px-2 py-0.5 rounded-md border border-[#C9AE8B]/30 dark:border-stone-700">
+                            {rec.id}
+                          </span>
+                          <span className="font-mono text-xs font-bold text-[#8C6207] dark:text-[#F6AD55]">
+                            Table {rec.tableLabel}
+                          </span>
+                        </div>
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                           rec.paymentMethod === "UPI"
                             ? "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800/50"
@@ -636,38 +647,110 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                         }`}>
                           {rec.paymentMethod}
                         </span>
-                      </td>
-                      <td className="p-3.5 font-bold text-[#241F1C] dark:text-white font-serif text-sm">₹{rec.totalRupees}</td>
-                      <td className="p-3.5 text-[#725039] dark:text-stone-400 text-[11px]">
-                        {new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="p-3.5 text-right">
-                        <button
-                          onClick={() => {
-                            setActiveReceipt({
-                              orderId: rec.id,
-                              tableLabel: rec.tableLabel,
-                              items: [
-                                { name: "Settled Order Items", qty: rec.itemsCount, priceRupees: Math.round(rec.totalRupees / rec.itemsCount), subtotalRupees: rec.totalRupees }
-                              ],
-                              subtotalRupees: Math.round(rec.totalRupees / 1.05),
-                              taxRupees: Math.round(rec.totalRupees - rec.totalRupees / 1.05),
-                              totalRupees: rec.totalRupees,
-                              paymentMethod: rec.paymentMethod,
-                              paidAt: rec.paidAt,
-                            });
-                          }}
-                          className="inline-flex items-center gap-1 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-3 py-1 text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 hover:text-[#241F1C] dark:hover:text-white transition cursor-pointer"
-                        >
-                          <Printer className="h-3 w-3" />
-                          <span>Chit</span>
-                        </button>
-                      </td>
-                    </tr>
+                      </div>
+
+                      {/* Bottom Row: Timestamp, Amount, and Chit Action */}
+                      <div className="flex items-center justify-between pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/80">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] uppercase font-mono text-[#8C6D53] dark:text-stone-500">Settled At</span>
+                          <span className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                            {new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="font-serif text-lg font-bold text-[#241F1C] dark:text-white">
+                            ₹{rec.totalRupees}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveReceipt({
+                                orderId: rec.id,
+                                tableLabel: rec.tableLabel,
+                                items: [
+                                  { name: "Settled Order Items", qty: rec.itemsCount, priceRupees: Math.round(rec.totalRupees / rec.itemsCount), subtotalRupees: rec.totalRupees }
+                                ],
+                                subtotalRupees: Math.round(rec.totalRupees / 1.05),
+                                taxRupees: Math.round(rec.totalRupees - rec.totalRupees / 1.05),
+                                totalRupees: rec.totalRupees,
+                                paymentMethod: rec.paymentMethod,
+                                paidAt: rec.paidAt,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-3 py-1.5 text-xs font-semibold text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 active:scale-95 transition cursor-pointer"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            <span>Chit</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+
+                {/* Tablet / Desktop View: Clean Table with horizontal scroll support */}
+                <div className="hidden sm:block rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
+                  <div className="overflow-x-auto scrollbar-none">
+                    <table className="w-full min-w-[560px] text-left text-xs">
+                      <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
+                        <tr>
+                          <th className="p-3.5 whitespace-nowrap">Settlement ID</th>
+                          <th className="p-3.5 whitespace-nowrap">Table</th>
+                          <th className="p-3.5 whitespace-nowrap">Method</th>
+                          <th className="p-3.5 whitespace-nowrap">Amount</th>
+                          <th className="p-3.5 whitespace-nowrap">Settled At</th>
+                          <th className="p-3.5 text-right whitespace-nowrap">Receipt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
+                        {paidHistory.map((rec) => (
+                          <tr key={rec.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
+                            <td className="p-3.5 font-bold text-[#241F1C] dark:text-stone-200 whitespace-nowrap">{rec.id}</td>
+                            <td className="p-3.5 text-[#8C6207] dark:text-[#F6AD55] font-bold whitespace-nowrap">Table {rec.tableLabel}</td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                rec.paymentMethod === "UPI"
+                                  ? "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800/50"
+                                  : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50"
+                              }`}>
+                                {rec.paymentMethod}
+                              </span>
+                            </td>
+                            <td className="p-3.5 font-bold text-[#241F1C] dark:text-white font-serif text-sm whitespace-nowrap">₹{rec.totalRupees}</td>
+                            <td className="p-3.5 text-[#725039] dark:text-stone-400 text-[11px] whitespace-nowrap">
+                              {new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => {
+                                  setActiveReceipt({
+                                    orderId: rec.id,
+                                    tableLabel: rec.tableLabel,
+                                    items: [
+                                      { name: "Settled Order Items", qty: rec.itemsCount, priceRupees: Math.round(rec.totalRupees / rec.itemsCount), subtotalRupees: rec.totalRupees }
+                                    ],
+                                    subtotalRupees: Math.round(rec.totalRupees / 1.05),
+                                    taxRupees: Math.round(rec.totalRupees - rec.totalRupees / 1.05),
+                                    totalRupees: rec.totalRupees,
+                                    paymentMethod: rec.paymentMethod,
+                                    paidAt: rec.paidAt,
+                                  });
+                                }}
+                                className="inline-flex items-center gap-1 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-3 py-1 text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 hover:text-[#241F1C] dark:hover:text-white transition cursor-pointer"
+                              >
+                                <Printer className="h-3 w-3" />
+                                <span>Chit</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </main>
