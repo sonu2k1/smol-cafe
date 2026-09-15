@@ -207,32 +207,30 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
       )}
 
       {/* Header & Quick Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#B72E35] text-white shadow-xs">
-              <ChefHat className="h-5 w-5" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#B72E35] text-white shadow-xs shrink-0 mt-0.5 sm:mt-0">
+            <ChefHat className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-serif text-lg sm:text-2xl font-bold text-[#241F1C] dark:text-white leading-tight">
+                Daily Kitchen Menu & 86 Editor
+              </h1>
+              <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 text-[10px] sm:text-[11px] font-mono font-bold shrink-0">
+                Chef Live
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-serif text-2xl font-bold text-[#241F1C] dark:text-white">
-                  Daily Kitchen Menu & 86 Editor
-                </h1>
-                <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 text-[11px] font-mono font-bold">
-                  Chef Live
-                </span>
-              </div>
-              <p className="font-mono text-xs text-[#725039] dark:text-stone-400 mt-0.5">
-                Toggle dish availability (86), set low-stock portion alerts, and update daily chef specials.
-              </p>
-            </div>
+            <p className="font-mono text-[11px] sm:text-xs text-[#725039] dark:text-stone-400 mt-1">
+              Toggle dish availability (86), set low-stock portion alerts, and update daily chef specials.
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
           <button
             onClick={loadData}
-            className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3.5 py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition"
+            className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3.5 py-1.5 sm:py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
             <span>Sync Catalog</span>
@@ -336,14 +334,14 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
         </div>
 
         {/* Stock Status Pills & Search */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono text-stone-500 mr-1">Status:</span>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
+            <span className="text-[10px] sm:text-[11px] font-mono text-stone-500 mr-1 shrink-0">Status:</span>
             {(["ALL", "IN_STOCK", "LOW_STOCK", "SOLD_OUT"] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setStockFilter(s)}
-                className={`rounded-xl px-2.5 py-1 text-[11px] font-mono font-bold transition border ${
+                className={`shrink-0 rounded-xl px-2.5 py-1 text-[10px] sm:text-[11px] font-mono font-bold transition border ${
                   stockFilter === s
                     ? s === "SOLD_OUT"
                       ? "bg-rose-600 text-white border-rose-600"

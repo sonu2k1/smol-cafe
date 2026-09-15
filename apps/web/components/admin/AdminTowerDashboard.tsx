@@ -19,6 +19,8 @@ import {
   ExternalLink,
   Gift,
   TrendingUp,
+  Menu,
+  X,
 } from "lucide-react";
 import { TABLE_ZONES_CONFIG, createTableJsonTag, type TableJsonTag } from "@/lib/table-tag";
 import { getUpiConfig, updateMerchantConfig, type MerchantConfig } from "@/lib/upi";
@@ -52,6 +54,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
   const [inspectingTag, setInspectingTag] = useState<TableJsonTag | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("ALL");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Merchant Settings State
   const [merchantConfig, setMerchantConfig] = useState<MerchantConfig>(getUpiConfig());
@@ -109,6 +112,24 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
       createdAt: "42 mins ago",
     },
   ]);
+ 
+  const navItems: Array<{
+    id: typeof activeTab;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: string;
+  }> = [
+    { id: "overview", label: "Overview", icon: BarChart3 },
+    { id: "orders", label: "Orders", icon: ShoppingBag, badge: `${orders.length}` },
+    { id: "tables", label: "Tables", icon: Armchair, badge: "12" },
+    { id: "menu", label: "Menu", icon: Coffee, badge: "59" },
+    { id: "customers", label: "Customers", icon: Users },
+    { id: "staff", label: "Staff", icon: Shield },
+    { id: "payments", label: "Payments", icon: CreditCard },
+    { id: "rewards", label: "Rewards", icon: Gift, badge: "Club" },
+    { id: "analytics", label: "Analytics", icon: TrendingUp },
+    { id: "settings", label: "Settings", icon: Settings },
+  ];
 
   // Real-Time Sync Subscription
   useEffect(() => {
@@ -159,7 +180,114 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
 
   return (
     <div className="min-h-screen bg-[#F3E7D3] dark:bg-[#141211] text-[#241F1C] dark:text-[#FDFBF7] flex transition-colors duration-200">
-      {/* Sidebar Navigation */}
+      {/* Mobile Drawer Backdrop & Menu */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+          <aside className="relative w-4/5 max-w-xs bg-[#FAF4EB] dark:bg-[#1A1715] text-[#241F1C] dark:text-[#FDFBF7] flex flex-col justify-between shadow-2xl border-r border-[#C9AE8B]/40 dark:border-stone-800 z-50 h-full overflow-y-auto">
+            <div className="p-5 space-y-5">
+              {/* Drawer Header with Logo & Close Button */}
+              <div className="flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800/60 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="relative h-10 w-8 shrink-0 select-none">
+                    <Image
+                      src="/admin-logo.png"
+                      alt="smol café admin logo"
+                      fill
+                      priority
+                      className="object-contain drop-shadow-md dark:hidden block"
+                    />
+                    <Image
+                      src="/admin-logo-dark.png"
+                      alt="smol café admin logo night mode"
+                      fill
+                      priority
+                      className="object-contain drop-shadow-[0_0_12px_rgba(168,85,247,0.5)] hidden dark:block"
+                    />
+                  </div>
+                  <div>
+                    <h2 className="font-serif font-black text-sm text-[#241F1C] dark:text-white">
+                      smol café admin
+                    </h2>
+                    <p className="font-mono text-[9px] text-[#725039] dark:text-[#C9AE8B]">
+                      Operations Hub
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-xl p-2 text-[#725039] hover:bg-[#F3E7D3] dark:text-stone-400 dark:hover:bg-stone-800 cursor-pointer transition"
+                  aria-label="Close menu"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Navigation Links in Drawer */}
+              <nav className="space-y-1.5 text-xs font-medium">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 transition cursor-pointer ${
+                        isActive
+                          ? "bg-[#B72E35] text-white font-bold shadow-md"
+                          : "text-[#725039] hover:bg-[#F3E7D3] hover:text-[#241F1C] dark:text-stone-400 dark:hover:bg-stone-800/80 dark:hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </div>
+                      {item.badge && (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-mono ${
+                            isActive
+                              ? "bg-white/20 text-white"
+                              : "bg-[#F3E7D3] dark:bg-stone-800 text-[#725039] dark:text-stone-400"
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="border-t border-[#C9AE8B]/40 dark:border-stone-800 p-4 space-y-2 mt-auto">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-mono text-[#725039] dark:text-stone-400">Owner Access</span>
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <Link
+                href="/menu"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 px-3 py-2 text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-800 transition"
+              >
+                <span>Switch to Customer QR</span>
+                <ExternalLink className="h-3 w-3 text-[#725039] dark:text-stone-500" />
+              </Link>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop Sidebar Navigation */}
       <aside className="w-64 shrink-0 border-r border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] flex flex-col justify-between hidden md:flex transition-colors duration-200">
         <div className="p-5 space-y-6">
           {/* Admin Logo Showcase */}
@@ -184,24 +312,13 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
 
           {/* Navigation Links */}
           <nav className="space-y-1.5 text-xs font-medium">
-            {[
-              { id: "overview", label: "Overview", icon: BarChart3, badge: "Live" },
-              { id: "orders", label: "Orders", icon: ShoppingBag, badge: `${orders.length}` },
-              { id: "tables", label: "Tables", icon: Armchair, badge: "12" },
-              { id: "menu", label: "Menu Management", icon: Coffee, badge: "59" },
-              { id: "customers", label: "Customers", icon: Users },
-              { id: "staff", label: "Staff", icon: Shield },
-              { id: "payments", label: "Payments", icon: CreditCard },
-              { id: "rewards", label: "Rewards / Loyalty", icon: Gift, badge: "Club" },
-              { id: "analytics", label: "Analytics", icon: TrendingUp },
-              { id: "settings", label: "Settings", icon: Settings },
-            ].map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id as typeof activeTab)}
+                  onClick={() => setActiveTab(item.id)}
                   className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 transition cursor-pointer ${
                     isActive
                       ? "bg-[#B72E35] text-white font-bold shadow-md"
@@ -246,11 +363,21 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto pb-28 md:pb-6">
         {/* Top App Header */}
-        <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#1C1917]/95 px-6 py-4 backdrop-blur-md flex items-center justify-between transition-colors duration-200">
-          <div className="flex items-center gap-3">
-            <div className="flex md:hidden items-center gap-2">
+        <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#1C1917]/95 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-md flex items-center justify-between transition-colors duration-200 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            {/* Hamburger Button for Mobile */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden flex items-center justify-center h-9 w-9 shrink-0 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-800 transition cursor-pointer shadow-xs active:scale-95"
+              aria-label="Open navigation menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="flex md:hidden items-center gap-2 shrink-0">
               <div className="relative h-9 w-7 shrink-0 select-none">
                 <Image
                   src="/admin-logo.png"
@@ -268,8 +395,8 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
                 />
               </div>
             </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-[#241F1C] dark:text-white capitalize">
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-black tracking-tight text-[#241F1C] dark:text-white capitalize truncate">
                 {activeTab === "overview" && "Executive Operations Overview"}
                 {activeTab === "orders" && "Real-Time Order Pipeline"}
                 {activeTab === "tables" && "Table Floor Plan & JSON Tagging"}
@@ -281,19 +408,19 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
                 {activeTab === "analytics" && "Operational Analytics & Metrics"}
                 {activeTab === "settings" && "Merchant ID & Hardware Setup"}
               </h1>
-              <p className="font-mono text-[10px] text-[#725039] dark:text-[#C9AE8B]">
+              <p className="font-mono text-[9px] sm:text-[10px] text-[#725039] dark:text-[#C9AE8B] truncate">
                 Tapovan, Rishikesh • Real-Time Engine Active
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Quick Refresh */}
             <button
               onClick={() => {
                 broadcastSyncEvent({ type: "SETTINGS_UPDATED", timestamp: Date.now() });
               }}
-              className="flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 px-3 py-1.5 text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-800 transition cursor-pointer"
+              className="flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 px-2.5 sm:px-3 py-1.5 text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-800 transition cursor-pointer"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Sync All</span>
@@ -1145,6 +1272,72 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
           </div>
         )}
       </main>
+
+      {/* Floating Glassmorphic 3D Mobile Bottom Navbar (Thin & Adaptive) */}
+      <div className="fixed bottom-2.5 inset-x-2 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-xl z-40 md:hidden pointer-events-none">
+        <div className="pointer-events-auto rounded-full border border-[#D5C2AA]/80 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#141010]/95 backdrop-blur-2xl shadow-[0_8px_24px_rgba(114,80,57,0.12),0_1px_4px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[0_14px_36px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.1)] px-3 pt-2 pb-1.5 transition-all">
+          <nav className="flex items-center gap-2.5 overflow-x-auto scrollbar-none px-1 py-0.5 justify-start">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className="flex flex-col items-center gap-1 shrink-0 group relative focus:outline-none cursor-pointer select-none px-1"
+                >
+                  {/* 3D Icon Puck / Circle */}
+                  <div
+                    className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${
+                      isActive
+                        ? "bg-gradient-to-b from-[#DC2626] to-[#B72E35] text-white shadow-[0_2.5px_6px_rgba(183,46,53,0.35),0_1px_2px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.6)] scale-[1.03]"
+                        : "bg-gradient-to-b from-white to-[#EDE4D8] text-[#725039] border border-[#D9C4AC]/80 shadow-[0_1.5px_3px_rgba(114,80,57,0.08),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:brightness-95 dark:from-stone-800 dark:to-stone-900 dark:text-stone-300 dark:border-stone-700/60 dark:shadow-[0_1.5px_4px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.12)] dark:hover:brightness-110"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 stroke-[2]" />
+
+                    {/* 3D Floating Badge */}
+                    {item.badge && (
+                      <span
+                        className={`absolute -top-1 -right-1 flex h-3.5 min-w-[15px] items-center justify-center rounded-full px-1 text-[8px] font-bold font-mono ${
+                          item.id === "orders"
+                            ? "bg-[#DC2626] text-white shadow-[0_1.5px_3px_rgba(220,38,38,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)]"
+                            : "bg-[#F3E7D3] text-[#725039] border border-[#C9AE8B]/70 shadow-[0_1px_2px_rgba(0,0,0,0.08)] dark:bg-stone-800 dark:text-stone-200 dark:border-stone-700 dark:shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 3D Text Label */}
+                  <span
+                    className={`text-[10px] tracking-tight transition-all duration-200 ${
+                      isActive
+                        ? "font-bold text-[#B72E35] dark:text-white"
+                        : "font-medium text-[#725039] group-hover:text-[#241F1C] dark:text-stone-400 dark:group-hover:text-stone-200"
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+
+                  {/* Clean Smooth Active Indicator Bar */}
+                  <div className="flex items-center justify-center h-1 mt-0.5">
+                    {isActive ? (
+                      <span className="h-[2.5px] w-5 rounded-full bg-[#B72E35] dark:bg-red-500 shadow-[0_0_6px_rgba(183,46,53,0.35)] dark:shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+                    ) : (
+                      <span className="h-[2.5px] w-5 opacity-0" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* iOS Bottom Home Bar */}
+          <div className="w-16 sm:w-20 h-0.5 bg-[#725039]/20 dark:bg-white/20 rounded-full mx-auto mt-0.5" />
+        </div>
+      </div>
 
       {/* JSON Table Tag Inspector Modal */}
       {inspectingTag && (
