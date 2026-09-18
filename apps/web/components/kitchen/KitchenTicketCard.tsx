@@ -84,43 +84,42 @@ export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, on
           ? "bg-[#75AFA7]/20 text-[#75AFA7] border-[#75AFA7]/40"
           : "bg-stone-800 text-stone-400 border-stone-700";
 
-  let actionButtonLabel = "start preparing";
+  let actionButtonLabel = "START PREPARING";
   let actionButtonColor = "bg-[#B72E35] hover:bg-[#9B242A] text-white";
 
   if (displayStatus === "PREPARING") {
-    actionButtonLabel = "mark ready";
-    actionButtonColor = "bg-[#F2C84B] text-[#241F1C] hover:bg-[#DEB33A] font-semibold";
+    actionButtonLabel = "MARK READY";
+    actionButtonColor = "bg-[#F2C84B] text-[#241F1C] hover:bg-[#DEB33A] font-bold";
   } else if (displayStatus === "READY") {
-    actionButtonLabel = "complete order";
-    actionButtonColor = "bg-[#75AFA7] text-white hover:bg-[#5C968E]";
+    actionButtonLabel = "MARK DELIVERED";
+    actionButtonColor = "bg-[#75AFA7] text-white hover:bg-[#5C968E] font-bold";
   }
 
   return (
-    <div className="flex flex-col justify-between rounded-2xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1D1815] p-4 shadow-sm transition-all hover:border-[#B72E35]/40 dark:hover:border-[#C9AE8B]/40">
+    <div className="flex flex-col justify-between rounded-2xl border-2 border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1D1815] p-4 shadow-sm transition-all hover:border-[#B72E35]/40 dark:hover:border-[#C9AE8B]/40">
       <div>
-        {/* Card Header: Order ID & Table Number in Noto Sans Mono */}
-        <div className="flex items-center justify-between gap-2 border-b border-[#C9AE8B]/30 dark:border-stone-800/80 pb-3">
+        {/* Card Header: Prominent TABLE Number & Payment: PAID Badge */}
+        <div className="flex items-center justify-between gap-2 border-b border-[#C9AE8B]/30 dark:border-stone-800/80 pb-2.5">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-lg font-bold text-[#241F1C] dark:text-[#F3E7D3]">
+            <span className="font-mono text-sm font-bold text-[#725039] dark:text-stone-400">
               #{ticket.orderNo || ticket.id.slice(-4)}
             </span>
-            <span className="rounded-lg border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#F3E7D3] dark:bg-[#241F1C] px-2 py-0.5 font-mono text-xs font-semibold text-[#B72E35] dark:text-[#F2C84B]">
-              table {ticket.tableLabel}{ticket.guestName ? ` • ${ticket.guestName}` : ""}
+            <span className="rounded-xl border border-[#B72E35]/30 bg-[#B72E35]/10 dark:bg-[#F2C84B]/10 px-2.5 py-1 font-mono text-xs font-black uppercase text-[#B72E35] dark:text-[#F2C84B]">
+              TABLE {ticket.tableLabel}
             </span>
           </div>
 
-          {/* Current Status Badge */}
-          <span className={`rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold ${statusBadgeStyle}`}>
-            {displayStatus}
+          {/* Payment Status Badge */}
+          <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/60 px-2 py-0.5 font-mono text-[10px] font-extrabold text-emerald-800 dark:text-emerald-300">
+            Payment: PAID
           </span>
         </div>
 
-        {/* Metadata Bar: Order Time & Preparation Timer */}
-        <div className="flex items-center justify-between mt-2.5 px-0.5 font-mono text-xs text-[#725039] dark:text-[#C9AE8B]">
-          <div className="flex items-center gap-1">
-            <span className="text-[#8C6D53] dark:text-stone-500">time:</span>
-            <span suppressHydrationWarning>{orderTimeFormatted}</span>
-          </div>
+        {/* State Banner: NEW / PREPARING / READY / DELIVERED */}
+        <div className="flex items-center justify-between mt-2 px-0.5 font-mono text-xs text-[#725039] dark:text-[#C9AE8B]">
+          <span className={`rounded-md border px-2 py-0.5 text-[10.5px] font-bold ${statusBadgeStyle}`}>
+            {displayStatus === "NEW" ? "NEW ORDER" : displayStatus === "READY" ? "ORDER READY" : displayStatus}
+          </span>
 
           <div
             suppressHydrationWarning
@@ -131,22 +130,22 @@ export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, on
           </div>
         </div>
 
-        {/* Special Instructions Alert */}
+        {/* Special Instructions Alert (strictly food instructions only, no personal data) */}
         {ticket.instructions && (
           <div className="mt-2.5 rounded-xl border border-[#F2C84B]/60 dark:border-[#F2C84B]/40 bg-[#F2C84B]/15 dark:bg-[#F2C84B]/10 p-2 font-mono text-xs text-[#8C6207] dark:text-[#F2C84B]">
             <span className="font-bold">NOTE:</span> {ticket.instructions}
           </div>
         )}
 
-        {/* Items List with Quantity */}
-        <div className="my-3 space-y-2">
+        {/* Items List with Quantity (e.g. Bun Makkhan × 1) */}
+        <div className="my-3 space-y-2 divide-y divide-[#C9AE8B]/20 dark:divide-stone-800/60">
           {ticket.items.map((item) => (
-            <div key={item.id} className="flex items-start gap-2.5 text-xs sm:text-sm">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#B72E35] font-mono text-xs font-bold text-white shadow-xs">
-                {item.qty}
-              </span>
-              <span className="font-medium leading-snug text-[#241F1C] dark:text-[#F3E7D3]">
+            <div key={item.id} className="pt-1.5 flex items-start justify-between gap-2 text-xs sm:text-sm">
+              <span className="font-bold text-[#241F1C] dark:text-[#F3E7D3] flex-1">
                 {item.name}
+              </span>
+              <span className="flex h-5.5 px-2 shrink-0 items-center justify-center rounded-lg bg-[#B72E35] font-mono text-xs font-black text-white shadow-xs">
+                ×{item.qty}
               </span>
             </div>
           ))}
@@ -156,14 +155,14 @@ export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, on
       {/* Action Button or Completed Indicator */}
       <div className="pt-2 border-t border-[#C9AE8B]/30 dark:border-stone-800/80 mt-1">
         {displayStatus === "COMPLETED" ? (
-          <div className="flex h-11 w-full items-center justify-center rounded-xl bg-[#F3E7D3] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 font-mono text-xs font-medium text-[#245850] dark:text-[#75AFA7]">
-            ✓ order completed
+          <div className="flex h-11 w-full items-center justify-center rounded-xl bg-[#F3E7D3] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 font-mono text-xs font-bold text-[#245850] dark:text-[#75AFA7]">
+            ✓ DELIVERED TO TABLE
           </div>
         ) : (
           <button
             onClick={handleAction}
             disabled={isUpdating}
-            className={`flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl text-xs sm:text-sm font-bold tracking-wide shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer ${actionButtonColor}`}
+            className={`flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer ${actionButtonColor}`}
           >
             {isUpdating ? (
               <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />

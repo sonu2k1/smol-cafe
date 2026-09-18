@@ -317,7 +317,7 @@ export async function bypassPaymentAction(params?: {
       billId = newBill?.id || null;
     }
 
-    // 3. Record payment attempt
+    // 3. Record payment attempt and mark orders as PAID
     if (billId) {
       await supabase.from("payment_attempts").insert({
         bill_id: billId,
@@ -329,6 +329,19 @@ export async function bypassPaymentAction(params?: {
         created_at: now,
         captured_at: now,
       });
+
+      // Mark all session orders as confirmed & paid
+      await supabase
+        .from("orders")
+        .update({
+          payment_status: "PAID",
+          payment_method: "UPI",
+          status: "CONFIRMED",
+          confirmed_at: now,
+          confirmed_by: "Test Bypass Gateway (PAID)",
+        })
+        .eq("table_session_id", sessionId)
+        .not("status", "in", '("CANCELLED","REJECTED")');
     }
 
     // 4. Touch table session activity timestamp (keep it OPEN for live kitchen tracking)

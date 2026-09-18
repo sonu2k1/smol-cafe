@@ -1,4 +1,8 @@
 import { fetchActiveCashierTablesAction } from "@/app/bill/actions";
+import {
+  fetchPendingCashierOrdersAction,
+  fetchPaidCashierHistoryAction,
+} from "@/app/cashier/actions";
 import { CashierDashboard } from "@/components/cashier/CashierDashboard";
 
 export const metadata = {
@@ -7,7 +11,19 @@ export const metadata = {
 };
 
 export default async function CashierPage() {
-  const tables = await fetchActiveCashierTablesAction();
+  const [tables, pendingOrdersRes, paidHistoryRes] = await Promise.all([
+    fetchActiveCashierTablesAction(),
+    fetchPendingCashierOrdersAction(),
+    fetchPaidCashierHistoryAction(),
+  ]);
 
-  return <CashierDashboard initialTables={tables} />;
+  return (
+    <CashierDashboard
+      initialTables={tables}
+      initialPendingOrders={pendingOrdersRes.success ? pendingOrdersRes.orders : []}
+      initialPaidHistory={paidHistoryRes.success ? paidHistoryRes.records : []}
+    />
+  );
 }
+
+

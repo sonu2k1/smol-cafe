@@ -19,6 +19,7 @@ export interface PendingOrderVerification {
   tableSessionId: string;
   verificationCode: string;
   status: OrderStatus;
+  paymentStatus?: string;
   submittedAt: string | null;
   totalPaise: number;
   instructions: string | null;
@@ -38,22 +39,20 @@ export interface ConfirmOrderResult {
 }
 
 /**
- * Server Action: Fetches all orders waiting in Cashier / Front-Desk Verification Queue (PENDING_CONFIRMATION).
+ * Server Action: Fetches all active incoming orders for Cashier Review & Billing Queue.
  */
 export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrdersResult> {
   const supabase = createAdminClient();
 
   try {
-    // 1. Fetch pending orders waiting for cashier review
-    const pendingStatuses = isMockDatabase()
-      ? ["PENDING_CONFIRMATION", "SUBMITTED"]
-      : ["SUBMITTED"];
+    // 1. Fetch incoming submitted/preparing orders
+    const pendingStatuses = ["SUBMITTED", "ACCEPTED", "PREPARING", "READY"];
 
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select("*")
       .in("status", pendingStatuses)
-      .order("submitted_at", { ascending: true });
+      .order("created_at", { ascending: false });
 
     if (ordersError || !orders) {
       return { success: false, orders: [], message: "Failed to fetch pending queue." };
@@ -136,7 +135,8 @@ export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrd
         tableSessionId: o.table_session_id || "",
         verificationCode: o.verification_code || "4821",
         status: o.status,
-        submittedAt: o.submitted_at,
+        paymentStatus: (o as unknown as { payment_status?: string }).payment_status || "PAID",
+        submittedAt: o.submitted_at || o.created_at,
         totalPaise: o.total_snapshot || 0,
         instructions: o.instructions || null,
         items: itemsByOrder.get(o.id) || [],
@@ -272,3 +272,174 @@ export async function rejectCashierOrderAction(
     return { success: false, message: "Unexpected error rejecting order." };
   }
 }
+
+export interface PaidHistoryItem {
+  name: string;
+  qty: number;
+  priceRupees: number;
+  subtotalRupees: number;
+}
+
+export interface PaidHistoryRecord {
+  id: string;
+  tableLabel: string;
+  totalRupees: number;
+  paymentMethod: "UPI" | "CASH" | "CARD";
+  paidAt: string;
+  itemsCount: number;
+  items?: PaidHistoryItem[];
+}
+
+export interface FetchPaidHistoryResult {
+  success: boolean;
+  records: PaidHistoryRecord[];
+  totalRevenueRupees: number;
+  message?: string;
+}
+
+/**
+ * Server Action: Fetches all paid orders & settlements for Cashier Audit & Paid Orders tab.
+ */
+export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryResult> {
+  const supabase = createAdminClient();
+
+  try {
+    // 1. Fetch paid orders (all placed/submitted/cooking/delivered/closed orders)
+    const { data: orders, error: ordersErr } = await supabase
+      .from("orders")
+      .select("*")
+      .not("status", "in", '("CANCELLED","REJECTED","DRAFT")')
+      .order("created_at", { ascending: false });
+
+    if (ordersErr) {
+      console.error("Error fetching paid orders:", ordersErr);
+    }
+
+    // 2. Fetch dining table labels
+    const sessionIds = (orders || [])
+      .map((o) => o.table_session_id)
+      .filter((id): id is string => Boolean(id));
+
+    const tableLabelMap = new Map<string, string>();
+    if (sessionIds.length > 0) {
+      const { data: sessions } = await supabase
+        .from("table_sessions")
+        .select("id, table_id")
+        .in("id", sessionIds);
+
+      const tableIds = (sessions || [])
+        .map((s) => s.table_id)
+        .filter((id): id is string => Boolean(id));
+
+      if (tableIds.length > 0) {
+        const { data: tables } = await supabase
+          .from("dining_tables")
+          .select("id, label")
+          .in("id", tableIds);
+
+        const tableMap = new Map<string, string>();
+        for (const t of tables || []) {
+          tableMap.set(t.id, t.label);
+        }
+
+        for (const s of sessions || []) {
+          tableLabelMap.set(s.id, tableMap.get(s.table_id) || "01");
+        }
+      }
+    }
+
+    // 3. Fetch order items
+    const orderIds = (orders || []).map((o) => o.id);
+    const itemsByOrder = new Map<string, PaidHistoryItem[]>();
+
+    if (orderIds.length > 0) {
+      const { data: orderItems } = await supabase
+        .from("order_items")
+        .select("*")
+        .in("order_id", orderIds);
+
+      for (const item of (orderItems as Array<{
+        id: string;
+        order_id: string;
+        name_snapshot: string;
+        unit_price_snapshot: number;
+        qty: number;
+        line_subtotal: number;
+      }>) || []) {
+        if (!itemsByOrder.has(item.order_id)) {
+          itemsByOrder.set(item.order_id, []);
+        }
+        itemsByOrder.get(item.order_id)!.push({
+          name: item.name_snapshot,
+          qty: item.qty,
+          priceRupees: Math.round(item.unit_price_snapshot / 100),
+          subtotalRupees: Math.round(item.line_subtotal / 100),
+        });
+      }
+    }
+
+    // 4. Map to PaidHistoryRecord
+    const records: PaidHistoryRecord[] = (orders || [])
+      .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED")
+      .map((o) => {
+        const orderItemsList = itemsByOrder.get(o.id) || [];
+        const totalItemsCount = orderItemsList.reduce((acc, i) => acc + i.qty, 0) || 1;
+        const rawMethod = (o as unknown as { payment_method?: string }).payment_method;
+        let method: "UPI" | "CASH" | "CARD" = "UPI";
+        if (rawMethod?.toUpperCase() === "CASH") {
+          method = "CASH";
+        } else if (rawMethod?.toUpperCase() === "CARD") {
+          method = "CARD";
+        } else {
+          method = "UPI";
+        }
+
+        let tableLabel = "01";
+        if (o.table_session_id) {
+          const mapped = tableLabelMap.get(o.table_session_id);
+          if (mapped) {
+            tableLabel = mapped;
+          } else {
+            const match = o.table_session_id.match(/tbl[_-]?(\d+)|table[_-]?(\d+)/i);
+            if (match) {
+              tableLabel = (match[1] || match[2]).padStart(2, "0");
+            }
+          }
+        }
+
+        return {
+          id: `ORD-${o.order_no || o.id.slice(-4)}`,
+          tableLabel,
+          totalRupees: Math.round((o.total_snapshot || 0) / 100),
+          paymentMethod: method,
+          paidAt: o.confirmed_at || o.submitted_at || o.created_at,
+          itemsCount: totalItemsCount,
+          items: orderItemsList.length > 0 ? orderItemsList : [
+            {
+              name: `Order #${o.order_no} Items`,
+              qty: 1,
+              priceRupees: Math.round((o.total_snapshot || 0) / 100),
+              subtotalRupees: Math.round((o.total_snapshot || 0) / 100),
+            },
+          ],
+        };
+      });
+
+    const totalRevenueRupees = records.reduce((acc, r) => acc + r.totalRupees, 0);
+
+    return {
+      success: true,
+      records,
+      totalRevenueRupees,
+    };
+  } catch (err) {
+    console.error("Error in fetchPaidCashierHistoryAction:", err);
+    return {
+      success: false,
+      records: [],
+      totalRevenueRupees: 0,
+      message: "Failed to fetch paid history.",
+    };
+  }
+}
+

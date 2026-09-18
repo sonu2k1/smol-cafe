@@ -13,9 +13,12 @@ import {
   fetchPendingCashierOrdersAction,
   confirmCashierOrderAction,
   rejectCashierOrderAction,
+  fetchPaidCashierHistoryAction,
   type PendingOrderVerification,
+  type PaidHistoryRecord,
 } from "@/app/cashier/actions";
-import { Bell, Armchair, Sparkles, Check, Receipt, CreditCard, Tag, Printer } from "lucide-react";
+import { Bell, Armchair, Sparkles, Check, Receipt, CreditCard, Tag, Printer, RefreshCw } from "lucide-react";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { createTableJsonTag, type TableJsonTag } from "@/lib/table-tag";
 import { JsonTagInspectorModal } from "@/components/table/JsonTagInspectorModal";
@@ -25,41 +28,24 @@ import { ThemeToggle } from "@/components/common/ThemeToggle";
 
 interface CashierDashboardProps {
   initialTables: ActiveCashierTable[];
+  initialPendingOrders?: PendingOrderVerification[];
+  initialPaidHistory?: PaidHistoryRecord[];
 }
 
-export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTables }) => {
-  const [activeTab, setActiveTab] = useState<"queue" | "tables" | "paid">("queue");
+export const CashierDashboard: React.FC<CashierDashboardProps> = ({
+  initialTables,
+  initialPendingOrders = [],
+  initialPaidHistory = [],
+}) => {
+  const [activeTab, setActiveTab] = useState<"queue" | "tables" | "paid">("paid");
   const [tables, setTables] = useState<ActiveCashierTable[]>(initialTables);
-  const [pendingOrders, setPendingOrders] = useState<PendingOrderVerification[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrderVerification[]>(initialPendingOrders);
+  const [paidHistory, setPaidHistory] = useState<PaidHistoryRecord[]>(initialPaidHistory);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTable, setSelectedTable] = useState<ActiveCashierTable | null>(null);
   const [inspectingTag, setInspectingTag] = useState<TableJsonTag | null>(null);
   const [activeUpiTable, setActiveUpiTable] = useState<ActiveCashierTable | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<ReceiptData | null>(null);
-  const [paidHistory, setPaidHistory] = useState<Array<{
-    id: string;
-    tableLabel: string;
-    totalRupees: number;
-    paymentMethod: "UPI" | "CASH";
-    paidAt: string;
-    itemsCount: number;
-  }>>([
-    {
-      id: "SETTLE-8421",
-      tableLabel: "02",
-      totalRupees: 640,
-      paymentMethod: "UPI",
-      paidAt: new Date(Date.now() - 1800000).toISOString(),
-      itemsCount: 3,
-    },
-    {
-      id: "SETTLE-8420",
-      tableLabel: "05",
-      totalRupees: 380,
-      paymentMethod: "CASH",
-      paidAt: new Date(Date.now() - 3600000).toISOString(),
-      itemsCount: 2,
-    },
-  ]);
   const [amountTendered, setAmountTendered] = useState("");
   const [staffName, setStaffName] = useState("Cashier");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,19 +60,31 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
   } | null>(null);
 
   const refreshData = useCallback(async () => {
+    setIsRefreshing(true);
     try {
-      const [tableData, pendingData] = await Promise.all([
+      const [tableData, pendingData, paidData] = await Promise.all([
         fetchActiveCashierTablesAction(),
         fetchPendingCashierOrdersAction(),
+        fetchPaidCashierHistoryAction(),
       ]);
       setTables(tableData);
       if (pendingData.success) {
         setPendingOrders(pendingData.orders);
       }
+      if (paidData.success) {
+        setPaidHistory(paidData.records);
+      }
     } catch (err) {
       console.error("Failed to refresh cashier data:", err);
+    } finally {
+      setIsRefreshing(false);
     }
   }, []);
+
+  // Supabase Real-time subscriptions for cross-device live updates
+  useSupabaseRealtime({ table: "orders", onData: () => refreshData() });
+  useSupabaseRealtime({ table: "table_sessions", onData: () => refreshData() });
+  useSupabaseRealtime({ table: "bills", onData: () => refreshData() });
 
   const handleOpenTableForGuest = async (label: string) => {
     await openTableSessionAction(label);
@@ -262,6 +260,16 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
 
           {/* Controls Right */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => refreshData()}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 px-2.5 py-1 text-xs font-mono text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 active:scale-95 transition cursor-pointer"
+              title="Refresh Queue & Tables"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-[#B72E35] dark:text-[#F6AD55] ${isRefreshing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Sync</span>
+            </button>
             <span className="flex items-center gap-1 sm:gap-1.5 rounded-full border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 px-2 sm:px-3 py-1 text-[11px] sm:text-xs font-mono text-[#725039] dark:text-stone-400">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="hidden sm:inline">Live 3s</span>
@@ -295,6 +303,8 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
 
         {/* Tab Switcher */}
         <div className="flex items-center gap-1.5 sm:gap-2 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5 overflow-x-auto scrollbar-none">
+          {/* Order Confirmation Queue & Tables tabs temporarily commented out */}
+          {/*
           <button
             type="button"
             onClick={() => setActiveTab("queue")}
@@ -330,6 +340,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
               {tables.length}
             </span>
           </button>
+          */}
 
           <button
             type="button"
@@ -349,7 +360,8 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
           </button>
         </div>
 
-        {/* TAB 1: ORDER VERIFICATION & CONFIRMATION QUEUE */}
+        {/* TAB 1 & TAB 2 TEMPORARILY COMMENTED OUT */}
+        {/*
         {activeTab === "queue" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -382,41 +394,50 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                     className="relative flex flex-col justify-between rounded-3xl border-2 border-[#F2C84B] dark:border-amber-500/60 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-lg space-y-4 animate-scale-in transition-colors"
                   >
                     <div>
-                      {/* Top Row: Table Badge & Verification PIN */}
-                      <div className="flex items-start justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
-                        <div>
-                          <span className="font-mono text-2xl font-black text-[#241F1C] dark:text-white">
-                            Table {order.tableLabel}
+                      <div className="flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-[#B72E35] animate-pulse" />
+                          <span className="font-mono text-xs font-black uppercase tracking-wider text-[#B72E35] dark:text-[#F2C84B]">
+                            NEW ORDER
                           </span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700/60 px-2.5 py-0.5 font-mono text-[11px] font-extrabold text-emerald-800 dark:text-emerald-300">
+                          <Check className="h-3 w-3" />
+                          Payment: {order.paymentStatus || "PAID"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-start justify-between pt-2.5 pb-2">
+                        <div>
+                          <h2 className="font-mono text-2xl font-black text-[#241F1C] dark:text-white">
+                            Table {order.tableLabel}
+                          </h2>
                           <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
                             Order #{order.orderNo} • {new Date(order.submittedAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </p>
                         </div>
 
-                        {/* Customer 4-digit PIN */}
-                        <div className="rounded-2xl border-2 border-[#B72E35] dark:border-[#F2C84B] bg-[#B72E35]/10 dark:bg-[#F2C84B]/10 px-3 py-1.5 text-right">
-                          <span className="block font-mono text-[9px] uppercase font-bold text-[#B72E35] dark:text-[#F2C84B] tracking-wider">
-                            VERIFY PIN
+                        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3]/70 dark:bg-stone-800/80 px-3 py-1 text-right">
+                          <span className="block font-mono text-[8.5px] uppercase font-bold text-[#725039] dark:text-stone-400 tracking-wider">
+                            PIN
                           </span>
-                          <span className="font-mono text-xl font-black text-[#B72E35] dark:text-[#F2C84B]">
+                          <span className="font-mono text-lg font-black text-[#241F1C] dark:text-white">
                             {order.verificationCode}
                           </span>
                         </div>
                       </div>
 
-                      {/* Special Instructions Note if present */}
                       {order.instructions && (
-                        <div className="mt-3 rounded-xl border border-amber-300 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/20 p-2.5 text-xs text-amber-900 dark:text-amber-300 font-serif italic">
+                        <div className="mt-1 rounded-xl border border-amber-300 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/20 p-2 text-xs text-amber-900 dark:text-amber-300 font-serif italic">
                           &quot;{order.instructions}&quot;
                         </div>
                       )}
 
-                      {/* Items List */}
-                      <div className="mt-3 space-y-1.5 font-sans text-xs divide-y divide-[#C9AE8B]/20 dark:divide-stone-800/60">
+                      <div className="mt-2 space-y-1.5 font-sans text-xs divide-y divide-[#C9AE8B]/20 dark:divide-stone-800/60">
                         {order.items.map((item) => (
                           <div key={item.id} className="pt-1.5 flex items-center justify-between">
                             <span className="font-medium text-[#241F1C] dark:text-stone-200">
-                              <strong className="font-mono text-[#B72E35] dark:text-[#F6AD55]">{item.qty}x</strong> {item.name}
+                              <strong className="font-mono text-[#B72E35] dark:text-[#F6AD55]">{item.qty}×</strong> {item.name}
                             </span>
                             <span className="font-mono text-[#725039] dark:text-stone-400">
                               ₹{Math.round(item.lineSubtotal / 100)}
@@ -426,11 +447,10 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                       </div>
                     </div>
 
-                    {/* Bottom: Total & Confirm Action */}
                     <div className="border-t border-[#C9AE8B]/30 dark:border-stone-800 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div>
                         <span className="block font-mono text-[9px] uppercase font-bold text-[#8C6D53] dark:text-stone-500">
-                          ORDER TOTAL
+                          ORDER TOTAL (PAID)
                         </span>
                         <span className="font-mono text-xl font-black text-emerald-600 dark:text-emerald-400">
                           ₹{Math.round(order.totalPaise / 100)}
@@ -453,7 +473,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                           className="flex-2 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 active:scale-95 transition disabled:opacity-50 cursor-pointer text-center"
                         >
                           <Check className="h-4 w-4" />
-                          <span>Confirm &amp; Push</span>
+                          <span>Pushed to Kitchen</span>
                         </button>
                       </div>
                     </div>
@@ -464,7 +484,6 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
           </div>
         )}
 
-        {/* TAB 2: TABLES & CASH BILLING POS */}
         {activeTab === "tables" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -518,7 +537,6 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                       }`}
                     >
                       <div>
-                        {/* Top Row: Table Label & Status */}
                         <div className="flex items-center justify-between">
                           <h2 className="text-2xl font-black font-mono tracking-tight text-[#241F1C] dark:text-white group-hover:text-[#B72E35] dark:group-hover:text-[#F6AD55]">
                             Table {table.tableLabel}
@@ -539,7 +557,6 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                         </p>
                       </div>
 
-                      {/* Bottom: Total Bill & Action */}
                       <div className="mt-6 flex flex-col gap-2 border-t border-[#C9AE8B]/30 dark:border-stone-800/80 pt-4">
                         <div className="flex items-baseline justify-between">
                           <div>
@@ -595,6 +612,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
             )}
           </div>
         )}
+        */}
 
         {/* TAB 3: PAID ORDERS & SETTLEMENT AUDIT */}
         {activeTab === "paid" && (
@@ -668,7 +686,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                               setActiveReceipt({
                                 orderId: rec.id,
                                 tableLabel: rec.tableLabel,
-                                items: [
+                                items: rec.items || [
                                   { name: "Settled Order Items", qty: rec.itemsCount, priceRupees: Math.round(rec.totalRupees / rec.itemsCount), subtotalRupees: rec.totalRupees }
                                 ],
                                 subtotalRupees: Math.round(rec.totalRupees / 1.05),
@@ -711,7 +729,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                             <td className="p-3.5 whitespace-nowrap">
                               <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                                 rec.paymentMethod === "UPI"
-                                  ? "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800/50"
+                                   ? "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800/50"
                                   : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50"
                               }`}>
                                 {rec.paymentMethod}
@@ -727,7 +745,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({ initialTable
                                   setActiveReceipt({
                                     orderId: rec.id,
                                     tableLabel: rec.tableLabel,
-                                    items: [
+                                    items: rec.items || [
                                       { name: "Settled Order Items", qty: rec.itemsCount, priceRupees: Math.round(rec.totalRupees / rec.itemsCount), subtotalRupees: rec.totalRupees }
                                     ],
                                     subtotalRupees: Math.round(rec.totalRupees / 1.05),

@@ -1,6 +1,6 @@
 "use server";
 
-import { getTableSessionCookie, isValidUuid } from "@/lib/session";
+import { getTableSessionCookie, isValidUuid, type TableSessionData } from "@/lib/session";
 import { resolveQrToken } from "@/app/t/actions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -38,10 +38,19 @@ export interface PlaceOrderResult {
   orderNo?: number;
   verificationCode?: string;
   status?: string;
+  paymentStatus?: string;
+  tableLabel?: string;
   discountPaise?: number;
   totalPaise?: number;
   isDuplicate?: boolean;
   changedItems?: ChangedItemDiff[];
+}
+
+export interface PlacePaidOrderOptions {
+  paymentMethod?: string;
+  transactionId?: string;
+  rewardId?: string;
+  instructions?: string;
 }
 
 /**
@@ -52,13 +61,14 @@ export async function placeOrderAction(
   items: PlaceOrderItemInput[],
   idempotencyKey: string,
   rewardId?: string,
-  instructions?: string
+  instructions?: string,
+  sessionOverride?: TableSessionData
 ): Promise<PlaceOrderResult> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   // 1. Verify Active Table Session from Signed Cookie or fallback to default table
-  let session = await getTableSessionCookie();
+  let session = sessionOverride || (await getTableSessionCookie());
   if (!session || !session.sessionId || !session.locationId || !isValidUuid(session.sessionId)) {
     const defaultRes = await resolveQrToken("table-01", true);
     if (defaultRes.success && defaultRes.session) {
@@ -219,6 +229,10 @@ export async function placeOrderAction(
       success: true,
       orderId: result.order_id,
       orderNo: result.order_no,
+      status: result.status || "CONFIRMED",
+      paymentStatus: "PAID",
+      tableLabel: session.tableLabel || "01",
+      verificationCode: result.verification_code || "4821",
       discountPaise: result.discount_paise || 0,
       totalPaise: result.total_paise,
       isDuplicate: result.is_duplicate || false,
@@ -246,6 +260,62 @@ export async function placeOrderAction(
     };
   }
 }
+
+export interface PlacePaidOrderOptions {
+  rewardId?: string;
+  instructions?: string;
+  paymentMethod?: string;
+  tableLabel?: string;
+}
+
+/**
+ * Server Action: Places an order ONLY AFTER payment is confirmed.
+ * Associates the permanent table number, creates confirmed order in DB, and assigns paymentStatus = "PAID".
+ */
+export async function placePaidOrderAction(
+  items: PlaceOrderItemInput[],
+  idempotencyKey: string,
+  options: PlacePaidOrderOptions = {}
+): Promise<PlaceOrderResult> {
+  const { rewardId, instructions, paymentMethod = "UPI", tableLabel } = options;
+
+  let sessionOverride: TableSessionData | undefined;
+  if (tableLabel) {
+    const targetToken = `table-${tableLabel.toString().padStart(2, "0")}`;
+    const res = await resolveQrToken(targetToken, true);
+    if (res.success && res.session) {
+      sessionOverride = res.session;
+    }
+  }
+
+  const result = await placeOrderAction(items, idempotencyKey, rewardId, instructions, sessionOverride);
+
+  if (result.success && result.orderId) {
+    try {
+      const supabase = createAdminClient();
+      const now = new Date().toISOString();
+      await supabase
+        .from("orders")
+        .update({
+          payment_status: "PAID",
+          payment_method: paymentMethod,
+          status: "CONFIRMED",
+          confirmed_at: now,
+          confirmed_by: `${paymentMethod} (PAID)`,
+        })
+        .eq("id", result.orderId);
+    } catch (err) {
+      console.warn("Failed to mark payment status on order:", err);
+    }
+  }
+
+  return {
+    ...result,
+    paymentStatus: "PAID",
+    tableLabel: tableLabel || result.tableLabel || "01",
+  };
+}
+
 
 /**
  * Server Action: Allows customer to edit their order while in PENDING_CONFIRMATION state.

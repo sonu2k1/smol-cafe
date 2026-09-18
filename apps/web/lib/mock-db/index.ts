@@ -89,6 +89,8 @@ export interface MockOrder {
   customer_id?: string | null;
   customer_name?: string | null;
   customer_phone?: string | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -384,6 +386,22 @@ export class MockQueryBuilder {
   in(col: string, vals: unknown[]): this {
     const set = new Set(vals);
     this.filters.push((row) => set.has(row[col]));
+    return this;
+  }
+
+  not(col: string, op: string, val: unknown): this {
+    if (op === "in") {
+      let excluded: string[] = [];
+      if (typeof val === "string") {
+        excluded = val.replace(/[()"]/g, "").split(",").map((s) => s.trim());
+      } else if (Array.isArray(val)) {
+        excluded = val.map(String);
+      }
+      const set = new Set(excluded);
+      this.filters.push((row) => !set.has(String(row[col])));
+    } else if (op === "eq" || op === "is") {
+      this.filters.push((row) => row[col] !== val);
+    }
     return this;
   }
 
@@ -736,13 +754,13 @@ export class MockSupabaseClient {
         customer_session_id: customerSessionId,
         verification_code: verificationCode,
         order_no: orderNo,
-        status: "PENDING_CONFIRMATION",
+        status: "CONFIRMED",
         service_mode: "DINE_IN",
         instructions: instructions || null,
         submitted_at: now,
-        confirmed_at: null,
-        confirmed_by: null,
-        accepted_at: null,
+        confirmed_at: now,
+        confirmed_by: "Payment Gateway (PAID)",
+        accepted_at: now,
         ready_at: null,
         served_at: null,
         predicted_ready_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
@@ -755,6 +773,8 @@ export class MockSupabaseClient {
         customer_id: profileId,
         customer_name: customerName,
         customer_phone: customerPhone,
+        payment_status: "PAID",
+        payment_method: "UPI",
         version: 1,
         created_at: now,
         updated_at: now,
@@ -794,10 +814,10 @@ export class MockSupabaseClient {
         id: `osh_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         order_id: orderId,
         from_status: null,
-        to_status: "PENDING_CONFIRMATION",
+        to_status: "CONFIRMED",
         actor_type: "CUSTOMER",
         actor_id: customerSessionId,
-        notes: "Order placed by customer, waiting for cashier confirmation",
+        notes: "Payment successful (PAID). Order confirmed and dispatched to Kitchen & Cashier",
         created_at: now,
       });
 
@@ -807,7 +827,8 @@ export class MockSupabaseClient {
           order_id: orderId,
           order_no: orderNo,
           verification_code: verificationCode,
-          status: "PENDING_CONFIRMATION",
+          status: "CONFIRMED",
+          payment_status: "PAID",
           discount_paise: discountPaise,
           total_paise: totalPaise,
           is_duplicate: false,
