@@ -309,8 +309,8 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-[#725039]/15 dark:border-white/10">
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl border border-[#B72E35]/30 bg-[#B72E35]/10 dark:bg-[#B72E35]/20 shadow-sm">
-              <QrCode className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-[#B72E35]" />
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl border border-[#B72E35]/30 bg-[#B72E35]/10 dark:border-[#754CFF]/40 dark:bg-[#754CFF]/20 shadow-sm">
+              <QrCode className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-[#B72E35] dark:text-[#9D7BFF]" />
             </div>
             <div>
               <h3 className="font-serif text-base sm:text-lg font-medium tracking-tight text-[#241F1C] dark:text-[#F3E7D3] lowercase">
@@ -338,7 +338,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
             onClick={() => setActiveTab("camera")}
             className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 sm:py-2.5 transition-all font-sans cursor-pointer ${
               activeTab === "camera"
-                ? "bg-[#FAF4EB] dark:bg-[#2A2420] font-semibold text-[#B72E35] dark:text-[#F3E7D3] shadow-sm border border-[#725039]/15 dark:border-white/10"
+                ? "bg-[#FAF4EB] dark:bg-[#2A2420] font-semibold text-[#B72E35] dark:text-[#9D7BFF] shadow-sm border border-[#725039]/15 dark:border-[#754CFF]/30"
                 : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#F3E7D3] border border-transparent"
             }`}
           >
@@ -349,7 +349,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
             onClick={() => setActiveTab("picker")}
             className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 sm:py-2.5 transition-all font-sans cursor-pointer ${
               activeTab === "picker"
-                ? "bg-[#FAF4EB] dark:bg-[#2A2420] font-semibold text-[#B72E35] dark:text-[#F3E7D3] shadow-sm border border-[#725039]/15 dark:border-white/10"
+                ? "bg-[#FAF4EB] dark:bg-[#2A2420] font-semibold text-[#B72E35] dark:text-[#9D7BFF] shadow-sm border border-[#725039]/15 dark:border-[#754CFF]/30"
                 : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#F3E7D3] border border-transparent"
             }`}
           >
@@ -388,17 +388,17 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
               <>
                 <div className="relative z-10 h-48 w-48 sm:h-56 sm:w-56 flex items-center justify-center pointer-events-none">
                   {/* 4 Corner brackets */}
-                  <div className="absolute top-0 left-0 h-7 w-7 sm:h-8 sm:w-8 border-t-3 border-l-3 border-[#B72E35] rounded-tl-xl shadow-[0_0_8px_#B72E35]" />
-                  <div className="absolute top-0 right-0 h-7 w-7 sm:h-8 sm:w-8 border-t-3 border-r-3 border-[#B72E35] rounded-tr-xl shadow-[0_0_8px_#B72E35]" />
-                  <div className="absolute bottom-0 left-0 h-7 w-7 sm:h-8 sm:w-8 border-b-3 border-l-3 border-[#B72E35] rounded-bl-xl shadow-[0_0_8px_#B72E35]" />
-                  <div className="absolute bottom-0 right-0 h-7 w-7 sm:h-8 sm:w-8 border-b-3 border-r-3 border-[#B72E35] rounded-br-xl shadow-[0_0_8px_#B72E35]" />
+                  <div className="absolute top-0 left-0 h-7 w-7 sm:h-8 sm:w-8 border-t-3 border-l-3 border-[#B72E35] dark:border-[#754CFF] rounded-tl-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
+                  <div className="absolute top-0 right-0 h-7 w-7 sm:h-8 sm:w-8 border-t-3 border-r-3 border-[#B72E35] dark:border-[#754CFF] rounded-tr-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
+                  <div className="absolute bottom-0 left-0 h-7 w-7 sm:h-8 sm:w-8 border-b-3 border-l-3 border-[#B72E35] dark:border-[#754CFF] rounded-bl-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
+                  <div className="absolute bottom-0 right-0 h-7 w-7 sm:h-8 sm:w-8 border-b-3 border-r-3 border-[#B72E35] dark:border-[#754CFF] rounded-br-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
 
                   {/* Animated Laser Beam sweeping bottom to top */}
-                  <div className="absolute inset-x-2 h-[2.5px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[#FF5B52] to-transparent shadow-[0_0_12px_#FF5B52,0_0_4px_#FFA8A3] animate-laser-scan pointer-events-none" />
+                  <div className="absolute inset-x-2 h-[2.5px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[#FF5B52] dark:via-[#B89EFF] to-transparent shadow-[0_0_12px_#FF5B52,0_0_4px_#FFA8A3] dark:shadow-[0_0_14px_#754CFF,0_0_6px_#D6C4FF] animate-laser-scan pointer-events-none" />
 
                   {/* Center target indicator */}
                   <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full border border-white/20 flex items-center justify-center">
-                    <div className="h-2 w-2 rounded-full bg-[#B72E35] animate-ping opacity-75" />
+                    <div className="h-2 w-2 rounded-full bg-[#B72E35] dark:bg-[#9D7BFF] animate-ping opacity-75" />
                   </div>
                 </div>
 
@@ -438,11 +438,11 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
               <div className="relative z-10 flex flex-col items-center justify-center p-4 sm:p-6 text-center max-w-sm w-full">
                 {/* Viewfinder Preview Box */}
                 <div className="relative h-36 w-36 sm:h-40 sm:w-40 flex items-center justify-center mb-3">
-                  <div className="absolute top-0 left-0 h-6 w-6 border-t-2 border-l-2 border-[#B72E35] rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 h-6 w-6 border-t-2 border-r-2 border-[#B72E35] rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-[#B72E35] rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-[#B72E35] rounded-br-lg" />
-                  <div className="absolute inset-x-2 h-[2px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[#B72E35] to-transparent animate-laser-scan" />
+                  <div className="absolute top-0 left-0 h-6 w-6 border-t-2 border-l-2 border-[#B72E35] dark:border-[#754CFF] rounded-tl-lg" />
+                  <div className="absolute top-0 right-0 h-6 w-6 border-t-2 border-r-2 border-[#B72E35] dark:border-[#754CFF] rounded-tr-lg" />
+                  <div className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-[#B72E35] dark:border-[#754CFF] rounded-bl-lg" />
+                  <div className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-[#B72E35] dark:border-[#754CFF] rounded-br-lg" />
+                  <div className="absolute inset-x-2 h-[2px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[#B72E35] dark:via-[#B89EFF] to-transparent animate-laser-scan" />
                   <QrCode className="h-14 w-14 text-[#C9AE8B]/30" />
                 </div>
 

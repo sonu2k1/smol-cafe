@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ChefHat, Shield, ArrowRight, Sun, Moon, X } from "lucide-react";
+import { ChefHat, Shield, ArrowRight, Sun, Moon, X, Receipt } from "lucide-react";
 import { TableScannerModal } from "@/components/table/TableScannerModal";
 import { StaffForkLockIcon } from "@/components/common/StaffForkLockIcon";
 
@@ -150,25 +150,34 @@ export default function RoleSelectionPage() {
 
           {/* Top Hero Brand Block (Logo + Eyebrow + Headlines + Divider - shifted upwards) */}
           <div className="flex flex-col items-center -translate-y-3 sm:-translate-y-5 w-full">
-            {/* Official Clean Arched Door Logo (Enlarged and prominent) */}
-            <div className="animate-fade-in-down mb-1.5 flex flex-col items-center">
+            {/* Official Clean Arched Door Logo (Enlarged and prominent with ambient glow) */}
+            <div className="animate-fade-in-down mb-1.5 flex flex-col items-center relative">
+              {/* Ambient Reddish (Day) / Electric Violet #754CFF (Night) Aura Glow behind logo */}
+              <div
+                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-36 sm:w-44 h-40 sm:h-48 rounded-full blur-2xl pointer-events-none transition-all duration-500 ${
+                  isDark
+                    ? "bg-gradient-to-b from-[#754CFF]/50 via-[#754CFF]/35 to-transparent shadow-[0_0_40px_rgba(117,76,255,0.4)]"
+                    : "bg-gradient-to-b from-[#B72E35]/35 via-[#B72E35]/25 to-transparent"
+                }`}
+              />
+
               <div className="relative h-[115px] w-[82px] sm:h-[135px] sm:w-[96px] transition-transform duration-300 hover:scale-105 animate-float cursor-pointer">
-                {/* Day Mode Logo: Clean Arched Red Door */}
+                {/* Day Mode Logo: Clean Arched Red Door with subtle reddish glow */}
                 <Image
                   src="/logo-transparent.png?v=2"
                   alt="smol café"
                   fill
-                  className={`object-contain transition-opacity duration-500 drop-shadow-[0_16px_24px_rgba(114,80,57,0.22)] ${
+                  className={`object-contain transition-opacity duration-500 drop-shadow-[0_0_26px_rgba(183,46,53,0.38)] drop-shadow-[0_16px_24px_rgba(114,80,57,0.18)] ${
                     isDark ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
                   }`}
                   priority
                 />
-                {/* Night Mode Logo: Clean Arched Glowing Neon Violet Door */}
+                {/* Night Mode Logo: Clean Arched Glowing Neon Electric Violet Door */}
                 <Image
                   src="/logo-dark-transparent.png?v=2"
                   alt="smol café after dark"
                   fill
-                  className={`object-contain transition-all duration-500 drop-shadow-[0_0_28px_rgba(117,76,255,0.7)] drop-shadow-[0_16px_24px_rgba(0,0,0,0.7)] ${
+                  className={`object-contain transition-all duration-500 drop-shadow-[0_0_32px_rgba(117,76,255,0.85)] drop-shadow-[0_16px_24px_rgba(0,0,0,0.7)] ${
                     isDark ? "opacity-100 scale-100" : "opacity-0 pointer-events-none scale-95"
                   }`}
                   priority
@@ -244,10 +253,10 @@ export default function RoleSelectionPage() {
                 }`}
               />
 
-              {/* Ambient Smol Cherry Glow behind floating badge */}
+              {/* Ambient Glow behind floating badge */}
               <div
                 className={`absolute -top-12 left-1/2 -translate-x-1/2 w-36 h-16 blur-2xl pointer-events-none transition-all duration-300 ${
-                  isDark ? "bg-[#B72E35]/35" : "bg-[#B72E35]/25"
+                  isDark ? "bg-[#754CFF]/45" : "bg-[#B72E35]/25"
                 }`}
               />
 
@@ -259,7 +268,7 @@ export default function RoleSelectionPage() {
                   aria-label="Scan Table QR"
                   className={`relative flex h-14 w-14 sm:h-15 sm:w-15 items-center justify-center rounded-[1.35rem] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer ${
                     isDark
-                      ? "bg-gradient-to-b from-[#2E2522] via-[#1C1715] to-[#120F0E] border border-white/15 shadow-[0_8px_25px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.15)]"
+                      ? "bg-gradient-to-b from-[#2E2522] via-[#1C1715] to-[#120F0E] border border-[#754CFF]/40 shadow-[0_8px_25px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.15)]"
                       : "bg-gradient-to-b from-[#FAF4EB] via-[#EFE3D3] to-[#E5D5C0] border border-[#725039]/25 shadow-[0_10px_25px_rgba(114,80,57,0.18),inset_0_1.5px_2px_rgba(255,255,255,0.95)]"
                   }`}
                 >
@@ -267,7 +276,7 @@ export default function RoleSelectionPage() {
                   <div className="relative flex items-center justify-center w-7 h-7 sm:w-7.5 sm:h-7.5">
                     <svg
                       className={`w-full h-full transition-colors duration-300 ${
-                        isDark ? "text-[#E04B52]" : "text-[#B72E35]"
+                        isDark ? "text-[#9D7BFF]" : "text-[#B72E35]"
                       }`}
                       viewBox="0 0 24 24"
                       fill="none"
@@ -295,23 +304,33 @@ export default function RoleSelectionPage() {
                     <div
                       className={`absolute inset-x-[-4px] -translate-y-1/2 h-[2px] pointer-events-none animate-laser-scan transition-colors duration-300 ${
                         isDark
-                          ? "bg-gradient-to-r from-transparent via-[#FF5B52] to-transparent shadow-[0_0_10px_#FF5B52,0_0_4px_#FFA8A3] text-[#FF5B52]"
+                          ? "bg-gradient-to-r from-transparent via-[#B89EFF] to-transparent shadow-[0_0_12px_#754CFF,0_0_6px_#D6C4FF] text-[#B89EFF]"
                           : "bg-gradient-to-r from-transparent via-[#B72E35] to-transparent shadow-[0_0_10px_#B72E35,0_0_4px_#D6454D] text-[#B72E35]"
                       }`}
                     />
                   </div>
 
-                  {/* Attached mini pill indicator at TOP-RIGHT with BLINKING SMOL CHERRY DOT */}
+                  {/* Attached mini pill indicator at TOP-RIGHT with BLINKING DOT */}
                   <div
                     className={`absolute -top-2.5 -right-2.5 flex items-center justify-center px-2 py-0.5 rounded-full border transition-colors duration-300 ${
                       isDark
-                        ? "bg-[#241F1C] border-[#B72E35] shadow-[0_0_12px_rgba(183,46,53,0.7)]"
+                        ? "bg-[#1E1916] border-[#754CFF] shadow-[0_0_12px_rgba(117,76,255,0.7)]"
                         : "bg-gradient-to-b from-[#FFFFFF] to-[#FAF4EB] border border-[#B72E35] shadow-[0_2px_8px_rgba(183,46,53,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)]"
                     }`}
                   >
                     <span className="relative flex h-2 w-2 items-center justify-center">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#B72E35] opacity-80" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#B72E35] shadow-[0_0_8px_#B72E35] animate-red-dot" />
+                      <span
+                        className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-80 ${
+                          isDark ? "bg-[#754CFF]" : "bg-[#B72E35]"
+                        }`}
+                      />
+                      <span
+                        className={`relative inline-flex rounded-full h-2 w-2 shadow-sm ${
+                          isDark
+                            ? "bg-[#9D7BFF] shadow-[0_0_8px_#754CFF]"
+                            : "bg-[#B72E35] shadow-[0_0_8px_#B72E35]"
+                        }`}
+                      />
                     </span>
                   </div>
                 </button>
@@ -335,24 +354,28 @@ export default function RoleSelectionPage() {
                 Scan table QR stand to browse the seasonal menu &amp; order directly from your seat.
               </p>
 
-              {/* Primary Action Button ("scan table QR code") with Smol Cherry Gradient */}
+              {/* Primary Action Button ("scan table QR code") with Adaptive Theme Gradient */}
               <div className="relative mt-4 sm:mt-5 w-full">
-                {/* Diffuse smol cherry ambient floor glow underneath button */}
+                {/* Diffuse ambient floor glow underneath button */}
                 <div
                   className={`absolute inset-x-4 -bottom-2 h-8 blur-lg pointer-events-none rounded-full transition-all duration-300 ${
-                    isDark ? "bg-[#B72E35]/45" : "bg-[#B72E35]/30"
+                    isDark ? "bg-[#754CFF]/55" : "bg-[#B72E35]/30"
                   }`}
                 />
                 <div
                   className={`absolute inset-x-8 -bottom-1 h-5 blur-md pointer-events-none rounded-full transition-all duration-300 ${
-                    isDark ? "bg-[#B72E35]/65" : "bg-[#B72E35]/45"
+                    isDark ? "bg-[#754CFF]/80" : "bg-[#B72E35]/45"
                   }`}
                 />
 
                 <button
                   type="button"
                   onClick={() => setIsScannerOpen(true)}
-                  className="relative group w-full flex items-center justify-between rounded-[1.3rem] sm:rounded-[1.4rem] p-2 sm:p-2.5 pl-3.5 sm:pl-4 pr-2 sm:pr-2.5 bg-gradient-to-r from-[#A5242A] via-[#B72E35] to-[#C93840] hover:from-[#B72E35] hover:to-[#D43D46] text-white shadow-[0_10px_24px_rgba(183,46,53,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.4)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.98] cursor-pointer"
+                  className={`relative group w-full flex items-center justify-between rounded-[1.3rem] sm:rounded-[1.4rem] p-2 sm:p-2.5 pl-3.5 sm:pl-4 pr-2 sm:pr-2.5 text-white transition-all duration-300 hover:scale-[1.01] active:scale-[0.98] cursor-pointer ${
+                    isDark
+                      ? "bg-gradient-to-r from-[#5B34E6] via-[#754CFF] to-[#8E65FF] hover:from-[#6B42FF] hover:to-[#9F7BFF] shadow-[0_10px_28px_rgba(117,76,255,0.55),inset_0_1px_1.5px_rgba(255,255,255,0.4)]"
+                      : "bg-gradient-to-r from-[#A5242A] via-[#B72E35] to-[#C93840] hover:from-[#B72E35] hover:to-[#D43D46] shadow-[0_10px_24px_rgba(183,46,53,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.4)]"
+                  }`}
                 >
                   {/* Left rounded viewfinder icon with center target circle */}
                   <div className="flex h-9 w-9 sm:h-9.5 sm:w-9.5 shrink-0 items-center justify-center rounded-xl bg-black/20 backdrop-blur-xs text-white">
@@ -547,7 +570,29 @@ export default function RoleSelectionPage() {
                 </div>
               </Link>
 
-              {/* Option 2: Admin Tower (Purple visual identity) */}
+              {/* Option 2: Cashier View (Crimson / Coral visual identity) */}
+              <Link
+                href="/cashier"
+                onClick={() => setIsStaffModalOpen(false)}
+                className="group flex items-center gap-3.5 p-3.5 rounded-2xl border border-[#B72E35]/45 bg-gradient-to-b from-[#FFFFFF] to-[#FAF4EB] dark:from-[#29211C] dark:to-[#1E1916] hover:border-[#B72E35] transition-all duration-200 text-left cursor-pointer shadow-[0_3px_8px_rgba(183,46,53,0.12),inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)] hover:-translate-y-0.5 active:translate-y-0.5"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#B72E35]/15 border border-[#B72E35]/45 text-[#B72E35] dark:text-[#E0535B] group-hover:scale-105 transition-transform shadow-xs">
+                  <Receipt className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-serif text-base font-bold text-[#241F1C] dark:text-[#F3E7D3] tracking-tight">
+                      Cashier View
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-[#C9AE8B] group-hover:text-[#B72E35] dark:group-hover:text-[#E0535B] group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] truncate">
+                    Front-Desk, POS &amp; Paid Orders
+                  </p>
+                </div>
+              </Link>
+
+              {/* Option 3: Admin Tower (Purple visual identity) */}
               <Link
                 href="/admin"
                 onClick={() => setIsStaffModalOpen(false)}
@@ -574,7 +619,7 @@ export default function RoleSelectionPage() {
             <div className="pt-2">
               <button
                 onClick={() => setIsStaffModalOpen(false)}
-                className="w-full py-2.5 rounded-xl border border-[#C9AE8B]/30 dark:border-white/10 font-mono text-xs text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white hover:bg-[#C9AE8B]/10 transition active:scale-95 cursor-pointer"
+                className="w-full py-2.5 rounded-xl border border-[#B72E35]/35 bg-[#B72E35]/10 dark:bg-[#B72E35]/20 font-mono text-xs font-semibold text-[#B72E35] dark:text-[#FF8B92] hover:bg-[#B72E35] hover:text-white dark:hover:bg-[#B72E35] dark:hover:text-white transition duration-200 active:scale-95 cursor-pointer shadow-xs"
               >
                 Cancel
               </button>

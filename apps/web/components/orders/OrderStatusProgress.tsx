@@ -8,12 +8,12 @@ interface OrderStatusProgressProps {
   status: OrderStatus;
 }
 
-const STEPS: { key: OrderStatus; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { key: "PENDING_CONFIRMATION", label: "Verification", icon: Clock },
+const STEPS = [
+  { key: "PAID", label: "Paid", icon: Check },
   { key: "CONFIRMED", label: "Confirmed", icon: Check },
   { key: "PREPARING", label: "Preparing", icon: ChefHat },
   { key: "READY", label: "Ready", icon: Bell },
-  { key: "SERVED", label: "Served", icon: Sparkles },
+  { key: "SERVED", label: "Delivered", icon: Sparkles },
 ];
 
 function getStepIndex(status: OrderStatus): number {
@@ -21,7 +21,7 @@ function getStepIndex(status: OrderStatus): number {
     case "DRAFT":
     case "PENDING_CONFIRMATION":
     case "SUBMITTED":
-      return 0;
+      return 1;
     case "CONFIRMED":
     case "ACCEPTED":
       return 1;
@@ -37,7 +37,7 @@ function getStepIndex(status: OrderStatus): number {
     case "REJECTED":
       return -1;
     default:
-      return 0;
+      return 1;
   }
 }
 

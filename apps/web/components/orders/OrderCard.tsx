@@ -21,43 +21,37 @@ function getStatusCopy(status: string): StatusCopy {
     case "PENDING_CONFIRMATION":
     case "SUBMITTED":
     case "DRAFT":
-      return {
-        title: "Order Received",
-        subtitle: "Order placed and logged in café system. Kitchen notified.",
-        badgeColor:
-          "bg-[#F2C84B]/20 text-[#725039] border-[#C9AE8B]",
-      };
     case "CONFIRMED":
     case "ACCEPTED":
       return {
         title: "Order Confirmed",
-        subtitle: "Cashier verified your order! Pushed to Kitchen for preparation.",
+        subtitle: "Payment successful (PAID)! Order confirmed and sent to kitchen.",
         badgeColor:
-          "bg-[#75AFA7]/25 text-[#1C463F] border-[#75AFA7]/40",
+          "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/50",
       };
     case "PREPARING":
       return {
-        title: "Crafting Your Order",
-        subtitle: "Your coffee is brewing and your food is on the grill.",
+        title: "Preparing Your Order",
+        subtitle: "Your coffee is brewing and your food is on the kitchen grill.",
         badgeColor:
-          "bg-[#F2C84B]/30 text-[#725039] border-[#C9AE8B]",
+          "bg-[#F2C84B]/30 text-[#725039] dark:text-[#F2C84B] border-[#C9AE8B]",
       };
     case "READY":
       return {
         title: "Order is Ready!",
         subtitle:
-          "Fresh and piping hot. Your server is bringing it over, or collect at the counter.",
+          "Fresh & piping hot! Staff is delivering directly to your table.",
         badgeColor:
-          "bg-[#75AFA7]/30 text-[#1C463F] border-[#75AFA7]/60",
+          "bg-[#75AFA7]/30 text-[#1C463F] dark:text-[#75AFA7] border-[#75AFA7]/60",
       };
     case "COMPLETED":
     case "SERVED":
     case "CLOSED":
       return {
-        title: "Served & Enjoyed",
-        subtitle: "Hope you loved it! You can order another round anytime from the menu.",
+        title: "Delivered to Table",
+        subtitle: "Delivered to your table. Hope you enjoy your time at smol café!",
         badgeColor:
-          "bg-[#FAF4EB] text-[#725039] border-[#C9AE8B]/40",
+          "bg-[#FAF4EB] text-[#725039] dark:text-[#C9AE8B] border-[#C9AE8B]/40",
       };
     case "CANCELLED":
     case "REJECTED":
@@ -111,11 +105,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
           </h3>
         </div>
 
-        <span
-          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider ${copy.badgeColor}`}
-        >
-          {order.status.replace("_", " ")}
-        </span>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700/60 px-2.5 py-0.5 font-mono text-[10px] font-extrabold text-emerald-800 dark:text-emerald-300">
+            Payment: PAID
+          </span>
+          <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10.5px] font-mono font-bold uppercase tracking-wider ${copy.badgeColor}`}
+          >
+            {order.status === "CONFIRMED" ? "CONFIRMED" : order.status.replace("_", " ")}
+          </span>
+        </div>
       </div>
 
       {/* Verification Notice & Customer Edit Button */}

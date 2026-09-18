@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { placeOrderAction, type ChangedItemDiff } from "@/app/menu/actions";
+import { placeOrderAction, placePaidOrderAction, type ChangedItemDiff } from "@/app/menu/actions";
 import { useNetworkHealth } from "@/hooks/useNetworkHealth";
 import { broadcastSyncEvent } from "@/lib/sync-events";
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
@@ -75,7 +75,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
     totalPaise: number;
   } | null>(null);
 
-  const displayTable = tableLabel || "07";
+  const displayTable = (tableLabel || "07").replace(/^(table|t)[-\s_]*/i, "").trim().padStart(2, "0");
   const itemsTotal = items.reduce(
     (sum, it) => sum + Math.round((it.item.pricePaise / 100) * it.qty),
     0
@@ -170,12 +170,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
     setTimeout(() => setBoardAdded(false), 2000);
   };
 
-  const handlePlaceOrder = async () => {
-    if (items.length === 0 || isSubmitting) return;
-
-    setIsSubmitting(true);
-    setErrorMessage(null);
-    setPriceConflicts(null);
+  const handleProcessPaidOrder = async (paymentMethod = "UPI", transactionId?: string) => {
+    if (items.length === 0) return null;
 
     const idempotencyKey = crypto.randomUUID();
     const orderPayload = items.map((cartItem) => ({
@@ -184,35 +180,63 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
       qty: cartItem.qty,
     }));
 
-    try {
-      const result = await placeOrderAction(orderPayload, idempotencyKey, undefined, instructions);
+    const result = await placePaidOrderAction(orderPayload, idempotencyKey, {
+      instructions: instructions || undefined,
+      paymentMethod,
+      tableLabel: displayTable,
+    });
 
-      if (result.success && result.orderNo && result.orderId) {
-        setOrderSuccess({
-          orderNo: result.orderNo,
-          orderId: result.orderId,
-          verificationCode: result.verificationCode || "4821",
-          totalPaise: result.totalPaise || subtotalPaise,
-        });
-        clearCart();
+    if (result.success && result.orderId && result.orderNo) {
+      const finalOrderId = result.orderId;
+      const finalOrderNo = result.orderNo;
+      const finalTotalPaise = result.totalPaise || grandTotal * 100;
+      const finalTableLabel = result.tableLabel || displayTable;
 
-        broadcastSyncEvent({
-          type: "ORDER_PLACED",
-          orderId: result.orderId,
-          orderNo: result.orderNo,
-          tableLabel: displayTable,
-          timestamp: Date.now(),
-        });
-      } else if (result.error === "PRICE_CHANGED" && result.changedItems) {
-        setPriceConflicts(result.changedItems);
-      } else {
-        setErrorMessage(result.message || "Failed to place order. Please try again.");
-      }
-    } catch (err) {
-      console.error("Order submission error:", err);
-      setErrorMessage("An unexpected error occurred. Please ask staff.");
-    } finally {
-      setIsSubmitting(false);
+      // Broadcast single source of truth order placed + paid event across Cashier & Kitchen KDS
+      broadcastSyncEvent({
+        type: "ORDER_PLACED",
+        orderId: finalOrderId,
+        orderNo: finalOrderNo,
+        tableLabel: finalTableLabel,
+        status: "CONFIRMED",
+        timestamp: Date.now(),
+        metadata: {
+          paymentStatus: "PAID",
+          paymentMethod,
+          transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
+          amountPaise: finalTotalPaise,
+          itemsCount: items.length,
+        },
+      });
+
+      broadcastSyncEvent({
+        type: "PAYMENT_COMPLETED",
+        orderId: finalOrderId,
+        orderNo: finalOrderNo,
+        tableLabel: finalTableLabel,
+        status: "PAID",
+        timestamp: Date.now(),
+        metadata: {
+          transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
+          amountPaise: finalTotalPaise,
+          paymentMethod,
+        },
+      });
+
+      return {
+        orderId: finalOrderId,
+        orderNo: finalOrderNo,
+        tableLabel: finalTableLabel,
+        totalPaise: finalTotalPaise,
+        verificationCode: result.verificationCode || "4821",
+      };
+    } else if (result.error === "PRICE_CHANGED" && result.changedItems) {
+      setPriceConflicts(result.changedItems);
+      setErrorMessage("Some item prices changed. Please review your cart.");
+      return null;
+    } else {
+      setErrorMessage(result.message || "Failed to confirm order after payment.");
+      return null;
     }
   };
 
@@ -222,89 +246,42 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
     setErrorMessage(null);
 
     try {
-      let finalOrderId = orderSuccess?.orderId;
-      let finalOrderNo = orderSuccess?.orderNo;
-      let finalTotalPaise = orderSuccess?.totalPaise || grandTotal * 100;
+      const transactionId = `TEST-BYPASS-${Date.now().toString().slice(-6)}`;
+      const currentItemsSnapshot = items.map((i) => ({
+        name: i.item.name,
+        qty: i.qty,
+        priceRupees: Math.round(i.item.pricePaise / 100),
+        subtotalRupees: Math.round((i.item.pricePaise / 100) * i.qty),
+      }));
 
-      // 1. If cart has items not yet placed into orders, place the order first
-      if (items.length > 0 && !orderSuccess) {
-        const idempotencyKey = crypto.randomUUID();
-        const orderPayload = items.map((cartItem) => ({
-          menu_item_id: cartItem.item.id,
-          expected_unit_price_paise: cartItem.item.pricePaise,
-          qty: cartItem.qty,
-        }));
-
-        const result = await placeOrderAction(orderPayload, idempotencyKey, undefined, instructions);
-        if (result.success && result.orderId) {
-          finalOrderId = result.orderId;
-          finalOrderNo = result.orderNo;
-          finalTotalPaise = result.totalPaise || grandTotal * 100;
-
-          broadcastSyncEvent({
-            type: "ORDER_PLACED",
-            orderId: result.orderId,
-            orderNo: result.orderNo,
-            tableLabel: displayTable,
-            timestamp: Date.now(),
-          });
-        }
+      // 1. Create paid & confirmed order in DB
+      const orderRes = await handleProcessPaidOrder("TEST_BYPASS", transactionId);
+      if (!orderRes) {
+        setIsBypassing(false);
+        return;
       }
 
-      // 2. Call bypassPaymentAction to settle backend session and bill
-      const bypassRes = await bypassPaymentAction({
+      // 2. Settle backend bill
+      await bypassPaymentAction({
         tableLabel: displayTable,
-        amountPaise: finalTotalPaise,
-      });
+        amountPaise: orderRes.totalPaise,
+      }).catch((err) => console.warn("Bypass bill settle notice:", err));
 
-      const transactionId = bypassRes.transactionId || `TEST-BYPASS-${Date.now().toString().slice(-6)}`;
-
-      // 3. Broadcast payment completed event for Kitchen / Cashier / POS sync
-      broadcastSyncEvent({
-        type: "PAYMENT_COMPLETED",
-        orderId: finalOrderId || `ORD-${Date.now().toString().slice(-6)}`,
-        orderNo: finalOrderNo,
-        tableLabel: displayTable,
-        status: "PAID",
-        timestamp: Date.now(),
-        metadata: {
-          transactionId,
-          amountPaise: finalTotalPaise,
-          paymentMethod: "TEST_BYPASS",
-          appName: "Pre-Prod Test Bypass",
-        },
-      });
-
-      const currentItemsSnapshot =
-        items.length > 0
-          ? items.map((i) => ({
-              name: i.item.name,
-              qty: i.qty,
-              priceRupees: Math.round(i.item.pricePaise / 100),
-              subtotalRupees: Math.round((i.item.pricePaise / 100) * i.qty),
-            }))
-          : [
-              {
-                name: "Artisanal Table Order",
-                qty: 1,
-                priceRupees: Math.round(finalTotalPaise / 100),
-                subtotalRupees: Math.round(finalTotalPaise / 100),
-              },
-            ];
-
-      // 4. Clear cart items
+      // 3. Clear cart
       clearCart();
 
-      // 5. Trigger post-payment celebration modal
+      // 4. Trigger celebration modal
       setCelebrationData({
-        orderId: finalOrderId || `ORD-${Date.now().toString().slice(-6)}`,
-        orderNo: finalOrderNo,
+        orderId: orderRes.orderId,
+        orderNo: orderRes.orderNo,
         tableLabel: displayTable,
         zone: "Indoor Cozy",
-        totalRupees: Math.round(finalTotalPaise / 100),
-        items: currentItemsSnapshot,
+        totalRupees: Math.round(orderRes.totalPaise / 100),
+        items: currentItemsSnapshot.length > 0 ? currentItemsSnapshot : [
+          { name: "Artisanal Table Order", qty: 1, priceRupees: Math.round(orderRes.totalPaise / 100), subtotalRupees: Math.round(orderRes.totalPaise / 100) }
+        ],
         transactionId,
-        appName: "Test Bypass Gateway",
+        appName: "Test Bypass Gateway (PAID)",
         onClose: () => {
           setCelebrationData(null);
           closeCart();
@@ -312,7 +289,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
       });
     } catch (err) {
       console.error("Test bypass payment failed:", err);
-      setErrorMessage("Test bypass failed. Please try again.");
+      setErrorMessage("Payment failed. Please try again.");
     } finally {
       setIsBypassing(false);
     }
@@ -881,11 +858,51 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
       {isUpiDrawerOpen && (
         <UpiPaymentDrawer
           tableLabel={displayTable}
-          orderId={orderSuccess?.orderId || "smol_preview"}
+          orderId={orderSuccess?.orderId || `ORD-${Date.now().toString().slice(-6)}`}
           amountPaise={orderSuccess?.totalPaise || (grandTotal > 0 ? grandTotal * 100 : subtotalPaise)}
-          onPaymentSuccess={() => {
+          items={
+            items.length > 0
+              ? items.map((i) => ({
+                  name: i.item.name,
+                  qty: i.qty,
+                  priceRupees: Math.round(i.item.pricePaise / 100),
+                  subtotalRupees: Math.round((i.item.pricePaise / 100) * i.qty),
+                }))
+              : []
+          }
+          onPaymentSuccess={async (paymentRes) => {
+            const currentItemsSnapshot = items.map((i) => ({
+              name: i.item.name,
+              qty: i.qty,
+              priceRupees: Math.round(i.item.pricePaise / 100),
+              subtotalRupees: Math.round((i.item.pricePaise / 100) * i.qty),
+            }));
+
+            // Create paid order in DB
+            const created = await handleProcessPaidOrder("UPI", paymentRes.transactionId);
+            clearCart();
             setIsUpiDrawerOpen(false);
-            closeCart();
+
+            if (created) {
+              setCelebrationData({
+                orderId: created.orderId,
+                orderNo: created.orderNo,
+                tableLabel: displayTable,
+                zone: "Indoor Cozy",
+                totalRupees: Math.round(created.totalPaise / 100),
+                items: currentItemsSnapshot.length > 0 ? currentItemsSnapshot : [
+                  { name: "Artisanal Table Order", qty: 1, priceRupees: Math.round(created.totalPaise / 100), subtotalRupees: Math.round(created.totalPaise / 100) }
+                ],
+                transactionId: paymentRes.transactionId,
+                appName: paymentRes.appName || "UPI Gateway (PAID)",
+                onClose: () => {
+                  setCelebrationData(null);
+                  closeCart();
+                },
+              });
+            } else {
+              closeCart();
+            }
           }}
           onClose={() => setIsUpiDrawerOpen(false)}
         />

@@ -45,7 +45,8 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
   const [isJsonInspectorOpen, setIsJsonInspectorOpen] = useState(false);
   const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
 
-  const tableJsonTag = createTableJsonTag(tableLabel || "01");
+  const displayTable = (tableLabel || "01").replace(/^(table|t)[-\s_]*/i, "").trim().padStart(2, "0");
+  const tableJsonTag = createTableJsonTag(displayTable);
 
   const refreshOrders = useCallback(async () => {
     try {
@@ -182,9 +183,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
               {currentGuestName ? `${currentGuestName}'s order` : "your order"}
             </h1>
             <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
-              {tableLabel
-                ? `Table ${tableLabel}${currentGuestName ? ` • Guest: ${currentGuestName}` : ""} • ${locationName.toLowerCase()}`
-                : "brewing happiness"}
+              Table {displayTable}{currentGuestName ? ` • Guest: ${currentGuestName}` : ""} • {locationName.toLowerCase()}
             </p>
           </div>
 
