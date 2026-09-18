@@ -21,13 +21,39 @@ import {
   TrendingUp,
   Menu,
   X,
+  Receipt,
+  Key,
+  Lock,
+  Eye,
+  EyeOff,
+  Check,
+  Edit2,
+  RotateCcw,
+  ChefHat,
+  Zap,
 } from "lucide-react";
 import { TABLE_ZONES_CONFIG, createTableJsonTag, type TableJsonTag } from "@/lib/table-tag";
 import { getUpiConfig, updateMerchantConfig, type MerchantConfig } from "@/lib/upi";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { JsonTagInspectorModal } from "@/components/table/JsonTagInspectorModal";
+import { OrderDetailsInspectorModal } from "@/components/admin/OrderDetailsInspectorModal";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { TableManager } from "@/components/admin/TableManager";
+import {
+  fetchAdminOverviewAction,
+  updateAdminOrderStatusAction,
+  type AdminOverviewData,
+  type AdminOrderRecord,
+  type AdminPaymentRecord,
+} from "@/app/admin/actions";
+import {
+  getRoleCredentialsAction,
+  updateRoleCredentialAction,
+  resetRoleCredentialAction,
+  type RoleCredentialsMap,
+  type RoleCredential,
+} from "@/app/smol-backdoor/actions";
+import type { OrderStatus } from "@smol-cafe/db";
 
 interface AdminTowerProps {
   initialMetrics?: {
@@ -35,9 +61,10 @@ interface AdminTowerProps {
     activeOrdersCount?: number;
     lowStockCount?: number;
   };
+  initialOverviewData?: AdminOverviewData;
 }
 
-export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
+export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverviewData }) => {
   const [activeTab, setActiveTab] = useState<
     | "overview"
     | "orders"
@@ -52,67 +79,486 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
   >("overview");
 
   const [inspectingTag, setInspectingTag] = useState<TableJsonTag | null>(null);
+  const [inspectingOrder, setInspectingOrder] = useState<AdminOrderRecord | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [menuSearchQuery, setMenuSearchQuery] = useState("");
+  const [selectedMenuCategory, setSelectedMenuCategory] = useState("ALL");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("ALL");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Live overview dataset
+  const [overviewData, setOverviewData] = useState<AdminOverviewData | null>(initialOverviewData || null);
+  const [orders, setOrders] = useState<AdminOrderRecord[]>(initialOverviewData?.orders || []);
+  const [payments, setPayments] = useState<AdminPaymentRecord[]>(initialOverviewData?.payments || []);
 
   // Merchant Settings State
   const [merchantConfig, setMerchantConfig] = useState<MerchantConfig>(getUpiConfig());
   const [settingsSaved, setSettingsSaved] = useState(false);
+
+  // Role Credentials State (RBAC Quick PINs)
+  const [roleCredentials, setRoleCredentials] = useState<RoleCredentialsMap>({
+    admin: {
+      role: "admin",
+      roleName: "Super Admin (Owner)",
+      portal: "/admin",
+      pin: "9900",
+      password: "smol2026",
+      permissions: "Full Control, Budgets, Logs",
+      status: "Active",
+    },
+    cashier: {
+      role: "cashier",
+      roleName: "Cashier / Counter Staff",
+      portal: "/cashier",
+      pin: "4422",
+      permissions: "Order Verification, Cash Settlement",
+      status: "Active",
+    },
+    kitchen: {
+      role: "kitchen",
+      roleName: "Kitchen Display (Chef/Barista)",
+      portal: "/kitchen",
+      pin: "7711",
+      permissions: "Order Queue, Prep Status Transition",
+      status: "Active",
+    },
+  });
+
+  const [editingRole, setEditingRole] = useState<RoleCredential | null>(null);
+  const [editPinValue, setEditPinValue] = useState("");
+  const [editPasswordValue, setEditPasswordValue] = useState("");
+  const [showPinMask, setShowPinMask] = useState(false);
+  const [pinUpdating, setPinUpdating] = useState(false);
+  const [pinFeedback, setPinFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    getRoleCredentialsAction()
+      .then((res) => {
+        if (res.success && res.credentials) {
+          setRoleCredentials(res.credentials);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleOpenEditPin = (roleCred: RoleCredential) => {
+    setEditingRole(roleCred);
+    setEditPinValue(roleCred.pin);
+    setEditPasswordValue(roleCred.password || "");
+    setShowPinMask(false);
+    setPinFeedback(null);
+  };
+
+  const handleSaveRolePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRole) return;
+    setPinUpdating(true);
+    setPinFeedback(null);
+
+    try {
+      const res = await updateRoleCredentialAction(
+        editingRole.role,
+        editPinValue,
+        editingRole.role === "admin" ? editPasswordValue : undefined
+      );
+
+      if (res.success && res.credentials) {
+        setRoleCredentials(res.credentials);
+        setPinFeedback({ type: "success", text: res.message });
+        setEditingRole(null);
+      } else {
+        setPinFeedback({ type: "error", text: res.message || "Failed to update PIN." });
+      }
+    } catch {
+      setPinFeedback({ type: "error", text: "An error occurred while updating PIN." });
+    } finally {
+      setPinUpdating(false);
+    }
+  };
+
+  const handleResetRolePin = async (role: "admin" | "cashier" | "kitchen") => {
+    setPinUpdating(true);
+    try {
+      const res = await resetRoleCredentialAction(role);
+      if (res.success && res.credentials) {
+        setRoleCredentials(res.credentials);
+        setEditPinValue(res.credentials[role].pin);
+        setEditPasswordValue(res.credentials[role].password || "");
+        setPinFeedback({ type: "success", text: res.message });
+      }
+    } catch {
+      setPinFeedback({ type: "error", text: "Failed to reset PIN." });
+    } finally {
+      setPinUpdating(false);
+    }
+  };
+
+  // Timeframe Scope State (Today, Weekly, Monthly, Yearly)
+  const [timeframe, setTimeframe] = useState<"TODAY" | "WEEKLY" | "MONTHLY" | "YEARLY">("TODAY");
+
+  // Dynamic Bezier Path Builder for Organic Revenue Trajectory
+  const buildSmoothSpline = (pts: Array<{ x: number; y: number }>): string => {
+    if (pts.length === 0) return "M 0,125 L 520,125";
+    if (pts.length === 1) return `M 0,${pts[0].y.toFixed(1)} L 520,${pts[0].y.toFixed(1)}`;
+
+    let path = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i === 0 ? 0 : i - 1];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      path += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+    return path;
+  };
+
+  // Dynamic Timeframe Data Sets strictly computed from real customer orders
+  const getTimeframeData = () => {
+    const validOrders = orders.filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED");
+
+    if (timeframe === "WEEKLY") {
+      const days = [
+        { label: "Sun", dayIdx: 0 },
+        { label: "Mon", dayIdx: 1 },
+        { label: "Tue", dayIdx: 2 },
+        { label: "Wed", dayIdx: 3 },
+        { label: "Thu", dayIdx: 4 },
+        { label: "Fri", dayIdx: 5 },
+        { label: "Sat", dayIdx: 6 },
+      ];
+
+      const buckets = days.map((d) => {
+        const dayOrders = orders.filter((o) => {
+          const dt = new Date(o.rawCreatedAt || o.createdAt || Date.now());
+          return dt.getDay() === d.dayIdx;
+        });
+        const rev = dayOrders
+          .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED")
+          .reduce((sum, o) => sum + (o.totalRupees || 0), 0);
+        return {
+          hour: d.label,
+          orders: dayOrders.length,
+          revenue: rev,
+        };
+      });
+
+      const totalOrdersCount = orders.length;
+      const totalRev = validOrders.reduce((sum, o) => sum + (o.totalRupees || 0), 0);
+      const maxRev = Math.max(...buckets.map((b) => b.revenue), 100);
+
+      const pts = buckets.map((b, i) => ({
+        x: 40 + i * 73,
+        y: Math.max(10, Math.min(125, 125 - Math.round((b.revenue / maxRev) * 105))),
+      }));
+
+      const baselinePts = pts.map((p) => ({
+        x: p.x,
+        y: Math.min(125, Math.max(15, p.y * 1.06 + 5)),
+      }));
+
+      let peakIdx = 0;
+      let highestRev = -1;
+      buckets.forEach((b, idx) => {
+        if (b.revenue > highestRev) {
+          highestRev = b.revenue;
+          peakIdx = idx;
+        }
+      });
+
+      const yMax = Math.max(maxRev, 1000);
+      const yAxisLabels = [
+        `₹${Math.round((yMax * 1.2) / 1000)}k`,
+        `₹${Math.round((yMax * 0.8) / 1000)}k`,
+        `₹${Math.round((yMax * 0.4) / 1000)}k`,
+        "₹0",
+      ];
+
+      return {
+        subtitleOrders: "7-Day Daily Ticket Volume (Sun – Sat)",
+        badgeOrders: `${totalOrdersCount} Weekly Orders`,
+        buckets,
+        subtitleRevenue: "7-Day Cumulative vs Baseline Trajectory",
+        badgeRevenue: `₹${totalRev.toLocaleString("en-IN")} This Week`,
+        yAxisLabels,
+        xAxisLabels: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        curveYellow: buildSmoothSpline(baselinePts),
+        curvePurple: buildSmoothSpline(pts),
+        peakX: pts[peakIdx]?.x ?? 350,
+        peakY: pts[peakIdx]?.y ?? 10,
+        startX: 40,
+        stepX: 73,
+        capsuleWidth: 26,
+      };
+    }
+
+    if (timeframe === "MONTHLY") {
+      const weeks = [
+        { label: "Week 1", min: 1, max: 7 },
+        { label: "Week 2", min: 8, max: 14 },
+        { label: "Week 3", min: 15, max: 21 },
+        { label: "Week 4", min: 22, max: 31 },
+      ];
+
+      const buckets = weeks.map((w) => {
+        const weekOrders = orders.filter((o) => {
+          const dt = new Date(o.rawCreatedAt || o.createdAt || Date.now());
+          const dom = dt.getDate();
+          return dom >= w.min && dom <= w.max;
+        });
+        const rev = weekOrders
+          .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED")
+          .reduce((sum, o) => sum + (o.totalRupees || 0), 0);
+        return {
+          hour: w.label,
+          orders: weekOrders.length,
+          revenue: rev,
+        };
+      });
+
+      const totalOrdersCount = orders.length;
+      const totalRev = validOrders.reduce((sum, o) => sum + (o.totalRupees || 0), 0);
+      const maxRev = Math.max(...buckets.map((b) => b.revenue), 100);
+
+      const pts = buckets.map((b, i) => ({
+        x: 65 + i * 130,
+        y: Math.max(10, Math.min(125, 125 - Math.round((b.revenue / maxRev) * 105))),
+      }));
+
+      const baselinePts = pts.map((p) => ({
+        x: p.x,
+        y: Math.min(125, Math.max(15, p.y * 1.06 + 5)),
+      }));
+
+      let peakIdx = 0;
+      let highestRev = -1;
+      buckets.forEach((b, idx) => {
+        if (b.revenue > highestRev) {
+          highestRev = b.revenue;
+          peakIdx = idx;
+        }
+      });
+
+      const yMax = Math.max(maxRev, 1000);
+      const yAxisLabels = [
+        `₹${(yMax * 1.2 >= 100000 ? (yMax * 1.2 / 100000).toFixed(1) + "L" : Math.round(yMax * 1.2 / 1000) + "k")}`,
+        `₹${(yMax * 0.8 >= 100000 ? (yMax * 0.8 / 100000).toFixed(1) + "L" : Math.round(yMax * 0.8 / 1000) + "k")}`,
+        `₹${(yMax * 0.4 >= 100000 ? (yMax * 0.4 / 100000).toFixed(1) + "L" : Math.round(yMax * 0.4 / 1000) + "k")}`,
+        "₹0",
+      ];
+
+      return {
+        subtitleOrders: "4-Week Monthly Ticket Aggregate",
+        badgeOrders: `${totalOrdersCount} Monthly Orders`,
+        buckets,
+        subtitleRevenue: "Monthly Revenue Curve from Customer Orders",
+        badgeRevenue: `₹${totalRev.toLocaleString("en-IN")} This Month`,
+        yAxisLabels,
+        xAxisLabels: ["Week 1", "Week 2", "Week 3", "Week 4"],
+        curveYellow: buildSmoothSpline(baselinePts),
+        curvePurple: buildSmoothSpline(pts),
+        peakX: pts[peakIdx]?.x ?? 380,
+        peakY: pts[peakIdx]?.y ?? 12,
+        startX: 65,
+        stepX: 130,
+        capsuleWidth: 28,
+      };
+    }
+
+    if (timeframe === "YEARLY") {
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const buckets = monthNames.map((mName, mIdx) => {
+        const monthOrders = orders.filter((o) => {
+          const dt = new Date(o.rawCreatedAt || o.createdAt || Date.now());
+          return dt.getMonth() === mIdx;
+        });
+        const rev = monthOrders
+          .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED")
+          .reduce((sum, o) => sum + (o.totalRupees || 0), 0);
+        return {
+          hour: mName,
+          orders: monthOrders.length,
+          revenue: rev,
+        };
+      });
+
+      const totalOrdersCount = orders.length;
+      const totalRev = validOrders.reduce((sum, o) => sum + (o.totalRupees || 0), 0);
+      const maxRev = Math.max(...buckets.map((b) => b.revenue), 100);
+
+      const pts = buckets.map((b, i) => ({
+        x: 28 + i * 42,
+        y: Math.max(10, Math.min(125, 125 - Math.round((b.revenue / maxRev) * 105))),
+      }));
+
+      const baselinePts = pts.map((p) => ({
+        x: p.x,
+        y: Math.min(125, Math.max(15, p.y * 1.06 + 5)),
+      }));
+
+      let peakIdx = 0;
+      let highestRev = -1;
+      buckets.forEach((b, idx) => {
+        if (b.revenue > highestRev) {
+          highestRev = b.revenue;
+          peakIdx = idx;
+        }
+      });
+
+      const yMax = Math.max(maxRev, 1000);
+      const yAxisLabels = [
+        `₹${(yMax * 1.2 >= 100000 ? (yMax * 1.2 / 100000).toFixed(1) + "L" : Math.round(yMax * 1.2 / 1000) + "k")}`,
+        `₹${(yMax * 0.8 >= 100000 ? (yMax * 0.8 / 100000).toFixed(1) + "L" : Math.round(yMax * 0.8 / 1000) + "k")}`,
+        `₹${(yMax * 0.4 >= 100000 ? (yMax * 0.4 / 100000).toFixed(1) + "L" : Math.round(yMax * 0.4 / 1000) + "k")}`,
+        "₹0",
+      ];
+
+      return {
+        subtitleOrders: "Annual Monthly Order Volume (12 Months)",
+        badgeOrders: `${totalOrdersCount} Annual Orders`,
+        buckets,
+        subtitleRevenue: "Annual Revenue Trajectory from Actual Orders",
+        badgeRevenue: `₹${totalRev.toLocaleString("en-IN")} Annual`,
+        yAxisLabels,
+        xAxisLabels: ["Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dec)"],
+        curveYellow: buildSmoothSpline(baselinePts),
+        curvePurple: buildSmoothSpline(pts),
+        peakX: pts[peakIdx]?.x ?? 520,
+        peakY: pts[peakIdx]?.y ?? 8,
+        startX: 28,
+        stepX: 42,
+        capsuleWidth: 16,
+      };
+    }
+
+    // Default: TODAY
+    const hourSlots = [
+      { label: "8a", h: 8 }, { label: "9a", h: 9 }, { label: "10a", h: 10 },
+      { label: "11a", h: 11 }, { label: "12p", h: 12 }, { label: "1p", h: 13 },
+      { label: "2p", h: 14 }, { label: "3p", h: 15 }, { label: "4p", h: 16 },
+      { label: "5p", h: 17 }, { label: "6p", h: 18 }, { label: "7p", h: 19 },
+      { label: "8p", h: 20 }, { label: "9p", h: 21 },
+    ];
+
+    const buckets = hourSlots.map((slot) => {
+      const slotOrders = orders.filter((o) => {
+        const dt = new Date(o.rawCreatedAt || o.createdAt || Date.now());
+        const h = dt.getHours();
+        if (slot.h === 8) return h <= 8;
+        if (slot.h === 21) return h >= 21;
+        return h === slot.h;
+      });
+      const rev = slotOrders
+        .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED")
+        .reduce((sum, o) => sum + (o.totalRupees || 0), 0);
+      return {
+        hour: slot.label,
+        orders: slotOrders.length,
+        revenue: rev,
+      };
+    });
+
+    const totalOrdersCount = orders.length;
+    const totalRev = validOrders.reduce((sum, o) => sum + (o.totalRupees || 0), 0);
+    const maxRev = Math.max(...buckets.map((b) => b.revenue), 100);
+
+    const pts = buckets.map((b, i) => ({
+      x: 28 + i * 35,
+      y: Math.max(10, Math.min(125, 125 - Math.round((b.revenue / maxRev) * 105))),
+    }));
+
+    const baselinePts = pts.map((p) => ({
+      x: p.x,
+      y: Math.min(125, Math.max(15, p.y * 1.06 + 5)),
+    }));
+
+    let peakIdx = 0;
+    let highestRev = -1;
+    buckets.forEach((b, idx) => {
+      if (b.revenue > highestRev) {
+        highestRev = b.revenue;
+        peakIdx = idx;
+      }
+    });
+
+    const yMax = Math.max(maxRev, 1000);
+    const yAxisLabels = [
+      `₹${Math.round((yMax * 1.2) / 1000)}k`,
+      `₹${Math.round((yMax * 0.8) / 1000)}k`,
+      `₹${Math.round((yMax * 0.4) / 1000)}k`,
+      "₹0",
+    ];
+
+    return {
+      subtitleOrders: "Real-time Hourly Customer Velocity (8AM – 10PM)",
+      badgeOrders: `Live · ${totalOrdersCount} Orders`,
+      buckets,
+      subtitleRevenue: "Live Velocity Wave from Actual Placed Orders",
+      badgeRevenue: `₹${totalRev.toLocaleString("en-IN")} Today`,
+      yAxisLabels,
+      xAxisLabels: ["8 AM Opening", "12 PM Lunch", "4 PM Peak", "7 PM Evening", "10 PM Close"],
+      curveYellow: buildSmoothSpline(baselinePts),
+      curvePurple: buildSmoothSpline(pts),
+      peakX: pts[peakIdx]?.x ?? 255,
+      peakY: pts[peakIdx]?.y ?? 10,
+      startX: 28,
+      stepX: 35,
+      capsuleWidth: 18,
+    };
+  };
 
   // Dynamic Menu Stock Management (simulated local persistence)
   const [soldOutItems, setSoldOutItems] = useState<Record<string, boolean>>({
     item_croissant_butter: true, // example 1 item sold out
   });
 
-  // Mock Active Orders in Tower
-  const [orders, setOrders] = useState([
-    {
-      id: "ORD-9421",
-      orderNo: 104,
-      tableLabel: "04",
-      zone: "Courtyard Verandah",
-      items: ["Artisanal Flat White (x2)", "Sourdough Mushroom Melt (x1)"],
-      status: "PREPARING",
-      totalRupees: 580,
-      paymentStatus: "PAID (UPI)",
-      createdAt: "10 mins ago",
-    },
-    {
-      id: "ORD-9420",
-      orderNo: 103,
-      tableLabel: "02",
-      zone: "Indoor Cozy",
-      items: ["Single Origin Pour Over (x1)", "Almond Bun (x2)"],
-      status: "READY",
-      totalRupees: 420,
-      paymentStatus: "PAID (CASH)",
-      createdAt: "18 mins ago",
-    },
-    {
-      id: "ORD-9419",
-      orderNo: 102,
-      tableLabel: "07",
-      zone: "Garden Terrace",
-      items: ["Iced Cascara Brew (x2)", "Truffle Fries (x1)", "Hummus Platter (x1)"],
-      status: "SUBMITTED",
-      totalRupees: 890,
-      paymentStatus: "PAYMENT_PENDING",
-      createdAt: "3 mins ago",
-    },
-    {
-      id: "ORD-9418",
-      orderNo: 101,
-      tableLabel: "01",
-      zone: "Indoor Cozy",
-      items: ["Masala Chai (x2)", "Bun Maska (x2)"],
-      status: "SERVED",
-      totalRupees: 280,
-      paymentStatus: "PAID (UPI)",
-      createdAt: "42 mins ago",
-    },
-  ]);
- 
+  // Re-fetch function
+  const refreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await fetchAdminOverviewAction();
+      if (res.success && res.data) {
+        setOverviewData(res.data);
+        setOrders(res.data.orders);
+        setPayments(res.data.payments);
+      }
+    } catch (e) {
+      console.error("Failed to refresh admin data:", e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Real-Time Sync Subscription
+  useEffect(() => {
+    refreshData();
+
+    const unsub = subscribeToSyncEvents((ev) => {
+      console.log("[AdminTower] Sync event received:", ev.type);
+      refreshData();
+    });
+
+    const interval = setInterval(() => {
+      refreshData();
+    }, 12000);
+
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    await updateAdminOrderStatusAction(orderId, newStatus);
+    await refreshData();
+  };
+
   const navItems: Array<{
     id: typeof activeTab;
     label: string;
@@ -130,33 +576,6 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
     { id: "analytics", label: "Analytics", icon: TrendingUp },
     { id: "settings", label: "Settings", icon: Settings },
   ];
-
-  // Real-Time Sync Subscription
-  useEffect(() => {
-    const unsub = subscribeToSyncEvents((ev) => {
-      if (ev.type === "ORDER_PLACED") {
-        setOrders((prev) => [
-          {
-            id: ev.orderId || `ORD-${Date.now().toString().slice(-4)}`,
-            orderNo: ev.orderNo || prev.length + 101,
-            tableLabel: ev.tableLabel || "03",
-            zone: TABLE_ZONES_CONFIG[ev.tableLabel || "03"]?.zone || "Indoor Cozy",
-            items: ["Customer Table Order"],
-            status: "SUBMITTED",
-            totalRupees: 350,
-            paymentStatus: "PAYMENT_PENDING",
-            createdAt: "Just now",
-          },
-          ...prev,
-        ]);
-      } else if (ev.type === "STATUS_CHANGED" && ev.orderId) {
-        setOrders((prev) =>
-          prev.map((o) => (o.id === ev.orderId ? { ...o, status: ev.status || o.status } : o))
-        );
-      }
-    });
-    return unsub;
-  }, []);
 
   const handleUpdateMerchantSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,6 +595,11 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
       ...prev,
       [itemId]: !prev[itemId],
     }));
+
+    broadcastSyncEvent({
+      type: "SETTINGS_UPDATED",
+      timestamp: Date.now(),
+    });
   };
 
   return (
@@ -418,12 +842,14 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
             {/* Quick Refresh */}
             <button
               onClick={() => {
+                refreshData();
                 broadcastSyncEvent({ type: "SETTINGS_UPDATED", timestamp: Date.now() });
               }}
-              className="flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 px-2.5 sm:px-3 py-1.5 text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-800 transition cursor-pointer"
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 px-2.5 sm:px-3 py-1.5 text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-800 transition cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sync All</span>
+              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-[#B72E35]" : ""}`} />
+              <span className="hidden sm:inline">{isRefreshing ? "Syncing..." : "Sync All"}</span>
             </button>
 
             {/* Theme Toggle Button */}
@@ -437,12 +863,42 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
             {/* 6 Hero KPI Metric Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
               {[
-                { label: "TODAY'S ORDERS", value: "48", trend: "+14% vs yesterday", color: "#F2C84B" },
-                { label: "GROSS REVENUE", value: "₹18,450", trend: "+22% peak brew", color: "#48BB78" },
-                { label: "ACTIVE TABLES", value: "5 / 12", trend: "42% capacity", color: "#ED8936" },
-                { label: "PENDING KDS", value: "3 Tickets", trend: "Avg wait: 9m", color: "#B72E35" },
-                { label: "AVERAGE ORDER", value: "₹384", trend: "+8% add-ons", color: "#4299E1" },
-                { label: "TOP SELLER", value: "Flat White", trend: "32 cups sold", color: "#9F7AEA" },
+                {
+                  label: "TODAY'S ORDERS",
+                  value: `${overviewData?.kpis.todaysOrders ?? orders.length}`,
+                  trend: "Live synchronized",
+                  color: "#F2C84B",
+                },
+                {
+                  label: "GROSS REVENUE",
+                  value: `₹${(overviewData?.kpis.grossRevenueRupees ?? 0).toLocaleString("en-IN")}`,
+                  trend: "Paid & Verified",
+                  color: "#48BB78",
+                },
+                {
+                  label: "ACTIVE TABLES",
+                  value: `${overviewData?.kpis.activeTablesCount ?? 1} / 12`,
+                  trend: `${Math.round(((overviewData?.kpis.activeTablesCount ?? 1) / 12) * 100)}% capacity`,
+                  color: "#ED8936",
+                },
+                {
+                  label: "PENDING KDS",
+                  value: `${overviewData?.kpis.pendingKdsCount ?? 0} Tickets`,
+                  trend: "Active pipeline",
+                  color: "#B72E35",
+                },
+                {
+                  label: "AVERAGE ORDER",
+                  value: `₹${overviewData?.kpis.avgOrderRupees ?? 0}`,
+                  trend: "Per ticket avg",
+                  color: "#4299E1",
+                },
+                {
+                  label: "TOP SELLER",
+                  value: `${overviewData?.kpis.topSellerName ?? "Flat White"}`,
+                  trend: `${overviewData?.kpis.topSellerUnits ?? 0} sold`,
+                  color: "#9F7AEA",
+                },
               ].map((kpi, idx) => (
                 <div
                   key={idx}
@@ -452,126 +908,340 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
                     {kpi.label}
                   </span>
                   <div
-                    className="font-serif text-2xl font-black tracking-tight"
+                    className="font-serif text-xl sm:text-2xl font-black tracking-tight truncate"
                     style={{ color: kpi.color }}
                   >
                     {kpi.value}
                   </div>
-                  <span className="block text-[10px] text-[#8C6D53] dark:text-stone-500 font-mono">{kpi.trend}</span>
+                  <span className="block text-[10px] text-[#8C6D53] dark:text-stone-500 font-mono truncate">{kpi.trend}</span>
                 </div>
               ))}
             </div>
 
+            {/* Timeframe Scope Filter Bar (Today | Weekly | Monthly | Yearly) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FAF4EB] dark:bg-[#1A1715] p-3 rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 shadow-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#725039] dark:text-[#C9AE8B]">
+                  Analytics Range:
+                </span>
+                <span className="text-[11px] font-mono text-stone-500 hidden sm:inline">
+                  (Live velocity &amp; cumulative revenue)
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1 rounded-xl bg-[#EFE7DC] dark:bg-[#120F0E] p-1 border border-[#C9AE8B]/30 dark:border-stone-800">
+                {(
+                  [
+                    { id: "TODAY", label: "Today (Hourly)" },
+                    { id: "WEEKLY", label: "Weekly (7 Days)" },
+                    { id: "MONTHLY", label: "Monthly (4 Weeks)" },
+                    { id: "YEARLY", label: "Yearly (12 Months)" },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTimeframe(t.id)}
+                    className={`px-3 py-1.5 rounded-lg font-mono text-xs font-bold transition cursor-pointer ${
+                      timeframe === t.id
+                        ? "bg-[#B72E35] text-white shadow-xs"
+                        : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* 5 Interactive Analytics Charts Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Chart 1: Orders Over Time (Hourly Bar Chart) */}
-              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-sm space-y-3 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Orders Over Time</h3>
-                    <p className="font-mono text-xs text-[#725039] dark:text-stone-400">Hourly ticket load (8AM - 10PM)</p>
-                  </div>
-                  <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 border border-[#C9AE8B]/30 dark:border-stone-700 px-2.5 py-0.5 text-xs font-mono text-[#8C6207] dark:text-[#F2C84B]">
-                    Peak: 4PM - 6PM
-                  </span>
-                </div>
-
-                {/* SVG Bar Chart */}
-                <div className="h-44 w-full flex items-end justify-between gap-1.5 pt-4 pb-2 border-b border-[#C9AE8B]/30 dark:border-stone-800">
-                  {[
-                    { hour: "8a", orders: 4 },
-                    { hour: "9a", orders: 7 },
-                    { hour: "10a", orders: 12 },
-                    { hour: "11a", orders: 9 },
-                    { hour: "12p", orders: 15 },
-                    { hour: "1p", orders: 18 },
-                    { hour: "2p", orders: 11 },
-                    { hour: "3p", orders: 8 },
-                    { hour: "4p", orders: 22 },
-                    { hour: "5p", orders: 26 },
-                    { hour: "6p", orders: 21 },
-                    { hour: "7p", orders: 16 },
-                    { hour: "8p", orders: 19 },
-                    { hour: "9p", orders: 10 },
-                  ].map((bar, i) => {
-                    const heightPercent = Math.round((bar.orders / 28) * 100);
-                    return (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-                        <span className="text-[9px] font-mono text-[#725039] dark:text-stone-400 opacity-0 group-hover:opacity-100 transition">
-                          {bar.orders}
-                        </span>
-                        <div
-                          className="w-full rounded-t-lg bg-[#B72E35] group-hover:bg-[#F2C84B] transition-all"
-                          style={{ height: `${heightPercent}%` }}
-                        />
-                        <span className="text-[9px] font-mono text-[#8C6D53] dark:text-stone-500">{bar.hour}</span>
+            {(() => {
+              const tfData = getTimeframeData();
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Chart 1: Orders Over Time (3D Isometric Purple Cylindrical Column Bar Chart matching Reference Design) */}
+                  <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#151110] p-5 shadow-sm space-y-3 transition-colors">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white flex items-center gap-2">
+                          Orders Over Time
+                          <span className="h-2 w-2 rounded-full bg-[#A855F7] animate-pulse" />
+                        </h3>
+                        <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                          {tfData.subtitleOrders}
+                        </p>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                      <span className="rounded-full bg-[#A855F7]/15 dark:bg-[#A855F7]/25 border border-[#A855F7]/40 px-3 py-1 text-xs font-mono font-bold text-[#754CFF] dark:text-[#C4B5FD] shadow-xs">
+                        {tfData.badgeOrders}
+                      </span>
+                    </div>
 
-              {/* Chart 2: Revenue Trend (Area Curve) */}
-              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-sm space-y-3 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Revenue Trajectory</h3>
-                    <p className="font-mono text-xs text-[#725039] dark:text-stone-400">Cumulative day revenue vs 7-day average</p>
+                    {/* SVG 3D Isometric Cylinder Canvas */}
+                    <div className="relative h-48 w-full pt-1">
+                      <svg
+                        className="w-full h-full overflow-visible"
+                        viewBox="0 0 520 180"
+                        preserveAspectRatio="none"
+                      >
+                        <defs>
+                          {/* 3D Top Cap Highlight Gradient */}
+                          <linearGradient id="isoCapGrad" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#EDE9FE" />
+                            <stop offset="50%" stopColor="#DDD6FE" />
+                            <stop offset="100%" stopColor="#C4B5FD" />
+                          </linearGradient>
+
+                          {/* 3D Lit Left Face Gradient */}
+                          <linearGradient id="isoLeftGrad" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#C084FC" />
+                            <stop offset="100%" stopColor="#A855F7" />
+                          </linearGradient>
+
+                          {/* 3D Shadow Right Face Gradient */}
+                          <linearGradient id="isoRightGrad" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#9333EA" />
+                            <stop offset="100%" stopColor="#7E22CE" />
+                          </linearGradient>
+
+                          {/* 3D Column Hover Glow Filter */}
+                          <filter id="isoGlow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#A855F7" floodOpacity="0.45" />
+                          </filter>
+                        </defs>
+
+                        {/* Horizontal Dashed Grid Guidelines */}
+                        <line x1="10" y1="35" x2="515" y2="35" stroke="#C9AE8B" strokeOpacity="0.2" strokeDasharray="4 4" />
+                        <line x1="10" y1="75" x2="515" y2="75" stroke="#C9AE8B" strokeOpacity="0.2" strokeDasharray="4 4" />
+                        <line x1="10" y1="115" x2="515" y2="115" stroke="#C9AE8B" strokeOpacity="0.2" strokeDasharray="4 4" />
+                        <line x1="10" y1="155" x2="515" y2="155" stroke="#C9AE8B" strokeOpacity="0.3" />
+
+                        {(() => {
+                          const maxOrders = Math.max(...tfData.buckets.map((b) => b.orders), 1);
+                          const baseY = 155;
+                          const maxH = 125;
+                          const w = Math.min(tfData.capsuleWidth * 1.25, 32);
+
+                          return tfData.buckets.map((bar, i) => {
+                            const cx = tfData.startX + i * tfData.stepX;
+                            const norm = bar.orders > 0 ? bar.orders / maxOrders : 0;
+                            const h = bar.orders > 0 ? Math.max(22, Math.round(norm * maxH)) : 10;
+                            const topY = baseY - h;
+                            const halfW = w / 2;
+
+                            return (
+                              <g key={i} className="group cursor-pointer">
+                                {/* Vertical Guideline behind column */}
+                                <line
+                                  x1={cx}
+                                  y1="25"
+                                  x2={cx}
+                                  y2="155"
+                                  stroke="#C9AE8B"
+                                  strokeOpacity="0.12"
+                                  strokeDasharray="2 2"
+                                />
+
+                                {/* 3D Isometric Column Group */}
+                                <g
+                                  filter="url(#isoGlow)"
+                                  className="transition-all duration-300 group-hover:brightness-110 group-hover:-translate-y-1 origin-bottom"
+                                >
+                                  {/* 1. Left Lit Face of 3D Cylinder */}
+                                  <path
+                                    d={`M ${cx - halfW},${topY} 
+                                       C ${cx - halfW * 0.4},${topY + 6} ${cx},${topY + 6} ${cx},${topY + 6} 
+                                       L ${cx},${baseY} 
+                                       C ${cx},${baseY} ${cx - halfW * 0.4},${baseY} ${cx - halfW},${baseY} 
+                                       Z`}
+                                    fill="url(#isoLeftGrad)"
+                                  />
+
+                                  {/* 2. Right Shadow Face of 3D Cylinder */}
+                                  <path
+                                    d={`M ${cx},${topY + 6} 
+                                       C ${cx + halfW * 0.4},${topY + 6} ${cx + halfW},${topY} ${cx + halfW},${topY} 
+                                       L ${cx + halfW},${baseY} 
+                                       C ${cx + halfW * 0.4},${baseY + 4} ${cx},${baseY + 4} ${cx},${baseY} 
+                                       Z`}
+                                    fill="url(#isoRightGrad)"
+                                  />
+
+                                  {/* 3. Bottom Curved Base Bevel */}
+                                  <path
+                                    d={`M ${cx - halfW},${baseY} 
+                                       C ${cx - halfW * 0.3},${baseY + 4} ${cx + halfW * 0.3},${baseY + 4} ${cx + halfW},${baseY} 
+                                       C ${cx + halfW * 0.3},${baseY + 1} ${cx - halfW * 0.3},${baseY + 1} ${cx - halfW},${baseY} 
+                                       Z`}
+                                    fill="#7E22CE"
+                                    opacity="0.7"
+                                  />
+
+                                  {/* 4. Top Isometric Curved Dome Cap */}
+                                  <path
+                                    d={`M ${cx - halfW},${topY} 
+                                       C ${cx - halfW * 0.3},${topY - 7} ${cx + halfW * 0.3},${topY - 7} ${cx + halfW},${topY} 
+                                       C ${cx + halfW * 0.3},${topY + 7} ${cx - halfW * 0.3},${topY + 7} ${cx - halfW},${topY} 
+                                       Z`}
+                                    fill="url(#isoCapGrad)"
+                                    stroke="#C4B5FD"
+                                    strokeWidth="0.75"
+                                  />
+                                </g>
+
+                                {/* Order Count Label directly on Top */}
+                                <text
+                                  x={cx}
+                                  y={topY - 11}
+                                  textAnchor="middle"
+                                  className="text-[10px] sm:text-[11px] font-mono font-bold fill-[#754CFF] dark:fill-[#DDD6FE] select-none group-hover:scale-110 transition-transform"
+                                >
+                                  {bar.orders}
+                                </text>
+
+                                {/* Hover Tooltip */}
+                                <title>{`${bar.hour}: ${bar.orders} orders`}</title>
+                              </g>
+                            );
+                          });
+                        })()}
+                      </svg>
+                    </div>
+
+                    {/* X-Axis Timeline Labels */}
+                    <div className="flex justify-between pl-4 pr-3 font-mono text-[10px] text-[#725039] dark:text-stone-400 pt-1.5 border-t border-[#C9AE8B]/20 dark:border-stone-800 select-none">
+                      {tfData.buckets.map((b) => (
+                        <span key={b.hour}>{b.hour}</span>
+                      ))}
+                    </div>
                   </div>
-                  <span className="rounded-full bg-emerald-950/80 border border-emerald-800/60 px-2.5 py-0.5 text-xs font-mono text-emerald-400">
-                    +18% Today
-                  </span>
-                </div>
 
-                <div className="relative h-44 w-full pt-2">
-                  <svg className="w-full h-full" viewBox="0 0 400 120" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#48BB78" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="#48BB78" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    {/* 7-day average dotted line */}
-                    <path
-                      d="M0,100 Q100,75 200,55 T400,25"
-                      fill="none"
-                      stroke="#718096"
-                      strokeWidth="2"
-                      strokeDasharray="4 4"
-                    />
-                    {/* Today area */}
-                    <path
-                      d="M0,110 Q100,70 200,45 T400,10 L400,120 L0,120 Z"
-                      fill="url(#revenueGrad)"
-                    />
-                    {/* Today stroke */}
-                    <path
-                      d="M0,110 Q100,70 200,45 T400,10"
-                      fill="none"
-                      stroke="#48BB78"
-                      strokeWidth="3"
-                    />
-                  </svg>
-                  <div className="flex justify-between font-mono text-[10px] text-stone-500 pt-1">
-                    <span>Opening (8 AM)</span>
-                    <span>Noon (1 PM)</span>
-                    <span>Peak Evening (6 PM)</span>
-                    <span>Close (10 PM)</span>
+                  {/* Chart 2: Revenue Wave Trajectory (Organic Spline Wave) */}
+                  <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#151110] p-5 shadow-sm space-y-3 transition-colors">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white flex items-center gap-2">
+                          Revenue Trajectory
+                          <span className="h-2 w-2 rounded-full bg-[#754CFF] animate-pulse" />
+                        </h3>
+                        <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                          {tfData.subtitleRevenue}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <div className="hidden sm:flex items-center gap-3 text-[11px] font-mono pr-2">
+                          <span className="flex items-center gap-1.5 text-[#754CFF] dark:text-[#A855F7] font-bold">
+                            <span className="h-2.5 w-2.5 rounded-full bg-[#754CFF]" />
+                            Actual
+                          </span>
+                          <span className="flex items-center gap-1.5 text-[#D97706] dark:text-[#F2C84B]">
+                            <span className="h-0.5 w-3.5 border-t-2 border-dashed border-[#F2C84B]" />
+                            Baseline
+                          </span>
+                        </div>
+
+                        <span className="rounded-full bg-[#754CFF]/15 dark:bg-[#754CFF]/25 border border-[#754CFF]/40 px-3 py-1 text-xs font-mono font-bold text-[#754CFF] dark:text-[#C4B5FD] shadow-xs">
+                          {tfData.badgeRevenue}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Spline Wave Canvas with Left Y-Axis */}
+                    <div className="relative h-48 w-full flex pt-3">
+                      <div className="flex flex-col justify-between pr-2.5 py-1 text-[10px] font-mono text-[#8C6D53] dark:text-stone-400 select-none shrink-0 border-r border-[#C9AE8B]/30 dark:border-stone-800/80">
+                        {tfData.yAxisLabels.map((lbl, idx) => (
+                          <span key={idx}>{lbl}</span>
+                        ))}
+                      </div>
+
+                      <div className="relative flex-1 h-full pl-2">
+                        <svg
+                          className="w-full h-full overflow-visible"
+                          viewBox="0 0 520 130"
+                          preserveAspectRatio="none"
+                        >
+                          <defs>
+                            <linearGradient id="purpleWaveGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#754CFF" stopOpacity="0.55" />
+                              <stop offset="40%" stopColor="#8B5CF6" stopOpacity="0.30" />
+                              <stop offset="100%" stopColor="#151110" stopOpacity="0.0" />
+                            </linearGradient>
+
+                            <filter id="purpleGlow" x="-10%" y="-10%" width="120%" height="120%">
+                              <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#754CFF" floodOpacity="0.4" />
+                            </filter>
+                          </defs>
+
+                          <line x1="0" y1="10" x2="520" y2="10" stroke="#C9AE8B" strokeOpacity="0.15" strokeDasharray="3 3" />
+                          <line x1="0" y1="50" x2="520" y2="50" stroke="#C9AE8B" strokeOpacity="0.15" strokeDasharray="3 3" />
+                          <line x1="0" y1="90" x2="520" y2="90" stroke="#C9AE8B" strokeOpacity="0.15" strokeDasharray="3 3" />
+                          <line x1="0" y1="125" x2="520" y2="125" stroke="#C9AE8B" strokeOpacity="0.25" />
+
+                          {/* 1. Golden Yellow Dashed Baseline Wave */}
+                          <path
+                            d={tfData.curveYellow}
+                            fill="none"
+                            stroke="#F2C84B"
+                            strokeWidth="2"
+                            strokeDasharray="5 4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="opacity-90 dark:opacity-95"
+                          />
+
+                          {/* 2. Purple Wave Gradient Fill Area */}
+                          <path
+                            d={`${tfData.curvePurple} L 520,130 L 0,130 Z`}
+                            fill="url(#purpleWaveGrad)"
+                          />
+
+                          {/* 3. Purple Stroke Line with Glow */}
+                          <path
+                            d={tfData.curvePurple}
+                            fill="none"
+                            stroke="#A855F7"
+                            strokeWidth="3.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            filter="url(#purpleGlow)"
+                            className="transition-all duration-300"
+                          />
+
+                          <circle
+                            cx={tfData.peakX}
+                            cy={tfData.peakY}
+                            r="5"
+                            fill="#754CFF"
+                            stroke="#FFFFFF"
+                            strokeWidth="2.5"
+                            className="animate-pulse"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* X-Axis Timeline Labels */}
+                    <div className="flex justify-between pl-8 pr-1 font-mono text-[10px] text-[#725039] dark:text-stone-400 pt-0.5 border-t border-[#C9AE8B]/20 dark:border-stone-800">
+                      {tfData.xAxisLabels.map((lbl, idx) => (
+                        <span key={idx}>{lbl}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              );
+            })()}
 
+            {/* Lower Row: Best-Selling Items & Zone/Payment Breakdown */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Chart 3: Best-Selling Items Breakdown */}
               <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-sm space-y-4 transition-colors">
                 <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Best-Selling Items</h3>
                 <div className="space-y-3">
-                  {[
-                    { name: "Artisanal Flat White", sales: 42, rev: "₹7,560", pct: 90 },
-                    { name: "Sourdough Mushroom Melt", sales: 31, rev: "₹8,680", pct: 75 },
-                    { name: "Masala Chai Pot", sales: 28, rev: "₹2,520", pct: 65 },
-                    { name: "Iced Cascara Cold Brew", sales: 24, rev: "₹4,560", pct: 55 },
-                    { name: "Classic Cinnamon Bun", sales: 19, rev: "₹2,660", pct: 45 },
-                  ].map((item, i) => (
+                  {(overviewData?.bestSellers || [
+                    { name: "Artisanal Flat White", sales: 14, rev: "₹2,520", pct: 90 },
+                    { name: "Bun Makkhan", sales: 12, rev: "₹1,080", pct: 75 },
+                    { name: "Sourdough Mushroom Melt", sales: 8, rev: "₹2,240", pct: 55 },
+                    { name: "Iced Cascara Cold Brew", sales: 6, rev: "₹1,320", pct: 40 },
+                  ]).map((item, i) => (
                     <div key={i} className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="font-bold text-[#241F1C] dark:text-stone-200">{item.name}</span>
@@ -596,12 +1266,12 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
                 <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-sm space-y-3 transition-colors">
                   <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-white">Zone Utilization</h3>
                   <div className="space-y-2.5 text-xs">
-                    {[
+                    {(overviewData?.zoneUtilization || [
                       { zone: "Indoor Cozy", occ: "75%", color: "#F2C84B" },
                       { zone: "Courtyard Verandah", occ: "60%", color: "#B72E35" },
                       { zone: "Garden Terrace", occ: "40%", color: "#48BB78" },
                       { zone: "Brew Bar", occ: "100%", color: "#4299E1" },
-                    ].map((z, idx) => (
+                    ]).map((z, idx) => (
                       <div key={idx} className="flex items-center justify-between">
                         <span className="text-[#5C4533] dark:text-stone-300">{z.zone}</span>
                         <span className="font-mono font-bold" style={{ color: z.color }}>
@@ -616,11 +1286,11 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
                 <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-sm space-y-3 transition-colors">
                   <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-white">Payment Split</h3>
                   <div className="space-y-2.5 text-xs">
-                    {[
-                      { mode: "UPI Direct QR", pct: "68%", color: "#48BB78" },
-                      { mode: "Counter Cash", pct: "22%", color: "#ED8936" },
+                    {(overviewData?.paymentSplit || [
+                      { mode: "UPI Direct QR", pct: "70%", color: "#48BB78" },
+                      { mode: "Counter Cash", pct: "20%", color: "#ED8936" },
                       { mode: "Card / NFC", pct: "10%", color: "#4299E1" },
-                    ].map((p, idx) => (
+                    ]).map((p, idx) => (
                       <div key={idx} className="flex items-center justify-between">
                         <span className="text-[#5C4533] dark:text-stone-300">{p.mode}</span>
                         <span className="font-mono font-bold" style={{ color: p.color }}>
@@ -718,11 +1388,11 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
                         <td className="p-3.5 text-[11px] text-[#725039] dark:text-stone-400">{o.paymentStatus}</td>
                         <td className="p-3.5 text-right">
                           <button
-                            onClick={() => setInspectingTag(createTableJsonTag(o.tableLabel))}
-                            className="inline-flex items-center gap-1 rounded-lg bg-stone-800 px-2.5 py-1 text-xs text-stone-300 hover:bg-stone-700 transition"
+                            onClick={() => setInspectingOrder(o)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-800 px-3 py-1.5 text-xs font-serif font-bold text-[#725039] dark:text-[#F3E7D3] hover:border-[#B72E35] dark:hover:border-[#F2C84B] hover:text-[#B72E35] dark:hover:text-[#F2C84B] transition shadow-xs cursor-pointer active:scale-95"
                           >
-                            <Tag className="h-3 w-3 text-[#F2C84B]" />
-                            <span>JSON Tag</span>
+                            <Receipt className="h-3.5 w-3.5 text-[#B72E35] dark:text-[#F2C84B]" />
+                            <span>View Details</span>
                           </button>
                         </td>
                       </tr>
@@ -737,65 +1407,168 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
         {activeTab === "tables" && <TableManager />}
 
         {/* Tab 4: MENU MANAGEMENT & STOCK TOGGLE */}
-        {activeTab === "menu" && (
-          <div className="p-6 space-y-4 max-w-7xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-[#241F1C] dark:text-white">Menu Items Catalog (59 Items)</h2>
-                <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
-                  Toggle instant In-Stock / Sold-Out availability for live customer menus
-                </p>
-              </div>
-            </div>
+        {activeTab === "menu" && (() => {
+          const catalogItems = overviewData?.menuItems || [];
+          const categories = overviewData?.menuCategories || ["ALL"];
 
-            <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
-                  <tr>
-                    <th className="p-3.5">Item Name</th>
-                    <th className="p-3.5">Category</th>
-                    <th className="p-3.5">Target Price</th>
-                    <th className="p-3.5">Dietary</th>
-                    <th className="p-3.5 text-right">Availability Toggle</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800">
-                  {[
-                    { id: "item_flat_white", name: "Artisanal Flat White", cat: "Specialty Coffee", price: "₹180", diet: "Vegetarian" },
-                    { id: "item_pour_over", name: "Pour Over (Ratnagiri Estate)", cat: "Specialty Coffee", price: "₹220", diet: "Vegan" },
-                    { id: "item_sourdough_melt", name: "Sourdough Mushroom Melt", cat: "Sandwiches", price: "₹280", diet: "Vegetarian" },
-                    { id: "item_jaggery_latte", name: "Jaggery Latte", cat: "Specialty Coffee", price: "₹190", diet: "Vegetarian" },
-                    { id: "item_croissant_butter", name: "Flaky Butter Croissant", cat: "Bakes & Treats", price: "₹140", diet: "Vegetarian" },
-                    { id: "item_masala_chai", name: "Cutting Masala Chai", cat: "Chai & Infusions", price: "₹90", diet: "Vegetarian" },
-                    { id: "item_smoothie_bowl", name: "Açaí Berry Power Bowl", cat: "Comfort Bowls", price: "₹310", diet: "Vegan" },
-                  ].map((item) => {
-                    const isSoldOut = soldOutItems[item.id] || false;
-                    return (
-                      <tr key={item.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
-                        <td className="p-3.5 font-bold text-[#241F1C] dark:text-white">{item.name}</td>
-                        <td className="p-3.5 font-mono text-[#725039] dark:text-stone-400">{item.cat}</td>
-                        <td className="p-3.5 font-serif font-bold text-[#B72E35] dark:text-[#F2C84B]">{item.price}</td>
-                        <td className="p-3.5 font-mono text-[#725039] dark:text-stone-400">{item.diet}</td>
-                        <td className="p-3.5 text-right">
-                          <button
-                            onClick={() => toggleItemStock(item.id)}
-                            className={`rounded-full px-3 py-1 font-mono text-xs font-bold transition ${
-                              isSoldOut
-                                ? "bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800"
-                                : "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800"
-                            }`}
-                          >
-                            {isSoldOut ? "SOLD OUT" : "IN STOCK"}
-                          </button>
+          const filteredMenuItems = catalogItems.filter((item) => {
+            const matchesCategory = selectedMenuCategory === "ALL" || item.category === selectedMenuCategory;
+            const q = menuSearchQuery.trim().toLowerCase();
+            const matchesQuery =
+              !q ||
+              item.name.toLowerCase().includes(q) ||
+              item.category.toLowerCase().includes(q) ||
+              item.dietary.toLowerCase().includes(q) ||
+              item.price.toLowerCase().includes(q);
+            return matchesCategory && matchesQuery;
+          });
+
+          const totalSoldOut = catalogItems.filter((item) => soldOutItems[item.id]).length;
+          const totalInStock = catalogItems.length - totalSoldOut;
+
+          return (
+            <div className="p-6 space-y-4 max-w-7xl">
+              {/* Header & Status Chips */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold font-serif text-[#241F1C] dark:text-white">
+                    Menu Items Catalog ({catalogItems.length} Artisanal Items)
+                  </h2>
+                  <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                    Toggle instant In-Stock / Sold-Out availability for live customer menus
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 font-mono text-xs">
+                  <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 px-3 py-1 font-bold">
+                    {totalInStock} In Stock
+                  </span>
+                  <span className="rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800 px-3 py-1 font-bold">
+                    {totalSoldOut} Sold Out
+                  </span>
+                </div>
+              </div>
+
+              {/* Search & Category Filter Toolbar */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {/* Category Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 max-w-full">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedMenuCategory(cat)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-mono font-bold whitespace-nowrap transition cursor-pointer ${
+                          selectedMenuCategory === cat
+                            ? "bg-[#B72E35] text-white shadow-xs"
+                            : "bg-[#FAF4EB] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="relative min-w-[240px]">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#8C6D53] dark:text-stone-500" />
+                    <input
+                      type="text"
+                      placeholder="Search 59 menu items..."
+                      value={menuSearchQuery}
+                      onChange={(e) => setMenuSearchQuery(e.target.value)}
+                      className="w-full rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 pl-9 pr-4 py-2 text-xs text-[#241F1C] dark:text-white placeholder:text-[#8C6D53] dark:placeholder:text-stone-500 focus:border-[#B72E35] focus:outline-none"
+                    />
+                    {menuSearchQuery && (
+                      <button
+                        onClick={() => setMenuSearchQuery("")}
+                        className="absolute right-3 top-2.5 text-xs text-[#8C6D53] hover:text-[#241F1C] dark:hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 59 Menu Items Table */}
+              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
+                    <tr>
+                      <th className="p-3.5">#</th>
+                      <th className="p-3.5">Item Name</th>
+                      <th className="p-3.5">Category</th>
+                      <th className="p-3.5">Target Price</th>
+                      <th className="p-3.5">Dietary</th>
+                      <th className="p-3.5 text-right">Availability Toggle</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800">
+                    {filteredMenuItems.length > 0 ? (
+                      filteredMenuItems.map((item, idx) => {
+                        const isSoldOut = soldOutItems[item.id] || false;
+                        const isVegan = item.dietary.toLowerCase().includes("vegan");
+                        const isEgg = item.dietary.toLowerCase().includes("egg");
+
+                        return (
+                          <tr key={item.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
+                            <td className="p-3.5 font-mono text-[11px] text-stone-400">
+                              {(idx + 1).toString().padStart(2, "0")}
+                            </td>
+                            <td className="p-3.5">
+                              <span className="font-bold text-[#241F1C] dark:text-white block">{item.name}</span>
+                              <span className="font-mono text-[10px] text-stone-500">{item.id}</span>
+                            </td>
+                            <td className="p-3.5 font-mono text-[#725039] dark:text-stone-400">
+                              <span className="rounded-md bg-[#EFE7DC] dark:bg-stone-800 px-2 py-0.5 text-[11px]">
+                                {item.category}
+                              </span>
+                            </td>
+                            <td className="p-3.5 font-serif font-bold text-[#B72E35] dark:text-[#F2C84B] text-sm">
+                              {item.price}
+                            </td>
+                            <td className="p-3.5">
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-[10px] font-mono font-medium ${
+                                  isVegan
+                                    ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                    : isEgg
+                                    ? "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                                    : "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-300 border border-green-300 dark:border-green-800"
+                                }`}
+                              >
+                                {item.dietary}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right">
+                              <button
+                                onClick={() => toggleItemStock(item.id)}
+                                className={`rounded-full px-3 py-1 font-mono text-xs font-bold transition cursor-pointer ${
+                                  isSoldOut
+                                    ? "bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800 shadow-xs"
+                                    : "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 shadow-xs"
+                                }`}
+                              >
+                                {isSoldOut ? "SOLD OUT" : "IN STOCK"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center font-mono text-xs text-[#725039] dark:text-stone-400">
+                          No menu items match &quot;{menuSearchQuery}&quot; in {selectedMenuCategory}
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Tab 5: CUSTOMERS & LOYALTY */}
         {activeTab === "customers" && (
@@ -833,48 +1606,163 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
 
         {/* Tab 6: STAFF & ACCESS ROLES (RBAC) */}
         {activeTab === "staff" && (
-          <div className="p-6 space-y-6 max-w-7xl">
-            <div className="flex items-center justify-between">
+          <div className="p-6 space-y-6 max-w-7xl animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold text-[#241F1C] dark:text-white">Staff Role-Based Access Control (RBAC)</h2>
-                <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
-                  Authorized portals, default PIN keys &amp; active permissions
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-[#B72E35] dark:text-[#F2C84B]" />
+                  <h2 className="text-xl font-bold text-[#241F1C] dark:text-white">Staff Role-Based Access Control (RBAC)</h2>
+                </div>
+                <p className="font-mono text-xs text-[#725039] dark:text-stone-400 mt-0.5">
+                  Authorized portals, live Quick PIN access keys &amp; credentials management
                 </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/smol-backdoor"
+                  target="_blank"
+                  className="flex items-center gap-1.5 rounded-2xl bg-[#241F1C] dark:bg-stone-800 text-white px-3.5 py-2 text-xs font-mono font-bold hover:bg-stone-800 dark:hover:bg-stone-700 transition shadow-xs"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Open Backdoor Portal</span>
+                </Link>
               </div>
             </div>
 
+            {pinFeedback && (
+              <div
+                className={`flex items-center justify-between rounded-2xl p-4 text-xs font-mono transition-all border ${
+                  pinFeedback.type === "success"
+                    ? "bg-emerald-50 text-emerald-900 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-800"
+                    : "bg-rose-50 text-rose-900 border-rose-300 dark:bg-rose-950/80 dark:text-rose-200 dark:border-rose-800"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {pinFeedback.type === "success" ? (
+                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <X className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                  )}
+                  <span>{pinFeedback.text}</span>
+                </div>
+                <button onClick={() => setPinFeedback(null)} className="text-stone-400 hover:text-stone-600">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
             <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
-                  <tr>
-                    <th className="p-3.5">Role Name</th>
-                    <th className="p-3.5">Portal Access</th>
-                    <th className="p-3.5">Quick PIN</th>
-                    <th className="p-3.5">Permissions</th>
-                    <th className="p-3.5 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
-                  {[
-                    { role: "Super Admin (Owner)", portal: "/admin", pin: "9900", perm: "Full Control, Budgets, Logs", status: "Active" },
-                    { role: "Cashier / Counter Staff", portal: "/cashier", pin: "4422", perm: "Order Verification, Cash Settlement", status: "Active" },
-                    { role: "Kitchen Display (Chef/Barista)", portal: "/kitchen", pin: "7711", perm: "Order Queue, Prep Status Transition", status: "Active" },
-                    { role: "Customer (Guest)", portal: "/menu", pin: "None (QR)", perm: "Menu Browse, Order Submit, UPI Pay", status: "Public" },
-                  ].map((s, idx) => (
-                    <tr key={idx} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
-                      <td className="p-3.5 font-bold text-[#241F1C] dark:text-white font-sans">{s.role}</td>
-                      <td className="p-3.5 text-[#B72E35] dark:text-[#F2C84B]">{s.portal}</td>
-                      <td className="p-3.5 font-black text-[#241F1C] dark:text-stone-300">{s.pin}</td>
-                      <td className="p-3.5 text-[#725039] dark:text-stone-400 font-sans">{s.perm}</td>
-                      <td className="p-3.5 text-right">
-                        <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 px-2.5 py-0.5 text-[10px] font-bold">
-                          {s.status}
-                        </span>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
+                    <tr>
+                      <th className="p-4">Role Name</th>
+                      <th className="p-4">Portal Access</th>
+                      <th className="p-4">Quick PIN</th>
+                      <th className="p-4">Permissions</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4 text-right">Quick Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
+                    {[
+                      {
+                        ...roleCredentials.admin,
+                        icon: Zap,
+                      },
+                      {
+                        ...roleCredentials.cashier,
+                        icon: CreditCard,
+                      },
+                      {
+                        ...roleCredentials.kitchen,
+                        icon: ChefHat,
+                      },
+                      {
+                        role: "guest" as const,
+                        roleName: "Customer (Guest)",
+                        portal: "/menu",
+                        pin: "None (QR)",
+                        password: "",
+                        permissions: "Menu Browse, Order Submit, UPI Pay",
+                        status: "Public",
+                        icon: Coffee,
+                      },
+                    ].map((s, idx) => {
+                      const Icon = s.icon;
+                      const isStaff = s.role === "admin" || s.role === "cashier" || s.role === "kitchen";
+
+                      return (
+                        <tr key={idx} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
+                          <td className="p-4 font-bold text-[#241F1C] dark:text-white font-sans">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-stone-800 border border-[#C9AE8B]/30 shadow-xs">
+                                <Icon className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />
+                              </div>
+                              <div>
+                                <span className="block font-bold">{s.roleName}</span>
+                                {s.role === "admin" && Boolean(s.password) && (
+                                  <span className="text-[10px] font-mono text-stone-500 font-normal">
+                                    Password: {s.password}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <Link
+                              href={s.portal}
+                              target="_blank"
+                              className="text-[#B72E35] dark:text-[#F2C84B] hover:underline font-bold flex items-center gap-1"
+                            >
+                              <span>{s.portal}</span>
+                              <ExternalLink className="h-3 w-3 opacity-60" />
+                            </Link>
+                          </td>
+                          <td className="p-4">
+                            {isStaff ? (
+                              <div className="inline-flex items-center gap-1.5 rounded-xl bg-white dark:bg-stone-800 px-3 py-1 border border-[#C9AE8B]/50 dark:border-stone-700 shadow-xs">
+                                <Key className="h-3.5 w-3.5 text-[#B72E35] dark:text-[#F2C84B]" />
+                                <span className="font-black text-sm text-[#241F1C] dark:text-white tracking-widest">
+                                  {s.pin}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-stone-500">{s.pin}</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-[#725039] dark:text-stone-400 font-sans max-w-xs">{s.permissions}</td>
+                          <td className="p-4">
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
+                                s.status === "Public"
+                                  ? "bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
+                                  : "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800"
+                              }`}
+                            >
+                              {s.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            {isStaff ? (
+                              <button
+                                onClick={() => handleOpenEditPin(s as RoleCredential)}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-1.5 text-xs font-mono font-bold text-[#725039] dark:text-stone-200 hover:bg-[#B72E35] hover:text-white dark:hover:bg-[#B72E35] hover:border-[#B72E35] transition shadow-xs cursor-pointer"
+                              >
+                                <Edit2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                <span>Edit PIN</span>
+                              </button>
+                            ) : (
+                              <span className="text-stone-400 text-[11px]">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -983,7 +1871,18 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
         {/* Tab 8: PAYMENTS LEDGER */}
         {activeTab === "payments" && (
           <div className="p-6 space-y-4 max-w-7xl">
-            <h2 className="text-xl font-bold text-[#241F1C] dark:text-white">Payments Reconciliation &amp; Settlement Log</h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-[#241F1C] dark:text-white">Payments Reconciliation &amp; Settlement Log</h2>
+                <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
+                  Verified checkout transactions and daily gross revenue audits
+                </p>
+              </div>
+              <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 px-3 py-1 text-xs font-mono font-bold">
+                Total: ₹{(overviewData?.kpis.grossRevenueRupees ?? 0).toLocaleString("en-IN")}
+              </span>
+            </div>
+
             <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
@@ -993,14 +1892,15 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
                     <th className="p-3.5">Amount</th>
                     <th className="p-3.5">Order Ref</th>
                     <th className="p-3.5">Status</th>
+                    <th className="p-3.5 text-right">Time</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
-                  {[
-                    { txn: "UPI/2026/894129841", mode: "Google Pay", amt: "₹580", ord: "ORD-9421", st: "VERIFIED" },
-                    { txn: "UPI/2026/718291048", mode: "PhonePe", amt: "₹420", ord: "ORD-9420", st: "VERIFIED" },
-                    { txn: "CSH/2026/102941", mode: "Cash Tendered", amt: "₹280", ord: "ORD-9418", st: "SETTLED" },
-                  ].map((t, idx) => (
+                  {(payments.length > 0 ? payments : [
+                    { txn: "TXN/2026/89412984", mode: "UPI Direct QR", amt: "₹580", ord: "ORD-104", st: "VERIFIED", time: "10:15 AM" },
+                    { txn: "TXN/2026/71829104", mode: "Cash Tendered", amt: "₹420", ord: "ORD-103", st: "VERIFIED", time: "10:08 AM" },
+                    { txn: "TXN/2026/10294100", mode: "UPI Direct QR", amt: "₹280", ord: "ORD-101", st: "SETTLED", time: "09:45 AM" },
+                  ]).map((t, idx) => (
                     <tr key={idx} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
                       <td className="p-3.5 font-bold text-[#241F1C] dark:text-stone-200">{t.txn}</td>
                       <td className="p-3.5 text-[#B72E35] dark:text-[#F2C84B] font-bold">{t.mode}</td>
@@ -1011,6 +1911,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
                           {t.st}
                         </span>
                       </td>
+                      <td className="p-3.5 text-right text-[#725039] dark:text-stone-400 text-[11px]">{t.time}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1112,7 +2013,9 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 space-y-1 shadow-xs transition-colors">
                 <span className="font-mono text-[9px] uppercase font-bold text-[#725039] dark:text-stone-400">AVG TICKET VALUE</span>
-                <div className="font-serif text-2xl font-bold text-[#B72E35] dark:text-[#F2C84B]">₹384.50</div>
+                <div className="font-serif text-2xl font-bold text-[#B72E35] dark:text-[#F2C84B]">
+                  ₹{overviewData?.kpis.avgOrderRupees ?? 384}
+                </div>
                 <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">+8.4% vs last week</span>
               </div>
               <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 space-y-1 shadow-xs transition-colors">
@@ -1122,7 +2025,9 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
               </div>
               <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 space-y-1 shadow-xs transition-colors">
                 <span className="font-mono text-[9px] uppercase font-bold text-[#725039] dark:text-stone-400">PEAK ORDER RATE</span>
-                <div className="font-serif text-2xl font-bold text-[#B72E35]">26 tickets/hr</div>
+                <div className="font-serif text-2xl font-bold text-[#B72E35]">
+                  {Math.max(...(overviewData?.hourlyTrend || []).map((b) => b.orders), 1)} tickets/hr
+                </div>
                 <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400">4:00 PM – 6:00 PM</span>
               </div>
               <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 space-y-1 shadow-xs transition-colors">
@@ -1133,145 +2038,354 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
             </div>
 
             {/* Analytics Charts Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Chart 1: Orders Over Time */}
-              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-xs space-y-3 transition-colors">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Orders Over Time</h3>
-                  <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 px-2.5 py-0.5 text-xs font-mono text-[#B72E35] dark:text-[#F2C84B]">
-                    Peak: 5PM (26 Orders)
-                  </span>
-                </div>
-                <div className="h-44 w-full flex items-end justify-between gap-1.5 pt-4 pb-2 border-b border-[#C9AE8B]/30 dark:border-stone-800">
-                  {[
-                    { hour: "8a", orders: 4 }, { hour: "9a", orders: 7 }, { hour: "10a", orders: 12 },
-                    { hour: "11a", orders: 9 }, { hour: "12p", orders: 15 }, { hour: "1p", orders: 18 },
-                    { hour: "2p", orders: 11 }, { hour: "3p", orders: 8 }, { hour: "4p", orders: 22 },
-                    { hour: "5p", orders: 26 }, { hour: "6p", orders: 21 }, { hour: "7p", orders: 16 },
-                    { hour: "8p", orders: 19 }, { hour: "9p", orders: 10 },
-                  ].map((bar, i) => {
-                    const heightPercent = Math.round((bar.orders / 28) * 100);
-                    return (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-                        <div
-                          className="w-full rounded-t-md bg-[#B72E35] group-hover:bg-[#D97706] dark:group-hover:bg-[#F2C84B] transition-all"
-                          style={{ height: `${heightPercent}%` }}
-                        />
-                        <span className="text-[9px] font-mono text-[#725039] dark:text-stone-500">{bar.hour}</span>
+            {(() => {
+              const tfData = getTimeframeData();
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Chart 1: Orders Over Time (3D Isometric Purple Cylindrical Column Bar Chart matching Reference Design) */}
+                  <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#151110] p-5 shadow-xs space-y-3 transition-colors">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white flex items-center gap-2">
+                          Orders Over Time
+                          <span className="h-2 w-2 rounded-full bg-[#A855F7] animate-pulse" />
+                        </h3>
+                        <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                          {tfData.subtitleOrders}
+                        </p>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Chart 2: Revenue Trend */}
-              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-xs space-y-3 transition-colors">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Revenue Trajectory</h3>
-                  <span className="font-mono text-xs text-[#319795] dark:text-[#75AFA7]">Cumulative: ₹18,450</span>
-                </div>
-                <div className="h-44 w-full flex items-center justify-center p-2">
-                  <svg className="h-full w-full overflow-visible" viewBox="0 0 300 100">
-                    <polyline
-                      fill="none"
-                      stroke="#319795"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      points="0,95 30,85 60,78 90,65 120,58 150,44 180,40 210,25 240,18 270,12 300,5"
-                    />
-                    <polygon
-                      fill="#319795"
-                      fillOpacity="0.15"
-                      points="0,95 30,85 60,78 90,65 120,58 150,44 180,40 210,25 240,18 270,12 300,5 300,100 0,100"
-                    />
-                  </svg>
-                </div>
-                <div className="flex justify-between text-[10px] font-mono text-[#725039] dark:text-stone-500 pt-1 border-t border-[#C9AE8B]/30 dark:border-stone-800">
-                  <span>8:00 AM</span>
-                  <span>2:00 PM</span>
-                  <span>10:00 PM</span>
-                </div>
-              </div>
-
-              {/* Chart 3: Best-Selling Items */}
-              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-xs space-y-3 transition-colors">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Best-Selling Items</h3>
-                  <span className="font-mono text-xs text-[#8C6D53] dark:text-[#C9AE8B]">Top 5 Menu Items</span>
-                </div>
-                <div className="space-y-2.5 pt-2">
-                  {[
-                    { name: "Artisanal Flat White", qty: 32, rev: "₹7,040", pct: 85, color: "#B72E35" },
-                    { name: "Sourdough Mushroom Melt", qty: 24, rev: "₹7,680", pct: 68, color: "#D97706" },
-                    { name: "Single Origin Pour Over", qty: 19, rev: "₹4,180", pct: 54, color: "#319795" },
-                    { name: "Fresh Cinnamon Almond Bun", qty: 18, rev: "₹3,240", pct: 50, color: "#8C6D53" },
-                    { name: "Masala Chai Pot", qty: 15, rev: "₹2,100", pct: 40, color: "#754CFF" },
-                  ].map((item, i) => (
-                    <div key={i} className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="font-medium text-[#241F1C] dark:text-stone-200">{item.name}</span>
-                        <span className="font-mono text-[#725039] dark:text-stone-400">{item.qty} sold · {item.rev}</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-[#EBDDC8] dark:bg-stone-800 overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${item.pct}%`, backgroundColor: item.color }} />
-                      </div>
+                      <span className="rounded-full bg-[#A855F7]/15 dark:bg-[#A855F7]/25 border border-[#A855F7]/40 px-3 py-1 text-xs font-mono font-bold text-[#754CFF] dark:text-[#C4B5FD]">
+                        {tfData.badgeOrders}
+                      </span>
                     </div>
+
+                    {/* SVG 3D Isometric Cylinder Canvas */}
+                    <div className="relative h-48 w-full pt-1">
+                      <svg
+                        className="w-full h-full overflow-visible"
+                        viewBox="0 0 520 180"
+                        preserveAspectRatio="none"
+                      >
+                        <defs>
+                          {/* 3D Top Cap Highlight Gradient */}
+                          <linearGradient id="isoCapGradAnalytics" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#EDE9FE" />
+                            <stop offset="50%" stopColor="#DDD6FE" />
+                            <stop offset="100%" stopColor="#C4B5FD" />
+                          </linearGradient>
+
+                          {/* 3D Lit Left Face Gradient */}
+                          <linearGradient id="isoLeftGradAnalytics" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#C084FC" />
+                            <stop offset="100%" stopColor="#A855F7" />
+                          </linearGradient>
+
+                          {/* 3D Shadow Right Face Gradient */}
+                          <linearGradient id="isoRightGradAnalytics" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#9333EA" />
+                            <stop offset="100%" stopColor="#7E22CE" />
+                          </linearGradient>
+
+                          {/* 3D Column Hover Glow Filter */}
+                          <filter id="isoGlowAnalytics" x="-20%" y="-20%" width="140%" height="140%">
+                            <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#A855F7" floodOpacity="0.45" />
+                          </filter>
+                        </defs>
+
+                        {/* Horizontal Dashed Grid Guidelines */}
+                        <line x1="10" y1="35" x2="515" y2="35" stroke="#C9AE8B" strokeOpacity="0.2" strokeDasharray="4 4" />
+                        <line x1="10" y1="75" x2="515" y2="75" stroke="#C9AE8B" strokeOpacity="0.2" strokeDasharray="4 4" />
+                        <line x1="10" y1="115" x2="515" y2="115" stroke="#C9AE8B" strokeOpacity="0.2" strokeDasharray="4 4" />
+                        <line x1="10" y1="155" x2="515" y2="155" stroke="#C9AE8B" strokeOpacity="0.3" />
+
+                        {(() => {
+                          const maxOrders = Math.max(...tfData.buckets.map((b) => b.orders), 1);
+                          const baseY = 155;
+                          const maxH = 125;
+                          const w = Math.min(tfData.capsuleWidth * 1.25, 32);
+
+                          return tfData.buckets.map((bar, i) => {
+                            const cx = tfData.startX + i * tfData.stepX;
+                            const norm = bar.orders > 0 ? bar.orders / maxOrders : 0;
+                            const h = bar.orders > 0 ? Math.max(22, Math.round(norm * maxH)) : 10;
+                            const topY = baseY - h;
+                            const halfW = w / 2;
+
+                            return (
+                              <g key={i} className="group cursor-pointer">
+                                {/* Vertical Guideline behind column */}
+                                <line
+                                  x1={cx}
+                                  y1="25"
+                                  x2={cx}
+                                  y2="155"
+                                  stroke="#C9AE8B"
+                                  strokeOpacity="0.12"
+                                  strokeDasharray="2 2"
+                                />
+
+                                {/* 3D Isometric Column Group */}
+                                <g
+                                  filter="url(#isoGlowAnalytics)"
+                                  className="transition-all duration-300 group-hover:brightness-110 group-hover:-translate-y-1 origin-bottom"
+                                >
+                                  {/* 1. Left Lit Face of 3D Cylinder */}
+                                  <path
+                                    d={`M ${cx - halfW},${topY} 
+                                       C ${cx - halfW * 0.4},${topY + 6} ${cx},${topY + 6} ${cx},${topY + 6} 
+                                       L ${cx},${baseY} 
+                                       C ${cx},${baseY} ${cx - halfW * 0.4},${baseY} ${cx - halfW},${baseY} 
+                                       Z`}
+                                    fill="url(#isoLeftGradAnalytics)"
+                                  />
+
+                                  {/* 2. Right Shadow Face of 3D Cylinder */}
+                                  <path
+                                    d={`M ${cx},${topY + 6} 
+                                       C ${cx + halfW * 0.4},${topY + 6} ${cx + halfW},${topY} ${cx + halfW},${topY} 
+                                       L ${cx + halfW},${baseY} 
+                                       C ${cx + halfW * 0.4},${baseY + 4} ${cx},${baseY + 4} ${cx},${baseY} 
+                                       Z`}
+                                    fill="url(#isoRightGradAnalytics)"
+                                  />
+
+                                  {/* 3. Bottom Curved Base Bevel */}
+                                  <path
+                                    d={`M ${cx - halfW},${baseY} 
+                                       C ${cx - halfW * 0.3},${baseY + 4} ${cx + halfW * 0.3},${baseY + 4} ${cx + halfW},${baseY} 
+                                       C ${cx + halfW * 0.3},${baseY + 1} ${cx - halfW * 0.3},${baseY + 1} ${cx - halfW},${baseY} 
+                                       Z`}
+                                    fill="#7E22CE"
+                                    opacity="0.7"
+                                  />
+
+                                  {/* 4. Top Isometric Curved Dome Cap */}
+                                  <path
+                                    d={`M ${cx - halfW},${topY} 
+                                       C ${cx - halfW * 0.3},${topY - 7} ${cx + halfW * 0.3},${topY - 7} ${cx + halfW},${topY} 
+                                       C ${cx + halfW * 0.3},${topY + 7} ${cx - halfW * 0.3},${topY + 7} ${cx - halfW},${topY} 
+                                       Z`}
+                                    fill="url(#isoCapGradAnalytics)"
+                                    stroke="#C4B5FD"
+                                    strokeWidth="0.75"
+                                  />
+                                </g>
+
+                                {/* Order Count Label directly on Top */}
+                                <text
+                                  x={cx}
+                                  y={topY - 11}
+                                  textAnchor="middle"
+                                  className="text-[10px] sm:text-[11px] font-mono font-bold fill-[#754CFF] dark:fill-[#DDD6FE] select-none group-hover:scale-110 transition-transform"
+                                >
+                                  {bar.orders}
+                                </text>
+
+                                {/* Hover Tooltip */}
+                                <title>{`${bar.hour}: ${bar.orders} orders`}</title>
+                              </g>
+                            );
+                          });
+                        })()}
+                      </svg>
+                    </div>
+
+                    <div className="flex justify-between pl-4 pr-3 font-mono text-[10px] text-[#725039] dark:text-stone-400 pt-1.5 border-t border-[#C9AE8B]/20 dark:border-stone-800 select-none">
+                      {tfData.buckets.map((b) => (
+                        <span key={b.hour}>{b.hour}</span>
+                      ))}
+                    </div>
+                  </div>
+
+              {/* Chart 2: Revenue Wave Trajectory (Organic Spline Wave) */}
+              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#151110] p-5 shadow-xs space-y-3 transition-colors">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white flex items-center gap-2">
+                      Revenue Trajectory
+                      <span className="h-2 w-2 rounded-full bg-[#754CFF] animate-pulse" />
+                    </h3>
+                    <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                      {tfData.subtitleRevenue}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-[#754CFF]/15 dark:bg-[#754CFF]/25 border border-[#754CFF]/40 px-3 py-1 text-xs font-mono font-bold text-[#754CFF] dark:text-[#C4B5FD]">
+                      {tfData.badgeRevenue}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Spline Wave Canvas with Left Y-Axis */}
+                <div className="relative h-48 w-full flex pt-3">
+                  <div className="flex flex-col justify-between pr-2.5 py-1 text-[10px] font-mono text-[#8C6D53] dark:text-stone-400 select-none shrink-0 border-r border-[#C9AE8B]/30 dark:border-stone-800/80">
+                    {tfData.yAxisLabels.map((lbl, idx) => (
+                      <span key={idx}>{lbl}</span>
+                    ))}
+                  </div>
+
+                  <div className="relative flex-1 h-full pl-2">
+                    <svg className="w-full h-full overflow-visible" viewBox="0 0 520 130" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="purpleWaveGradAnalytics" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#754CFF" stopOpacity="0.55" />
+                          <stop offset="40%" stopColor="#8B5CF6" stopOpacity="0.30" />
+                          <stop offset="100%" stopColor="#151110" stopOpacity="0.0" />
+                        </linearGradient>
+                        <filter id="purpleGlowAnalytics" x="-10%" y="-10%" width="120%" height="120%">
+                          <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#754CFF" floodOpacity="0.4" />
+                        </filter>
+                      </defs>
+
+                      <line x1="0" y1="10" x2="520" y2="10" stroke="#C9AE8B" strokeOpacity="0.15" strokeDasharray="3 3" />
+                      <line x1="0" y1="50" x2="520" y2="50" stroke="#C9AE8B" strokeOpacity="0.15" strokeDasharray="3 3" />
+                      <line x1="0" y1="90" x2="520" y2="90" stroke="#C9AE8B" strokeOpacity="0.15" strokeDasharray="3 3" />
+                      <line x1="0" y1="125" x2="520" y2="125" stroke="#C9AE8B" strokeOpacity="0.25" />
+
+                      {/* Golden Yellow Dashed Baseline */}
+                      <path
+                        d={tfData.curveYellow}
+                        fill="none"
+                        stroke="#F2C84B"
+                        strokeWidth="2"
+                        strokeDasharray="5 4"
+                        strokeLinecap="round"
+                        className="opacity-90 dark:opacity-95"
+                      />
+
+                      {/* Electric Purple Area */}
+                      <path
+                        d={`${tfData.curvePurple} L 520,130 L 0,130 Z`}
+                        fill="url(#purpleWaveGradAnalytics)"
+                      />
+
+                      {/* Electric Purple Stroke */}
+                      <path
+                        d={tfData.curvePurple}
+                        fill="none"
+                        stroke="#A855F7"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        filter="url(#purpleGlowAnalytics)"
+                      />
+
+                      <circle cx={tfData.peakX} cy={tfData.peakY} r="5" fill="#754CFF" stroke="#FFFFFF" strokeWidth="2.5" className="animate-pulse" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="flex justify-between pl-8 pr-1 font-mono text-[10px] text-[#725039] dark:text-stone-400 pt-0.5 border-t border-[#C9AE8B]/20 dark:border-stone-800">
+                  {tfData.xAxisLabels.map((lbl, idx) => (
+                    <span key={idx}>{lbl}</span>
                   ))}
                 </div>
               </div>
 
-              {/* Chart 4: Table Utilization & Payment Methods */}
-              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-xs space-y-4 transition-colors">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Table Utilization</h3>
-                    <span className="font-mono text-xs text-[#B72E35] dark:text-[#F2C84B]">5 / 12 Active (42%)</span>
-                  </div>
-                  <div className="grid grid-cols-6 gap-2 pt-1">
-                    {Array.from({ length: 12 }, (_, i) => {
-                      const tableNum = (i + 1).toString().padStart(2, "0");
-                      const isOccupied = [1, 2, 4, 7, 10].includes(i + 1);
+              {/* Chart 3: Best-Selling Items (Real customer order aggregate) */}
+              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-xs space-y-3 transition-colors">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Best-Selling Items</h3>
+                  <span className="font-mono text-xs text-[#8C6D53] dark:text-[#C9AE8B]">Live Customer Tally</span>
+                </div>
+                <div className="space-y-2.5 pt-2">
+                  {(overviewData?.bestSellers || []).length > 0 ? (
+                    (overviewData?.bestSellers || []).slice(0, 5).map((item, i) => {
+                      const colors = ["#B72E35", "#D97706", "#319795", "#8C6D53", "#754CFF"];
                       return (
-                        <div
-                          key={tableNum}
-                          className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center font-mono text-xs ${
-                            isOccupied
-                              ? "border-[#B72E35] bg-[#B72E35]/10 dark:bg-[#B72E35]/20 text-[#B72E35] dark:text-[#F2C84B] font-bold"
-                              : "border-[#C9AE8B]/30 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 text-[#725039] dark:text-stone-500"
-                          }`}
-                        >
-                          <span className="font-bold">T{tableNum}</span>
-                          <span className="text-[9px]">{isOccupied ? "Busy" : "Free"}</span>
+                        <div key={i} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-medium text-[#241F1C] dark:text-stone-200">{item.name}</span>
+                            <span className="font-mono text-[#725039] dark:text-stone-400">{item.sales} sold · {item.rev}</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-[#EBDDC8] dark:bg-stone-800 overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.pct}%`, backgroundColor: colors[i % colors.length] }} />
+                          </div>
                         </div>
                       );
-                    })}
-                  </div>
+                    })
+                  ) : (
+                    <div className="py-6 text-center text-xs font-mono text-[#725039] dark:text-stone-400">
+                      No customer items sold yet
+                    </div>
+                  )}
                 </div>
+              </div>
+
+              {/* Chart 4: Table Utilization & Payment Methods (Live customer state) */}
+              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-xs space-y-4 transition-colors">
+                {(() => {
+                  const activeTableCount = Array.from({ length: 12 }).filter((_, i) => {
+                    const tableNum = (i + 1).toString().padStart(2, "0");
+                    return orders.some(
+                      (o) => o.tableLabel === tableNum && o.status !== "COMPLETED" && o.status !== "CANCELLED" && o.status !== "REJECTED"
+                    );
+                  }).length;
+
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Table Utilization</h3>
+                        <span className="font-mono text-xs text-[#B72E35] dark:text-[#F2C84B]">
+                          {activeTableCount} / 12 Active ({Math.round((activeTableCount / 12) * 100)}%)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-6 gap-2 pt-1">
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const tableNum = (i + 1).toString().padStart(2, "0");
+                          const isOccupied = orders.some(
+                            (o) => o.tableLabel === tableNum && o.status !== "COMPLETED" && o.status !== "CANCELLED" && o.status !== "REJECTED"
+                          );
+                          return (
+                            <div
+                              key={tableNum}
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center font-mono text-xs ${
+                                isOccupied
+                                  ? "border-[#B72E35] bg-[#B72E35]/10 dark:bg-[#B72E35]/20 text-[#B72E35] dark:text-[#F2C84B] font-bold"
+                                  : "border-[#C9AE8B]/30 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 text-[#725039] dark:text-stone-500"
+                              }`}
+                            >
+                              <span className="font-bold">T{tableNum}</span>
+                              <span className="text-[9px]">{isOccupied ? "Busy" : "Free"}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="border-t border-[#C9AE8B]/30 dark:border-stone-800 pt-3">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">Payment Methods</h3>
-                    <span className="font-mono text-xs text-[#319795] dark:text-[#75AFA7]">UPI Dominant</span>
+                    <span className="font-mono text-xs text-[#319795] dark:text-[#75AFA7]">
+                      {overviewData?.paymentSplit?.[0]?.mode || "UPI Direct QR"} Dominant
+                    </span>
                   </div>
                   <div className="flex h-3 w-full rounded-full overflow-hidden">
-                    <div className="bg-[#B72E35]" style={{ width: "68%" }} title="UPI (68%)" />
-                    <div className="bg-[#D97706] dark:bg-[#F2C84B]" style={{ width: "18%" }} title="QR Scan (18%)" />
-                    <div className="bg-[#319795] dark:bg-[#75AFA7]" style={{ width: "10%" }} title="Card/GPay (10%)" />
-                    <div className="bg-[#8C6D53] dark:bg-stone-600" style={{ width: "4%" }} title="Cash (4%)" />
+                    {(overviewData?.paymentSplit || []).map((ps, idx) => (
+                      <div
+                        key={idx}
+                        style={{ width: ps.pct, backgroundColor: ps.color }}
+                        title={`${ps.mode} (${ps.pct})`}
+                      />
+                    ))}
                   </div>
-                  <div className="flex items-center justify-between text-[10px] font-mono text-[#725039] dark:text-stone-400 mt-2">
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#B72E35]" /> UPI 68%</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#D97706] dark:bg-[#F2C84B]" /> QR 18%</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#319795] dark:bg-[#75AFA7]" /> Cards 10%</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#8C6D53] dark:bg-stone-600" /> Cash 4%</span>
+                  <div className="flex flex-wrap items-center justify-between text-[10px] font-mono text-[#725039] dark:text-stone-400 mt-2 gap-1">
+                    {(overviewData?.paymentSplit || []).map((ps, idx) => (
+                      <span key={idx} className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ps.color }} />
+                        {ps.mode} {ps.pct}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </main>
+          );
+        })()}
+        </div>
+      )}
+    </main>
 
       {/* Floating Glassmorphic 3D Mobile Bottom Navbar (Thin & Adaptive) */}
       <div className="fixed bottom-2.5 inset-x-2 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-xl z-40 md:hidden pointer-events-none">
@@ -1339,12 +2453,147 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = () => {
         </div>
       </div>
 
-      {/* JSON Table Tag Inspector Modal */}
-      {inspectingTag && (
-        <JsonTagInspectorModal
+      {/* Order & POS Details Inspector Modal */}
+      {(inspectingOrder || inspectingTag) && (
+        <OrderDetailsInspectorModal
+          order={inspectingOrder}
           tag={inspectingTag}
-          onClose={() => setInspectingTag(null)}
+          onClose={() => {
+            setInspectingOrder(null);
+            setInspectingTag(null);
+          }}
+          onUpdateStatus={handleStatusChange}
         />
+      )}
+
+      {/* Role PIN / Password Edit Modal */}
+      {editingRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="relative w-full max-w-md rounded-3xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1A1715] p-6 shadow-2xl space-y-5">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#B72E35]/15 text-[#B72E35]">
+                  <Key className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-[#241F1C] dark:text-white">
+                    Edit Quick PIN
+                  </h3>
+                  <p className="text-[11px] font-mono text-[#725039] dark:text-stone-400">
+                    {editingRole.roleName} ({editingRole.portal})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingRole(null)}
+                className="text-stone-400 hover:text-stone-600 dark:hover:text-white p-1 rounded-xl"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRolePin} className="space-y-4">
+              {/* Quick PIN Input */}
+              <div>
+                <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1.5 flex items-center justify-between">
+                  <span>Quick Access PIN (4-6 Digits)</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPinMask(!showPinMask)}
+                    className="text-[11px] font-mono text-[#B72E35] flex items-center gap-1 hover:underline"
+                  >
+                    {showPinMask ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    <span>{showPinMask ? "Hide" : "Show"}</span>
+                  </button>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPinMask ? "text" : "password"}
+                    required
+                    maxLength={10}
+                    value={editPinValue}
+                    onChange={(e) => setEditPinValue(e.target.value)}
+                    placeholder="e.g. 9900, 4422, 1234"
+                    className="w-full rounded-2xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-white dark:bg-stone-900 px-4 py-3 text-lg font-mono font-bold tracking-widest text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35] shadow-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Preset Quick Chips */}
+              <div>
+                <span className="block text-[10.5px] font-mono text-stone-500 mb-1.5">
+                  Quick PIN Suggestions:
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {["0000", "1234", "4422", "7711", "9900", "8888"].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setEditPinValue(preset)}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border transition ${
+                        editPinValue === preset
+                          ? "bg-[#B72E35] text-white border-[#B72E35]"
+                          : "bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3]"
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Master Password Input for Super Admin */}
+              {editingRole.role === "admin" && (
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1.5">
+                    Master Password (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editPasswordValue}
+                    onChange={(e) => setEditPasswordValue(e.target.value)}
+                    placeholder="e.g. smol2026"
+                    className="w-full rounded-2xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-white dark:bg-stone-900 px-4 py-2.5 text-sm font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35] shadow-xs"
+                  />
+                  <p className="text-[10px] font-mono text-stone-500 mt-1">
+                    Allows logging into the Owner Control Tower with alphanumeric password.
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-3 border-t border-[#C9AE8B]/30 dark:border-stone-800">
+                <button
+                  type="button"
+                  onClick={() => handleResetRolePin(editingRole.role)}
+                  className="flex items-center gap-1 text-xs font-mono text-stone-500 hover:text-[#B72E35] transition"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Reset to Default</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingRole(null)}
+                    className="rounded-xl px-4 py-2 text-xs font-mono text-stone-600 dark:text-stone-400 hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={pinUpdating}
+                    className="flex items-center gap-1.5 rounded-xl bg-[#B72E35] hover:bg-[#9B252B] px-5 py-2 text-xs font-mono font-bold text-white shadow-md transition disabled:opacity-50"
+                  >
+                    {pinUpdating ? "Saving..." : "Save New PIN"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

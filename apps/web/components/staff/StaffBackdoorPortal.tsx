@@ -1,59 +1,95 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { staffBackdoorLoginAction } from "@/app/smol-backdoor/actions";
-import { ChefHat, CreditCard, Zap, AlertTriangle } from "lucide-react";
+import {
+  staffBackdoorLoginAction,
+  getRoleCredentialsAction,
+} from "@/app/smol-backdoor/actions";
+import { AlertTriangle, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 
 export const StaffBackdoorPortal: React.FC = () => {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<"kitchen" | "cashier" | "admin">("cashier");
   const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [livePins, setLivePins] = useState<{ kitchen: string; cashier: string; admin: string }>({
+    kitchen: "7711",
+    cashier: "4422",
+    admin: "9900",
+  });
+
+  useEffect(() => {
+    getRoleCredentialsAction()
+      .then((res) => {
+        if (res.success && res.credentials) {
+          setLivePins({
+            kitchen: res.credentials.kitchen.pin,
+            cashier: res.credentials.cashier.pin,
+            admin: res.credentials.admin.pin,
+          });
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const roles = [
     {
       id: "kitchen" as const,
       name: "Kitchen KDS",
-      icon: ChefHat,
-      tagline: "Live confirmed ticket queue & brewing timer",
-      defaultPin: "7711",
-      accent: "#F2C84B",
+      lightLogo: "/kitchen-logo.png",
+      darkLogo: "/kitchen-logo-dark.png",
+      tagline: "Live confirmed ticket queue & prep timer",
+      defaultPin: livePins.kitchen || "7711",
+      accentColor: "text-amber-600 dark:text-[#F2C84B]",
+      badgeBg: "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800",
       destination: "/smol-backdoor/kitchen",
     },
     {
       id: "cashier" as const,
       name: "Cashier Desk",
-      icon: CreditCard,
+      lightLogo: "/cashier-logo.png",
+      darkLogo: "/cashier-logo-dark.png",
       tagline: "Order verification queue & table cash settlement",
-      defaultPin: "4422",
-      accent: "#B72E35",
+      defaultPin: livePins.cashier || "4422",
+      accentColor: "text-[#B72E35] dark:text-[#FF6B6B]",
+      badgeBg: "bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800",
       destination: "/smol-backdoor/cashier",
     },
     {
       id: "admin" as const,
       name: "Admin Control",
-      icon: Zap,
-      tagline: "Master café management, chalkboard & observability",
-      defaultPin: "9900",
-      accent: "#754CFF",
+      lightLogo: "/admin-logo.png",
+      darkLogo: "/admin-logo-dark.png",
+      tagline: "Master café management, analytics & floor radar",
+      defaultPin: livePins.admin || "9900",
+      accentColor: "text-[#754CFF] dark:text-[#C4B5FD]",
+      badgeBg: "bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800",
       destination: "/smol-backdoor/admin",
     },
   ];
 
   const handleQuickLogin = async (role: "kitchen" | "cashier" | "admin", customPin?: string) => {
+    // Require explicit PIN — no empty or default fallback allowed
+    const activePin = customPin ?? pin;
+
+    if (!activePin || activePin.trim().length === 0) {
+      setErrorMessage("Please enter your station PIN to continue.");
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage(null);
-
-    const defaultRolePin = roles.find((r) => r.id === role)?.defaultPin;
-    const activePin = customPin || pin || defaultRolePin;
 
     try {
       const res = await staffBackdoorLoginAction({
         role,
-        pin: activePin,
+        pin: activePin.trim(),
       });
 
       if (res.success && res.redirectTo) {
@@ -71,38 +107,54 @@ export const StaffBackdoorPortal: React.FC = () => {
   const currentRoleConfig = roles.find((r) => r.id === selectedRole)!;
 
   return (
-    <div className="min-h-screen bg-[#241F1C] text-[#F3E7D3] font-sans flex flex-col justify-between p-4 sm:p-6">
+    <div className="min-h-screen bg-[#FAF4EB] dark:bg-[#171412] text-[#241F1C] dark:text-[#F3E7D3] font-sans flex flex-col justify-between p-4 sm:p-6 transition-colors duration-200">
       {/* Top Header */}
-      <header className="mx-auto flex w-full max-w-lg items-center justify-between py-4 border-b border-[#3D3530]">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#B72E35] text-white font-serif font-bold text-lg shadow-md">
-            s
+      <header className="mx-auto flex w-full max-w-lg items-center justify-between py-4 border-b border-[#C9AE8B]/40 dark:border-stone-800">
+        <div className="flex items-center gap-3.5">
+          <div className="relative flex items-center justify-center shrink-0">
+            {/* Light Mode Logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/backdoor_logo_light.png"
+              alt="smol backdoor"
+              className="h-16 sm:h-20 w-auto object-contain dark:hidden transition-transform duration-300 hover:scale-105 drop-shadow-xs"
+            />
+            {/* Night / Dark Mode Logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/backdoor_logo_dark.png"
+              alt="smol backdoor"
+              className="h-16 sm:h-20 w-auto object-contain hidden dark:block transition-transform duration-300 hover:scale-105 drop-shadow-xs"
+            />
           </div>
           <div>
-            <h1 className="font-serif text-xl font-bold tracking-tight text-white lowercase">
+            <h1 className="font-serif text-2xl font-bold tracking-tight text-[#241F1C] dark:text-white lowercase">
               smol backdoor
             </h1>
-            <p className="font-mono text-[10px] font-medium text-[#C9AE8B]">
+            <p className="font-mono text-xs font-medium text-[#725039] dark:text-[#C9AE8B]">
               staff authorization &amp; role portal
             </p>
           </div>
         </div>
 
-        <Link
-          href="/smol-menu"
-          className="rounded-full border border-[#C9AE8B]/40 bg-[#3D3530] px-3.5 py-1 text-xs font-serif text-[#F3E7D3] hover:bg-[#4A423A] transition active:scale-95"
-        >
-          Customer Menu →
-        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          <ThemeToggle variant="pill" />
+          <Link
+            href="/"
+            className="rounded-full border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-800 px-3.5 py-1.5 text-xs font-serif font-bold text-[#725039] dark:text-[#F3E7D3] hover:bg-[#F3E7D3] dark:hover:bg-stone-700 transition active:scale-95 shadow-xs"
+          >
+            OUT →
+          </Link>
+        </div>
       </header>
 
-      {/* Main Role Selection & Keypad */}
-      <main className="mx-auto my-auto w-full max-w-lg space-y-6 py-6">
-        {/* Role Selector Tabs */}
-        <div className="grid grid-cols-3 gap-2 rounded-2xl border border-[#3D3530] bg-[#1A1715] p-1.5">
+      {/* Main Role Selection & Keypad Card */}
+      <main className="mx-auto my-auto w-full max-w-lg space-y-5 py-6">
+        {/* Role Selector 3-Column Tabs */}
+        <div className="grid grid-cols-3 gap-2.5 rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3]/60 dark:bg-[#1F1B18] p-2 shadow-xs">
           {roles.map((r) => {
             const isSelected = selectedRole === r.id;
-            const IconComp = r.icon;
+
             return (
               <button
                 key={r.id}
@@ -112,109 +164,136 @@ export const StaffBackdoorPortal: React.FC = () => {
                   setPin("");
                   setErrorMessage(null);
                 }}
-                className={`flex flex-col items-center justify-center rounded-xl py-3 px-2 text-center transition-all ${
+                className={`flex flex-col items-center justify-center rounded-2xl py-3 px-2 text-center transition-all duration-300 cursor-pointer ${
                   isSelected
-                    ? "bg-[#2E2824] shadow-md border border-[#C9AE8B]/30"
-                    : "opacity-60 hover:opacity-100"
+                    ? "bg-white dark:bg-[#2B2521] shadow-md border-2 border-[#B72E35] dark:border-[#C9AE8B]/70 scale-[1.04]"
+                    : "bg-transparent hover:bg-white/50 dark:hover:bg-white/5 opacity-60 hover:opacity-90"
                 }`}
               >
-                <IconComp className="h-6 w-6 mb-1 text-[#F2C84B]" />
-                <span className="font-serif text-xs font-bold text-white line-clamp-1">{r.name}</span>
+                <div
+                  className={`relative flex items-center justify-center rounded-2xl mb-2 transition-all duration-300 p-2 ${
+                    isSelected
+                      ? "h-24 w-24 bg-[#FAF4EB] dark:bg-stone-800 shadow-xs"
+                      : "h-14 w-14 bg-black/5 dark:bg-white/5"
+                  }`}
+                >
+                  <Image
+                    src={r.lightLogo}
+                    alt={r.name}
+                    width={80}
+                    height={80}
+                    className={`object-contain w-auto dark:hidden transition-all duration-300 ${isSelected ? "h-20" : "h-11"}`}
+                  />
+                  <Image
+                    src={r.darkLogo}
+                    alt={r.name}
+                    width={80}
+                    height={80}
+                    className={`object-contain w-auto hidden dark:block transition-all duration-300 ${isSelected ? "h-20" : "h-11"}`}
+                  />
+                </div>
+                <span
+                  className={`font-serif font-bold line-clamp-1 transition-all duration-300 ${
+                    isSelected
+                      ? "text-sm text-[#241F1C] dark:text-white"
+                      : "text-xs text-[#725039] dark:text-stone-400"
+                  }`}
+                >
+                  {r.name}
+                </span>
               </button>
             );
           })}
         </div>
 
-        {/* Selected Station Card */}
-        <div className="rounded-3xl border border-[#C9AE8B]/30 bg-[#1A1715] p-6 shadow-xl space-y-5">
+        {/* Selected Station Card (Warm Artisanal Container) */}
+        <div className="rounded-3xl border border-[#C9AE8B]/50 dark:border-stone-800 bg-white dark:bg-[#1E1A17] p-6 sm:p-7 shadow-xl space-y-5 transition-colors">
           <div className="flex items-start justify-between">
             <div>
-              <span className="inline-block rounded-md bg-[#2E2824] px-2.5 py-0.5 font-mono text-[10px] uppercase font-bold text-[#F2C84B] tracking-wider">
+              <span
+                className={`inline-block rounded-full px-3 py-0.5 font-mono text-[10px] uppercase font-bold tracking-wider border ${currentRoleConfig.badgeBg}`}
+              >
                 STATION AUTHORIZATION
               </span>
-              <h2 className="font-serif text-2xl font-bold text-white mt-1">
+              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#241F1C] dark:text-white mt-1.5">
                 {currentRoleConfig.name}
               </h2>
-              <p className="font-serif italic text-xs text-[#C9AE8B] mt-0.5">
+              <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] mt-0.5">
                 {currentRoleConfig.tagline}
               </p>
             </div>
-            <currentRoleConfig.icon className="h-8 w-8 text-[#C9AE8B]" />
+            <div className="relative flex h-28 w-28 items-center justify-center rounded-3xl bg-[#FAF4EB] dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-md p-3">
+              <Image
+                src={currentRoleConfig.lightLogo}
+                alt={currentRoleConfig.name}
+                width={88}
+                height={88}
+                className="object-contain h-20 w-auto dark:hidden"
+              />
+              <Image
+                src={currentRoleConfig.darkLogo}
+                alt={currentRoleConfig.name}
+                width={88}
+                height={88}
+                className="object-contain h-20 w-auto hidden dark:block"
+              />
+            </div>
           </div>
 
           {errorMessage && (
-            <div className="flex items-center gap-2 rounded-2xl border border-rose-900/60 bg-rose-950/40 p-3 text-xs text-rose-300 font-serif">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
+            <div className="flex items-center gap-2 rounded-2xl border border-rose-300 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 p-3.5 text-xs text-rose-900 dark:text-rose-300 font-serif animate-fade-in">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          {/* Quick PIN Input / Display */}
+          {/* Quick PIN Input Box */}
           <div className="space-y-2">
-            <label className="block text-xs font-mono text-[#C9AE8B]">
-              Enter Station PIN (Default: {currentRoleConfig.defaultPin})
-            </label>
-            <div className="flex gap-2">
+            <div className="flex items-center justify-between text-xs font-mono font-bold text-[#725039] dark:text-[#C9AE8B]">
+              <span>Enter Station PIN</span>
+              <button
+                type="button"
+                onClick={() => setShowPin(!showPin)}
+                className="text-[11px] text-[#B72E35] flex items-center gap-1 hover:underline cursor-pointer"
+              >
+                {showPin ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                <span>{showPin ? "Hide" : "Show"}</span>
+              </button>
+            </div>
+
+            <div className="flex gap-2.5">
               <input
-                type="password"
-                maxLength={6}
+                type={showPin ? "text" : "password"}
+                maxLength={8}
                 value={pin}
-                placeholder={currentRoleConfig.defaultPin}
+                placeholder="••••"
                 onChange={(e) => setPin(e.target.value)}
-                className="flex-1 rounded-xl border border-[#3D3530] bg-[#2E2824] px-4 py-3 font-mono text-xl font-bold text-center tracking-widest text-white focus:border-[#B72E35] focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleQuickLogin(selectedRole, pin);
+                  }
+                }}
+                className="flex-1 rounded-2xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#141210] px-4 py-3 font-mono text-xl font-black text-center tracking-widest text-[#241F1C] dark:text-white placeholder-stone-400 dark:placeholder-stone-600 focus:border-[#B72E35] focus:outline-none focus:ring-2 focus:ring-[#B72E35] shadow-inner"
               />
               <button
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => handleQuickLogin(selectedRole, pin)}
-                className="rounded-xl bg-[#B72E35] px-6 font-mono text-sm font-bold text-white hover:bg-[#9E242B] active:scale-95 transition disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 rounded-2xl bg-[#B72E35] hover:bg-[#9E242B] px-6 font-mono text-sm font-bold text-white shadow-md active:scale-95 transition disabled:opacity-50 cursor-pointer"
               >
-                {isSubmitting ? "..." : "Unlock →"}
+                <span>{isSubmitting ? "..." : "Unlock"}</span>
+                <ArrowRight className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          {/* 1-Click Station Launch */}
-          <div className="pt-2 border-t border-[#3D3530] flex items-center justify-between text-xs">
-            <span className="font-mono text-[11px] text-[#C9AE8B]">
-              One-click station launch:
-            </span>
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleQuickLogin(selectedRole, currentRoleConfig.defaultPin)}
-              className="rounded-lg bg-[#2E2824] px-3 py-1.5 font-mono text-xs font-bold text-[#F2C84B] hover:bg-[#3D3530] transition active:scale-95"
-            >
-              Instant Enter ({currentRoleConfig.name})
-            </button>
-          </div>
+
         </div>
 
-        {/* Navigation Quick Links */}
-        <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono text-[#C9AE8B]">
-          <Link
-            href="/smol-backdoor/kitchen"
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#3D3530] bg-[#1A1715] p-3 hover:bg-[#2E2824] transition"
-          >
-            <ChefHat className="h-4 w-4" /> Kitchen KDS
-          </Link>
-          <Link
-            href="/smol-backdoor/cashier"
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#3D3530] bg-[#1A1715] p-3 hover:bg-[#2E2824] transition"
-          >
-            <CreditCard className="h-4 w-4" /> Cashier POS
-          </Link>
-          <Link
-            href="/smol-backdoor/admin"
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#3D3530] bg-[#1A1715] p-3 hover:bg-[#2E2824] transition"
-          >
-            <Zap className="h-4 w-4" /> Admin Tower
-          </Link>
-        </div>
       </main>
 
       {/* Footer */}
-      <footer className="mx-auto w-full max-w-lg text-center py-3 text-[11px] font-mono text-[#725039]">
+      <footer className="text-center py-2 text-[11px] font-mono text-[#725039]/70 dark:text-stone-500">
         smol café • secure role-based operations • rishikesh
       </footer>
     </div>

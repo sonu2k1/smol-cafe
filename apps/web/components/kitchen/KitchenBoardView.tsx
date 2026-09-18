@@ -12,7 +12,7 @@ import type { OrderStatus } from "@smol-cafe/db";
 import { KitchenTicketCard } from "./KitchenTicketCard";
 import { EtaAccuracyReview } from "./EtaAccuracyReview";
 import { KitchenMenuManager } from "./KitchenMenuManager";
-import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed } from "lucide-react";
+import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed, RotateCcw } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
@@ -23,6 +23,7 @@ interface KitchenBoardViewProps {
 
 export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrders }) => {
   const [orders, setOrders] = useState<KitchenTicket[]>(initialOrders);
+  const [dismissedTicketIds, setDismissedTicketIds] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
@@ -34,7 +35,37 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
 
   useEffect(() => {
     setMounted(true);
+    try {
+      const saved = sessionStorage.getItem("smol_kds_dismissed_tickets");
+      if (saved) {
+        setDismissedTicketIds(new Set(JSON.parse(saved)));
+      }
+    } catch {
+      // sessionStorage safe fallback
+    }
   }, []);
+
+  const handleDismissTicket = (orderId: string) => {
+    setDismissedTicketIds((prev) => {
+      const updated = new Set(prev);
+      updated.add(orderId);
+      try {
+        sessionStorage.setItem("smol_kds_dismissed_tickets", JSON.stringify(Array.from(updated)));
+      } catch {
+        // safe
+      }
+      return updated;
+    });
+  };
+
+  const handleRestoreDismissed = () => {
+    setDismissedTicketIds(new Set());
+    try {
+      sessionStorage.removeItem("smol_kds_dismissed_tickets");
+    } catch {
+      // safe
+    }
+  };
 
   // Sound chime for incoming orders
   const playChime = useCallback(() => {
@@ -142,13 +173,15 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
   };
 
   // Group tickets strictly into 4 columns per specification:
-  // NEW -> PREPARING -> READY -> COMPLETED
-  const newOrders = orders.filter((o) =>
+  // Filter out any locally dismissed tickets (keeps data safe on DB and Admin Tower)
+  const visibleOrders = orders.filter((o) => !dismissedTicketIds.has(o.id));
+
+  const newOrders = visibleOrders.filter((o) =>
     ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED"].includes(o.status)
   );
-  const preparingOrders = orders.filter((o) => o.status === "PREPARING");
-  const readyOrders = orders.filter((o) => o.status === "READY");
-  const completedOrders = orders.filter((o) =>
+  const preparingOrders = visibleOrders.filter((o) => o.status === "PREPARING");
+  const readyOrders = visibleOrders.filter((o) => o.status === "READY");
+  const completedOrders = visibleOrders.filter((o) =>
     ["SERVED", "COMPLETED", "CLOSED"].includes(o.status)
   );
 
@@ -202,7 +235,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
               }`}
             >
               <Coffee className="h-3.5 w-3.5" />
-              <span>Live Tickets ({orders.filter((o) => o.status !== "SERVED").length})</span>
+              <span>Live Tickets ({visibleOrders.filter((o) => o.status !== "SERVED").length})</span>
             </button>
             <button
               onClick={() => setCurrentView("MENU_STOCK")}
@@ -219,6 +252,18 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Restore Dismissed Tickets Button (only visible if any are dismissed) */}
+            {dismissedTicketIds.size > 0 && (
+              <button
+                onClick={handleRestoreDismissed}
+                className="flex items-center gap-1 rounded-full border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1D1815] px-2.5 py-1 text-xs font-mono text-[#725039] dark:text-[#C9AE8B] hover:text-[#B72E35] hover:border-[#B72E35] transition cursor-pointer shadow-xs"
+                title="Restore dismissed tickets back to board"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span className="hidden sm:inline">restore ({dismissedTicketIds.size})</span>
+              </button>
+            )}
+
             {/* Station Load & ETA Analytics Toggle (Desktop) */}
             <button
               onClick={() => setShowEtaAnalytics(!showEtaAnalytics)}
@@ -389,6 +434,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   key={ticket.id}
                   ticket={ticket}
                   onTransition={handleTransition}
+                  onDismiss={handleDismissTicket}
                 />
               ))
             )}
@@ -420,6 +466,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   key={ticket.id}
                   ticket={ticket}
                   onTransition={handleTransition}
+                  onDismiss={handleDismissTicket}
                 />
               ))
             )}
@@ -451,6 +498,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   key={ticket.id}
                   ticket={ticket}
                   onTransition={handleTransition}
+                  onDismiss={handleDismissTicket}
                 />
               ))
             )}
@@ -482,6 +530,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   key={ticket.id}
                   ticket={ticket}
                   onTransition={handleTransition}
+                  onDismiss={handleDismissTicket}
                 />
               ))
             )}

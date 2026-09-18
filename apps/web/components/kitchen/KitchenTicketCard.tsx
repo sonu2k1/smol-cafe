@@ -1,15 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import type { KitchenTicket } from "@/app/kitchen/actions";
 import type { OrderStatus } from "@smol-cafe/db";
 
 interface KitchenTicketCardProps {
   ticket: KitchenTicket;
   onTransition: (orderId: string, fromStatus: OrderStatus, toStatus: OrderStatus) => Promise<void>;
+  onDismiss?: (orderId: string) => void;
 }
 
-export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, onTransition }) => {
+export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, onTransition, onDismiss }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
 
@@ -98,21 +100,38 @@ export const KitchenTicketCard: React.FC<KitchenTicketCardProps> = ({ ticket, on
   return (
     <div className="flex flex-col justify-between rounded-2xl border-2 border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1D1815] p-4 shadow-sm transition-all hover:border-[#B72E35]/40 dark:hover:border-[#C9AE8B]/40">
       <div>
-        {/* Card Header: Prominent TABLE Number & Payment: PAID Badge */}
+        {/* Card Header: Prominent TABLE Number, Payment: PAID Badge & Dismiss (X) */}
         <div className="flex items-center justify-between gap-2 border-b border-[#C9AE8B]/30 dark:border-stone-800/80 pb-2.5">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-bold text-[#725039] dark:text-stone-400">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-mono text-sm font-bold text-[#725039] dark:text-stone-400 shrink-0">
               #{ticket.orderNo || ticket.id.slice(-4)}
             </span>
-            <span className="rounded-xl border border-[#B72E35]/30 bg-[#B72E35]/10 dark:bg-[#F2C84B]/10 px-2.5 py-1 font-mono text-xs font-black uppercase text-[#B72E35] dark:text-[#F2C84B]">
+            <span className="rounded-xl border border-[#B72E35]/30 bg-[#B72E35]/10 dark:bg-[#F2C84B]/10 px-2.5 py-1 font-mono text-xs font-black uppercase text-[#B72E35] dark:text-[#F2C84B] truncate">
               TABLE {ticket.tableLabel}
             </span>
           </div>
 
-          {/* Payment Status Badge */}
-          <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/60 px-2 py-0.5 font-mono text-[10px] font-extrabold text-emerald-800 dark:text-emerald-300">
-            Payment: PAID
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Payment Status Badge */}
+            <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/60 px-2 py-0.5 font-mono text-[10px] font-extrabold text-emerald-800 dark:text-emerald-300">
+              Payment: PAID
+            </span>
+
+            {/* Dismiss Cross (X) Button */}
+            {onDismiss && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDismiss(ticket.id);
+                }}
+                className="flex h-6 w-6 items-center justify-center rounded-lg border border-stone-300 dark:border-stone-700 bg-[#EFE7DC] dark:bg-stone-800 text-[#725039] dark:text-stone-400 hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-800 transition cursor-pointer"
+                title="Dismiss ticket from kitchen board (keeps data in Admin Tower)"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* State Banner: NEW / PREPARING / READY / DELIVERED */}

@@ -4,14 +4,13 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ChefHat, Shield, ArrowRight, Sun, Moon, X, Receipt } from "lucide-react";
+import { Sun, Moon, ArrowRight } from "lucide-react";
 import { TableScannerModal } from "@/components/table/TableScannerModal";
 import { StaffForkLockIcon } from "@/components/common/StaffForkLockIcon";
 
 export default function RoleSelectionPage() {
   const router = useRouter();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [currentTable, setCurrentTable] = useState("01");
   const [isDark, setIsDark] = useState(false);
 
@@ -21,19 +20,6 @@ export default function RoleSelectionPage() {
     setIsDark(active);
     applyTheme(active);
   }, []);
-
-  // Listen for Escape key to close Staff Access modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsStaffModalOpen(false);
-      }
-    };
-    if (isStaffModalOpen) {
-      window.addEventListener("keydown", handleKeyDown);
-    }
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isStaffModalOpen]);
 
   const applyTheme = (dark: boolean) => {
     if (dark) {
@@ -117,12 +103,12 @@ export default function RoleSelectionPage() {
                 )}
               </button>
 
-              {/* Staff Lock Icon */}
+              {/* Staff Lock Icon -> Direct navigation to /smol-backdoor */}
               <div className="relative group">
-                <button
-                  onClick={() => setIsStaffModalOpen(true)}
-                  aria-label="Staff Access"
-                  title="Staff Access"
+                <Link
+                  href="/smol-backdoor"
+                  aria-label="Staff Backdoor Access"
+                  title="Staff Backdoor Portal"
                   style={{ color: isDark ? "#FF5B52" : "#B72E35" }}
                   className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 cursor-pointer focus:outline-none hover:scale-110 active:scale-95 ${
                     isDark
@@ -134,11 +120,11 @@ export default function RoleSelectionPage() {
                     style={{ color: isDark ? "#FF5B52" : "#B72E35" }}
                     className="h-6 w-6 shrink-0"
                   />
-                </button>
+                </Link>
 
                 {/* Desktop Hover Tooltip */}
                 <span className="pointer-events-none absolute -bottom-8 right-0 hidden whitespace-nowrap rounded-md bg-[#241F1C] px-2.5 py-1 text-[10px] font-mono text-[#F3E7D3] opacity-0 transition-opacity group-hover:opacity-100 sm:block dark:bg-[#FAF4EB] dark:text-[#241F1C] shadow-lg z-30 border border-white/10 dark:border-black/10">
-                  Staff Access
+                  Staff Backdoor
                 </span>
               </div>
             </div>
@@ -508,125 +494,6 @@ export default function RoleSelectionPage() {
           </footer>
         </div>
       </main>
-
-      {/* Staff Access Modal */}
-      {isStaffModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#241F1C]/70 backdrop-blur-xs animate-fade-in"
-          onClick={() => setIsStaffModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-[2rem] border border-[#C9AE8B]/40 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#1E1916] p-6 sm:p-7 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.4)] text-center animate-scale-in transition-all relative overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Subtle top bevel highlight */}
-            <div className="absolute top-0 inset-x-0 h-px bg-white/70 dark:bg-white/10 pointer-events-none" />
-
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-[#C9AE8B]/20 dark:border-white/10 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#B72E35]/10 dark:bg-[#754CFF]/15 border border-[#B72E35]/30 dark:border-[#754CFF]/40 text-[#B72E35] dark:text-[#754CFF] shadow-xs">
-                  <StaffForkLockIcon className="h-4.5 w-4.5" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-serif text-lg font-bold text-[#241F1C] dark:text-[#F3E7D3] tracking-tight lowercase">
-                    staff access
-                  </h3>
-                  <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
-                    select your workspace
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsStaffModalOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#C9AE8B]/30 dark:border-white/10 text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 active:scale-90"
-                aria-label="Close Staff Access"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Workspace Options with 3D tactile elevation */}
-            <div className="space-y-3.5 my-4">
-              {/* Option 1: Kitchen GDS (Gold / Yellow visual identity) */}
-              <Link
-                href="/kitchen"
-                onClick={() => setIsStaffModalOpen(false)}
-                className="group flex items-center gap-3.5 p-3.5 rounded-2xl border border-[#F2C84B]/50 bg-gradient-to-b from-[#FFFFFF] to-[#FAF4EB] dark:from-[#29211C] dark:to-[#1E1916] hover:border-[#F2C84B] transition-all duration-200 text-left cursor-pointer shadow-[0_3px_8px_rgba(242,200,75,0.12),inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)] hover:-translate-y-0.5 active:translate-y-0.5"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F2C84B]/20 border border-[#F2C84B]/50 text-[#C4951E] dark:text-[#F2C84B] group-hover:scale-105 transition-transform shadow-xs">
-                  <ChefHat className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="font-serif text-base font-bold text-[#241F1C] dark:text-[#F3E7D3] tracking-tight">
-                      Kitchen GDS
-                    </span>
-                    <ArrowRight className="h-4 w-4 text-[#C9AE8B] group-hover:text-[#F2C84B] group-hover:translate-x-1 transition-all" />
-                  </div>
-                  <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] truncate">
-                    Kitchen &amp; Orders Pipeline
-                  </p>
-                </div>
-              </Link>
-
-              {/* Option 2: Cashier View (Crimson / Coral visual identity) */}
-              <Link
-                href="/cashier"
-                onClick={() => setIsStaffModalOpen(false)}
-                className="group flex items-center gap-3.5 p-3.5 rounded-2xl border border-[#B72E35]/45 bg-gradient-to-b from-[#FFFFFF] to-[#FAF4EB] dark:from-[#29211C] dark:to-[#1E1916] hover:border-[#B72E35] transition-all duration-200 text-left cursor-pointer shadow-[0_3px_8px_rgba(183,46,53,0.12),inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)] hover:-translate-y-0.5 active:translate-y-0.5"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#B72E35]/15 border border-[#B72E35]/45 text-[#B72E35] dark:text-[#E0535B] group-hover:scale-105 transition-transform shadow-xs">
-                  <Receipt className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="font-serif text-base font-bold text-[#241F1C] dark:text-[#F3E7D3] tracking-tight">
-                      Cashier View
-                    </span>
-                    <ArrowRight className="h-4 w-4 text-[#C9AE8B] group-hover:text-[#B72E35] dark:group-hover:text-[#E0535B] group-hover:translate-x-1 transition-all" />
-                  </div>
-                  <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] truncate">
-                    Front-Desk, POS &amp; Paid Orders
-                  </p>
-                </div>
-              </Link>
-
-              {/* Option 3: Admin Tower (Purple visual identity) */}
-              <Link
-                href="/admin"
-                onClick={() => setIsStaffModalOpen(false)}
-                className="group flex items-center gap-3.5 p-3.5 rounded-2xl border border-[#754CFF]/45 bg-gradient-to-b from-[#FFFFFF] to-[#FAF4EB] dark:from-[#29211C] dark:to-[#1E1916] hover:border-[#754CFF] transition-all duration-200 text-left cursor-pointer shadow-[0_3px_8px_rgba(117,76,255,0.12),inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)] hover:-translate-y-0.5 active:translate-y-0.5"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#754CFF]/15 border border-[#754CFF]/45 text-[#754CFF] group-hover:scale-105 transition-transform shadow-xs">
-                  <Shield className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="font-serif text-base font-bold text-[#241F1C] dark:text-[#F3E7D3] tracking-tight">
-                      Admin Tower
-                    </span>
-                    <ArrowRight className="h-4 w-4 text-[#C9AE8B] group-hover:text-[#754CFF] group-hover:translate-x-1 transition-all" />
-                  </div>
-                  <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] truncate">
-                    Control Tower &amp; Analytics
-                  </p>
-                </div>
-              </Link>
-            </div>
-
-            {/* Cancel Button */}
-            <div className="pt-2">
-              <button
-                onClick={() => setIsStaffModalOpen(false)}
-                className="w-full py-2.5 rounded-xl border border-[#B72E35]/35 bg-[#B72E35]/10 dark:bg-[#B72E35]/20 font-mono text-xs font-semibold text-[#B72E35] dark:text-[#FF8B92] hover:bg-[#B72E35] hover:text-white dark:hover:bg-[#B72E35] dark:hover:text-white transition duration-200 active:scale-95 cursor-pointer shadow-xs"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* QR Scanner Modal */}
       {isScannerOpen && (
