@@ -12,7 +12,7 @@ import type { OrderStatus } from "@smol-cafe/db";
 import { KitchenTicketCard } from "./KitchenTicketCard";
 import { EtaAccuracyReview } from "./EtaAccuracyReview";
 import { KitchenMenuManager } from "./KitchenMenuManager";
-import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed } from "lucide-react";
+import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed, RotateCcw } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
@@ -23,6 +23,7 @@ interface KitchenBoardViewProps {
 
 export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrders }) => {
   const [orders, setOrders] = useState<KitchenTicket[]>(initialOrders);
+  const [dismissedTicketIds, setDismissedTicketIds] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
@@ -34,7 +35,37 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
 
   useEffect(() => {
     setMounted(true);
+    try {
+      const saved = sessionStorage.getItem("smol_kds_dismissed_tickets");
+      if (saved) {
+        setDismissedTicketIds(new Set(JSON.parse(saved)));
+      }
+    } catch {
+      // sessionStorage safe fallback
+    }
   }, []);
+
+  const handleDismissTicket = (orderId: string) => {
+    setDismissedTicketIds((prev) => {
+      const updated = new Set(prev);
+      updated.add(orderId);
+      try {
+        sessionStorage.setItem("smol_kds_dismissed_tickets", JSON.stringify(Array.from(updated)));
+      } catch {
+        // safe
+      }
+      return updated;
+    });
+  };
+
+  const handleRestoreDismissed = () => {
+    setDismissedTicketIds(new Set());
+    try {
+      sessionStorage.removeItem("smol_kds_dismissed_tickets");
+    } catch {
+      // safe
+    }
+  };
 
   // Sound chime for incoming orders
   const playChime = useCallback(() => {
@@ -142,24 +173,26 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
   };
 
   // Group tickets strictly into 4 columns per specification:
-  // NEW -> PREPARING -> READY -> COMPLETED
-  const newOrders = orders.filter((o) =>
+  // Filter out any locally dismissed tickets (keeps data safe on DB and Admin Tower)
+  const visibleOrders = orders.filter((o) => !dismissedTicketIds.has(o.id));
+
+  const newOrders = visibleOrders.filter((o) =>
     ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED"].includes(o.status)
   );
-  const preparingOrders = orders.filter((o) => o.status === "PREPARING");
-  const readyOrders = orders.filter((o) => o.status === "READY");
-  const completedOrders = orders.filter((o) =>
+  const preparingOrders = visibleOrders.filter((o) => o.status === "PREPARING");
+  const readyOrders = visibleOrders.filter((o) => o.status === "READY");
+  const completedOrders = visibleOrders.filter((o) =>
     ["SERVED", "COMPLETED", "CLOSED"].includes(o.status)
   );
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F3E7D3] dark:bg-[#241F1C] text-[#241F1C] dark:text-[#F3E7D3] font-sans transition-colors duration-200">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB]/95 dark:bg-[#1D1815]/95 px-3 sm:px-6 py-2.5 sm:py-3.5 backdrop-blur-md transition-colors duration-200">
-        <div className="flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB]/95 dark:bg-[#1D1815]/95 px-3 sm:px-6 py-2 sm:py-3 backdrop-blur-md transition-colors duration-200">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
           {/* Brand */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="relative h-9 w-7 sm:h-11 sm:w-8 shrink-0 select-none">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="relative h-8 w-6 sm:h-10 sm:w-7.5 shrink-0 select-none">
               <Image
                 src="/kitchen-logo.png"
                 alt="smol café kitchen logo"
@@ -175,54 +208,66 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                 className="object-contain drop-shadow-[0_0_8px_rgba(168,85,247,0.4)] hidden dark:block"
               />
             </div>
-            <div className="min-w-0">
+            <div className="shrink-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="font-serif text-base sm:text-lg font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3] lowercase">
+                <span className="font-serif text-base sm:text-lg font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3] lowercase whitespace-nowrap">
                   smol café
                 </span>
                 <span className="text-[10px] sm:text-xs text-[#754CFF]">✦</span>
-                <span className="rounded-md border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#F3E7D3] dark:bg-[#241F1C] px-1.5 sm:px-2 py-0.5 font-mono text-[10px] sm:text-[11px] text-[#B72E35] dark:text-[#F2C84B] shrink-0">
-                  kitchen gds
+                <span className="rounded-md border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#F3E7D3] dark:bg-[#241F1C] px-1.5 sm:px-2 py-0.5 font-mono text-[10px] sm:text-[11px] text-[#B72E35] dark:text-[#F2C84B] shrink-0 whitespace-nowrap">
+                  kitchen kds
                 </span>
               </div>
-              <p className="hidden sm:block font-serif italic text-[11px] text-[#725039] dark:text-[#C9AE8B] -mt-0.5 truncate">
-                order preparation & ticket dispatch
+              <p className="hidden lg:block font-serif italic text-[11px] text-[#725039] dark:text-[#C9AE8B] -mt-0.5 truncate whitespace-nowrap">
+                order preparation &amp; ticket dispatch
               </p>
             </div>
           </div>
 
-          {/* Central KDS View Switcher (Desktop Only: hidden on mobile, visible on md+) */}
-          <div className="hidden md:flex items-center gap-1 rounded-2xl bg-[#EFE7DC] dark:bg-[#151110] p-1 border border-[#C9AE8B]/30 dark:border-stone-800">
+          {/* Central KDS View Switcher (Desktop XL Only: inline on wide screens) */}
+          <div className="hidden xl:flex items-center gap-1 rounded-2xl bg-[#EFE7DC] dark:bg-[#151110] p-1 border border-[#C9AE8B]/30 dark:border-stone-800 shrink-0">
             <button
               onClick={() => setCurrentView("TICKETS")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 currentView === "TICKETS"
                   ? "bg-[#B72E35] text-white shadow-xs"
                   : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
               }`}
             >
-              <Coffee className="h-3.5 w-3.5" />
-              <span>Live Tickets ({orders.filter((o) => o.status !== "SERVED").length})</span>
+              <Coffee className="h-3.5 w-3.5 shrink-0" />
+              <span>Live Tickets ({visibleOrders.filter((o) => o.status !== "SERVED").length})</span>
             </button>
             <button
               onClick={() => setCurrentView("MENU_STOCK")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 currentView === "MENU_STOCK"
                   ? "bg-[#B72E35] text-white shadow-xs"
                   : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
               }`}
             >
-              <UtensilsCrossed className="h-3.5 w-3.5" />
-              <span>Daily Menu & 86</span>
+              <UtensilsCrossed className="h-3.5 w-3.5 shrink-0" />
+              <span>Daily Menu &amp; 86</span>
             </button>
           </div>
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Station Load & ETA Analytics Toggle (Desktop) */}
+            {/* Restore Dismissed Tickets Button (only visible if any are dismissed) */}
+            {dismissedTicketIds.size > 0 && (
+              <button
+                onClick={handleRestoreDismissed}
+                className="flex items-center gap-1 rounded-full border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1D1815] px-2.5 py-1 text-xs font-mono text-[#725039] dark:text-[#C9AE8B] hover:text-[#B72E35] hover:border-[#B72E35] transition cursor-pointer shadow-xs whitespace-nowrap"
+                title="Restore dismissed tickets back to board"
+              >
+                <RotateCcw className="h-3 w-3 shrink-0" />
+                <span className="hidden sm:inline">restore ({dismissedTicketIds.size})</span>
+              </button>
+            )}
+
+            {/* Station Load & ETA Analytics Toggle (Desktop XL) */}
             <button
               onClick={() => setShowEtaAnalytics(!showEtaAnalytics)}
-              className={`hidden md:flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-mono transition cursor-pointer ${
+              className={`hidden xl:flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-mono transition cursor-pointer whitespace-nowrap ${
                 showEtaAnalytics
                   ? "border-[#B72E35] bg-[#B72E35]/15 text-[#B72E35] dark:text-[#F2C84B]"
                   : "border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#F3E7D3]"
@@ -234,7 +279,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
             {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled((v) => !v)}
-              className={`flex items-center gap-1 rounded-full border px-2.5 sm:px-3 py-1 text-xs font-mono transition cursor-pointer ${
+              className={`flex items-center gap-1 rounded-full border px-2 sm:px-3 py-1 text-xs font-mono transition cursor-pointer whitespace-nowrap ${
                 soundEnabled
                   ? "border-[#F2C84B]/60 bg-[#F2C84B]/20 text-[#8C6207] dark:text-[#F2C84B]"
                   : "border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#F3E7D3]"
@@ -243,21 +288,21 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
             >
               {soundEnabled ? (
                 <>
-                  <Bell className="h-3.5 w-3.5 text-[#8C6207] dark:text-[#F2C84B]" />
+                  <Bell className="h-3.5 w-3.5 text-[#8C6207] dark:text-[#F2C84B] shrink-0" />
                   <span className="hidden sm:inline">chime on</span>
                 </>
               ) : (
                 <>
-                  <BellOff className="h-3.5 w-3.5" />
+                  <BellOff className="h-3.5 w-3.5 shrink-0" />
                   <span className="hidden sm:inline">chime off</span>
                 </>
               )}
             </button>
 
             {/* Live Polling Indicator */}
-            <div className="flex items-center gap-1.5 sm:gap-2 rounded-full border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] px-2 sm:px-3 py-1 text-xs font-mono text-[#725039] dark:text-[#C9AE8B]">
+            <div className="flex items-center gap-1.5 sm:gap-2 rounded-full border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] px-2 sm:px-3 py-1 text-xs font-mono text-[#725039] dark:text-[#C9AE8B] whitespace-nowrap">
               <span
-                className={`h-2 w-2 rounded-full bg-[#75AFA7] ${
+                className={`h-2 w-2 rounded-full bg-[#75AFA7] shrink-0 ${
                   isRefreshing ? "scale-125 opacity-70" : "animate-pulse"
                 }`}
               />
@@ -269,14 +314,16 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
             {/* Manual Sync Button */}
             <button
               onClick={refreshOrders}
-              className="flex h-7.5 w-7.5 sm:h-8 sm:w-8 items-center justify-center rounded-full border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#F3E7D3] transition cursor-pointer"
+              className="flex h-7.5 w-7.5 sm:h-8 sm:w-8 items-center justify-center rounded-full border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#F3E7D3] transition cursor-pointer shrink-0"
               title="Refresh tickets"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${isRefreshing ? "animate-spin" : ""}`} />
             </button>
 
             {/* Theme Toggle (Light / Dark Mode) */}
-            <ThemeToggle />
+            <div className="shrink-0">
+              <ThemeToggle />
+            </div>
 
             {/* Logout */}
             <button
@@ -284,52 +331,52 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                 await staffLogoutAction();
                 window.location.reload();
               }}
-              className="flex h-7.5 w-7.5 sm:h-auto sm:w-auto items-center justify-center gap-1 rounded-full border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] sm:px-3 sm:py-1 text-xs font-mono text-[#725039] dark:text-[#C9AE8B] hover:text-[#B72E35] transition cursor-pointer"
+              className="flex h-7.5 w-7.5 sm:h-auto sm:w-auto items-center justify-center gap-1 rounded-full border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] sm:px-3 sm:py-1 text-xs font-mono text-[#725039] dark:text-[#C9AE8B] hover:text-[#B72E35] transition cursor-pointer shrink-0 whitespace-nowrap"
               title="Logout"
             >
-              <LogOut className="h-3.5 w-3.5" />
+              <LogOut className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden sm:inline">logout</span>
             </button>
           </div>
         </div>
 
-        {/* Mobile View Switcher Row (< md screens) */}
-        <div className="md:hidden flex items-center justify-between gap-1.5 pt-2">
+        {/* Tablet & Mobile View Switcher Row (< xl screens, including iPads / tablets) */}
+        <div className="xl:hidden flex items-center justify-between gap-2 pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/60 mt-2">
           <div className="flex flex-1 items-center gap-1 rounded-xl bg-[#EFE7DC] dark:bg-[#151110] p-1 border border-[#C9AE8B]/30 dark:border-stone-800">
             <button
               onClick={() => setCurrentView("TICKETS")}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-mono text-xs font-bold transition cursor-pointer ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-mono text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 currentView === "TICKETS"
                   ? "bg-[#B72E35] text-white shadow-xs"
                   : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
               }`}
             >
-              <Coffee className="h-3.5 w-3.5" />
+              <Coffee className="h-3.5 w-3.5 shrink-0" />
               <span>Live Tickets ({orders.filter((o) => o.status !== "SERVED").length})</span>
             </button>
             <button
               onClick={() => setCurrentView("MENU_STOCK")}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-mono text-xs font-bold transition cursor-pointer ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-mono text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 currentView === "MENU_STOCK"
                   ? "bg-[#B72E35] text-white shadow-xs"
                   : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
               }`}
             >
-              <UtensilsCrossed className="h-3.5 w-3.5" />
-              <span>Daily Menu & 86</span>
+              <UtensilsCrossed className="h-3.5 w-3.5 shrink-0" />
+              <span>Daily Menu &amp; 86</span>
             </button>
           </div>
 
           <button
             onClick={() => setShowEtaAnalytics(!showEtaAnalytics)}
-            className={`flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs font-mono transition cursor-pointer ${
+            className={`flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs font-mono transition cursor-pointer shrink-0 whitespace-nowrap ${
               showEtaAnalytics
                 ? "border-[#B72E35] bg-[#B72E35]/15 text-[#B72E35] dark:text-[#F2C84B]"
                 : "border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] text-[#725039] dark:text-[#C9AE8B]"
             }`}
             title="Toggle Station Load"
           >
-            <span>⏱ ETA</span>
+            <span>⏱ ETA Load</span>
           </button>
         </div>
 
@@ -389,6 +436,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   key={ticket.id}
                   ticket={ticket}
                   onTransition={handleTransition}
+                  onDismiss={handleDismissTicket}
                 />
               ))
             )}
@@ -420,6 +468,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   key={ticket.id}
                   ticket={ticket}
                   onTransition={handleTransition}
+                  onDismiss={handleDismissTicket}
                 />
               ))
             )}
@@ -451,6 +500,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   key={ticket.id}
                   ticket={ticket}
                   onTransition={handleTransition}
+                  onDismiss={handleDismissTicket}
                 />
               ))
             )}
@@ -482,6 +532,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                   key={ticket.id}
                   ticket={ticket}
                   onTransition={handleTransition}
+                  onDismiss={handleDismissTicket}
                 />
               ))
             )}

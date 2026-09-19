@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   getUpiConfig,
   buildAppSpecificUpiUri,
@@ -10,7 +11,7 @@ import {
 import { broadcastSyncEvent } from "@/lib/sync-events";
 import { DigitalReceiptModal, type ReceiptData } from "./DigitalReceiptModal";
 import { PostPaymentCelebrationModal } from "./PostPaymentCelebrationModal";
-import { X, QrCode, Copy, Check, Smartphone } from "lucide-react";
+import { X, Copy, Check, Smartphone } from "lucide-react";
 
 interface UpiPaymentDrawerProps {
   orderId?: string;
@@ -59,6 +60,8 @@ export const UpiPaymentDrawer: React.FC<UpiPaymentDrawerProps> = ({
     // If mobile, attempt deep link launch
     if (typeof window !== "undefined" && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
       const deepLink = buildAppSpecificUpiUri(appKey, { amountPaise, orderNo: orderNo || orderId });
+
+      // Try opening app via deep link
       window.location.href = deepLink;
     }
 
@@ -71,7 +74,6 @@ export const UpiPaymentDrawer: React.FC<UpiPaymentDrawerProps> = ({
       broadcastSyncEvent({
         type: "PAYMENT_COMPLETED",
         orderId,
-        orderNo,
         tableLabel,
         status: "PAID",
         timestamp: Date.now(),
@@ -86,8 +88,11 @@ export const UpiPaymentDrawer: React.FC<UpiPaymentDrawerProps> = ({
       if (onPaymentSuccess) {
         onPaymentSuccess(res);
       }
+    } catch (err) {
+      console.error("UPI simulation failed", err);
     } finally {
       setIsProcessing(false);
+      setActiveProcessingApp(null);
     }
   };
 
@@ -125,36 +130,49 @@ export const UpiPaymentDrawer: React.FC<UpiPaymentDrawerProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs sm:items-center p-0 sm:p-4 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#241F1C]/40 dark:bg-black/50 p-0 sm:p-4 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-t-[2.5rem] sm:rounded-3xl border border-[#E2D7C7] bg-[#FAF4EB] p-6 shadow-2xl text-[#241F1C] transition-all animate-scale-in max-h-[92vh] overflow-y-auto"
+        className="w-full max-w-md rounded-t-[2.5rem] sm:rounded-3xl border border-[#E2D7C7] dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1E1A17] p-6 shadow-2xl text-[#241F1C] dark:text-[#F3E7D3] transition-all animate-scale-in max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drawer Pull Handle on Mobile */}
         <div className="pt-1 pb-3 flex justify-center sm:hidden">
-          <div className="w-10 h-1 rounded-full bg-stone-300" />
+          <div className="w-10 h-1 rounded-full bg-stone-300 dark:bg-stone-700" />
         </div>
 
         {/* Drawer Header */}
-        <div className="flex items-center justify-between border-b border-[#E2D7C7] pb-3">
+        <div className="flex items-center justify-between border-b border-[#E2D7C7] dark:border-stone-800 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#B72E35] text-white shadow-xs">
-              <QrCode className="h-5 w-5" />
+            <div className="flex h-9 px-2.5 items-center justify-center rounded-2xl bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-2xs">
+              <Image
+                src="/upi-logo-trimmed.png"
+                alt="UPI"
+                width={36}
+                height={14}
+                className="h-4 w-auto object-contain dark:hidden"
+              />
+              <Image
+                src="/upi-logo-dark.png"
+                alt="UPI"
+                width={36}
+                height={14}
+                className="h-4 w-auto object-contain hidden dark:block"
+              />
             </div>
             <div>
-              <h3 className="font-serif text-lg font-bold tracking-tight text-[#241F1C]">
+              <h3 className="font-serif text-lg font-bold tracking-tight text-[#241F1C] dark:text-white">
                 UPI Instant Gateway
               </h3>
-              <p className="font-serif italic text-xs text-[#725039]">
+              <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
                 Zero convenience fee • Direct bank transfer
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-200/70 text-stone-600 hover:bg-stone-300 transition"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-200/70 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-300 dark:hover:bg-stone-700 transition cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>

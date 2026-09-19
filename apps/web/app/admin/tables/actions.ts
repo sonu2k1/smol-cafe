@@ -36,9 +36,26 @@ const DEFAULT_SECTIONS = [
   "Brew Bar",
 ];
 
-// Persistent runtime sections in memory when mockStore is used
 declare global {
   var __SMOL_CUSTOM_SECTIONS__: string[] | undefined;
+  var __SMOL_TABLE_SECTIONS_MAP__: Record<string, string> | undefined;
+}
+
+if (!globalThis.__SMOL_TABLE_SECTIONS_MAP__) {
+  globalThis.__SMOL_TABLE_SECTIONS_MAP__ = {
+    "01": "Indoor Cozy",
+    "02": "Indoor Cozy",
+    "03": "Courtyard Verandah",
+    "04": "Courtyard Verandah",
+    "05": "Brew Bar",
+    "06": "Brew Bar",
+    "07": "Garden Terrace",
+    "08": "Garden Terrace",
+    "09": "Indoor Cozy",
+    "10": "Indoor Cozy",
+    "11": "Garden Terrace",
+    "12": "Courtyard Verandah",
+  };
 }
 
 function getSectionsList(tables: DiningTableRecord[]): string[] {
@@ -94,9 +111,11 @@ export async function fetchTablesAndSectionsAction(): Promise<{
       "12": "Courtyard Verandah",
     };
 
+    const sectionMap = globalThis.__SMOL_TABLE_SECTIONS_MAP__ || defaultZoneMap;
+
     const tables: DiningTableRecord[] = (tablesData || []).map((t: any) => {
       const cleanNum = t.label?.toString().padStart(2, "0");
-      const section = t.section || defaultZoneMap[cleanNum] || "Indoor Cozy";
+      const section = sectionMap[t.id] || sectionMap[t.label] || sectionMap[cleanNum] || t.section || defaultZoneMap[cleanNum] || "Indoor Cozy";
       return {
         id: t.id,
         location_id: t.location_id,
@@ -147,20 +166,34 @@ export async function createTableAction(input: CreateTableInput): Promise<{
     }
 
     const cleanNum = label.padStart(2, "0");
-    const tableId = `tbl_${cleanNum.toLowerCase().replace(/[^a-z0-9]/g, "_")}_${Date.now().toString(36)}`;
-    const locationId = "loc_smol_rishikesh_01";
     const section = input.section?.trim() || "Indoor Cozy";
     const seats = Number(input.seats) || 2;
     const active = input.active !== undefined ? input.active : true;
 
-    // Insert dining table
+    // 1. Fetch valid location UUID
+    let locationId: string | null = null;
+    const { data: loc } = await supabase.from("locations").select("id").limit(1).maybeSingle();
+    if (loc) {
+      locationId = loc.id;
+    } else {
+      const { data: newLoc } = await supabase
+        .from("locations")
+        .insert({ name: "smol café · rishikesh", timezone: "Asia/Kolkata" })
+        .select("id")
+        .single();
+      locationId = newLoc?.id || null;
+    }
+
+    if (!locationId) {
+      return { success: false, message: "Could not resolve restaurant location." };
+    }
+
+    // 2. Insert dining table (PostgreSQL gen_random_uuid generates UUID id)
     const { data: inserted, error: insertError } = await supabase
       .from("dining_tables")
       .insert({
-        id: tableId,
         location_id: locationId,
         label,
-        section,
         seats,
         active,
       })
@@ -171,10 +204,19 @@ export async function createTableAction(input: CreateTableInput): Promise<{
       return { success: false, message: insertError.message };
     }
 
-    // Generate table QR token
+    const tableId = inserted.id;
+
+    // 3. Save section mapping in runtime registry
+    if (!globalThis.__SMOL_TABLE_SECTIONS_MAP__) {
+      globalThis.__SMOL_TABLE_SECTIONS_MAP__ = {};
+    }
+    globalThis.__SMOL_TABLE_SECTIONS_MAP__[tableId] = section;
+    globalThis.__SMOL_TABLE_SECTIONS_MAP__[label] = section;
+    globalThis.__SMOL_TABLE_SECTIONS_MAP__[cleanNum] = section;
+
+    // 4. Generate table QR token
     const tokenStr = `table-${label.toLowerCase().replace(/\s+/g, "-")}`;
     await supabase.from("table_qr_tokens").insert({
-      id: `qr_${tableId}`,
       table_id: tableId,
       token_hash: tokenStr,
       version: 1,
@@ -196,7 +238,7 @@ export async function createTableAction(input: CreateTableInput): Promise<{
     return {
       success: true,
       table: {
-        id: inserted?.id || tableId,
+        id: tableId,
         location_id: locationId,
         label,
         seats,
@@ -225,38 +267,75 @@ export async function updateTableAction(
   try {
     const supabase = createAdminClient();
 
-    const updates: Record<string, any> = {};
-    if (input.label !== undefined) updates.label = input.label.trim();
-    if (input.section !== undefined) updates.section = input.section.trim();
-    if (input.seats !== undefined) updates.seats = Number(input.seats);
-    if (input.active !== undefined) updates.active = input.active;
+    // Only update columns that exist in the PostgreSQL dining_tables schema
+    const dbUpdates: Record<string, any> = {};
+    if (input.label !== undefined) dbUpdates.label = input.label.trim();
+    if (input.seats !== undefined) dbUpdates.seats = Number(input.seats);
+    if (input.active !== undefined) dbUpdates.active = input.active;
 
-    const { data: updated, error: updateError } = await supabase
-      .from("dining_tables")
-      .update(updates)
-      .eq("id", tableId)
-      .select()
-      .single();
+    let updated: any = null;
+    if (Object.keys(dbUpdates).length > 0) {
+      const { data, error: updateError } = await supabase
+        .from("dining_tables")
+        .update(dbUpdates)
+        .eq("id", tableId)
+        .select()
+        .single();
 
-    if (updateError) {
-      return { success: false, message: updateError.message };
+      if (updateError) {
+        return { success: false, message: updateError.message };
+      }
+      updated = data;
+    } else {
+      const { data } = await supabase
+        .from("dining_tables")
+        .select("*")
+        .eq("id", tableId)
+        .single();
+      updated = data;
     }
 
-    if (input.section && !DEFAULT_SECTIONS.includes(input.section)) {
-      if (!globalThis.__SMOL_CUSTOM_SECTIONS__) {
-        globalThis.__SMOL_CUSTOM_SECTIONS__ = [];
+    const cleanNum = (updated?.label || input.label || "").toString().padStart(2, "0");
+
+    // Handle section update in runtime memory
+    if (input.section) {
+      const trimmedSection = input.section.trim();
+      if (!globalThis.__SMOL_TABLE_SECTIONS_MAP__) {
+        globalThis.__SMOL_TABLE_SECTIONS_MAP__ = {};
       }
-      if (!globalThis.__SMOL_CUSTOM_SECTIONS__.includes(input.section)) {
-        globalThis.__SMOL_CUSTOM_SECTIONS__.push(input.section);
+      globalThis.__SMOL_TABLE_SECTIONS_MAP__[tableId] = trimmedSection;
+      if (updated?.label) globalThis.__SMOL_TABLE_SECTIONS_MAP__[updated.label] = trimmedSection;
+      if (cleanNum) globalThis.__SMOL_TABLE_SECTIONS_MAP__[cleanNum] = trimmedSection;
+
+      if (!DEFAULT_SECTIONS.includes(trimmedSection)) {
+        if (!globalThis.__SMOL_CUSTOM_SECTIONS__) {
+          globalThis.__SMOL_CUSTOM_SECTIONS__ = [];
+        }
+        if (!globalThis.__SMOL_CUSTOM_SECTIONS__.includes(trimmedSection)) {
+          globalThis.__SMOL_CUSTOM_SECTIONS__.push(trimmedSection);
+        }
       }
     }
+
+    const effectiveSection =
+      (input.section ? input.section.trim() : undefined) ||
+      globalThis.__SMOL_TABLE_SECTIONS_MAP__?.[tableId] ||
+      globalThis.__SMOL_TABLE_SECTIONS_MAP__?.[cleanNum] ||
+      "Indoor Cozy";
 
     revalidatePath("/admin");
     revalidatePath("/admin/tables");
 
     return {
       success: true,
-      table: updated,
+      table: {
+        id: updated?.id || tableId,
+        location_id: updated?.location_id || "",
+        label: updated?.label || input.label || "",
+        seats: updated?.seats !== undefined ? updated.seats : (input.seats || 2),
+        active: updated?.active !== undefined ? updated.active : (input.active !== undefined ? input.active : true),
+        section: effectiveSection,
+      },
       message: "Table updated successfully!",
     };
   } catch (err: any) {
@@ -369,16 +448,14 @@ export async function deleteSectionAction(name: string): Promise<{
       };
     }
 
-    const supabase = createAdminClient();
-    const { data: assignedTables } = await supabase
-      .from("dining_tables")
-      .select("id")
-      .eq("section", trimmed);
+    const assignedCount = Object.values(globalThis.__SMOL_TABLE_SECTIONS_MAP__ || {}).filter(
+      (s) => s === trimmed
+    ).length;
 
-    if (assignedTables && assignedTables.length > 0) {
+    if (assignedCount > 0) {
       return {
         success: false,
-        message: `Cannot delete section "${trimmed}": ${assignedTables.length} table(s) are currently assigned to it. Move them first.`,
+        message: `Cannot delete section "${trimmed}": ${assignedCount} table(s) are currently assigned to it. Move them first.`,
       };
     }
 

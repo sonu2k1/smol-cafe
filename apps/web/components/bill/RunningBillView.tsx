@@ -322,13 +322,20 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 p-1.5 shadow-2xs">
                   <Image
-                    src="/icon_upi_hd.png"
+                    src="/upi-logo-trimmed.png"
                     alt="UPI"
-                    width={28}
-                    height={28}
-                    className="object-contain dark:invert dark:brightness-150"
+                    width={32}
+                    height={16}
+                    className="object-contain w-auto h-5 dark:hidden"
+                  />
+                  <Image
+                    src="/upi-logo-dark.png"
+                    alt="UPI"
+                    width={32}
+                    height={16}
+                    className="object-contain w-auto h-5 hidden dark:block"
                   />
                 </div>
                 <div>
@@ -351,13 +358,13 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 p-1.5 shadow-2xs">
                   <Image
                     src="/icon_card_hd.png"
                     alt="Card"
                     width={28}
                     height={28}
-                    className="object-contain dark:invert dark:brightness-150"
+                    className="object-contain w-auto h-6 drop-shadow-xs"
                   />
                 </div>
                 <div>
@@ -379,13 +386,13 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 p-1.5 shadow-2xs">
                   <Image
                     src="/icon_wallet_hd.png"
                     alt="Wallets"
                     width={28}
                     height={28}
-                    className="object-contain dark:invert dark:brightness-150"
+                    className="object-contain w-auto h-6 drop-shadow-xs"
                   />
                 </div>
                 <div>
@@ -393,7 +400,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
                     Wallets
                   </h3>
                   <p className="font-sans text-[12.5px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
-                    PhonePe, Paytm, etc.
+                    Amazon Pay, Mobikwik &amp; more
                   </p>
                 </div>
               </div>

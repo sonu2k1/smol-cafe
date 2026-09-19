@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import QRCode from "qrcode";
 import {
   Armchair,
   Plus,
@@ -20,6 +21,10 @@ import {
   Sparkles,
   ToggleLeft,
   ToggleRight,
+  Download,
+  Copy,
+  Check,
+  ChevronDown,
 } from "lucide-react";
 import {
   type DiningTableRecord,
@@ -71,6 +76,18 @@ export const TableManager: React.FC<TableManagerProps> = ({
   const [isSectionsModalOpen, setIsSectionsModalOpen] = useState<boolean>(false);
   const [inspectingTag, setInspectingTag] = useState<TableJsonTag | null>(null);
   const [viewingQrTable, setViewingQrTable] = useState<DiningTableRecord | null>(null);
+  const [isBatchQrModalOpen, setIsBatchQrModalOpen] = useState<boolean>(false);
+
+  // Custom Dropdown Open States
+  const [isAddSectionDropdownOpen, setIsAddSectionDropdownOpen] = useState<boolean>(false);
+  const [isEditSectionDropdownOpen, setIsEditSectionDropdownOpen] = useState<boolean>(false);
+
+  // QR Generation States
+  const [qrDomain, setQrDomain] = useState<string>("https://smol-cafe-web.vercel.app");
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const [addQrPreviewUrl, setAddQrPreviewUrl] = useState<string>("");
+  const [allQrDataUrls, setAllQrDataUrls] = useState<Record<string, string>>({});
+  const [copied, setCopied] = useState<boolean>(false);
 
   // Form states
   const [tableLabel, setTableLabel] = useState<string>("");
@@ -83,6 +100,71 @@ export const TableManager: React.FC<TableManagerProps> = ({
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  // Real-time QR Generation for Add Table Modal preview
+  useEffect(() => {
+    if (isAddModalOpen && tableLabel.trim()) {
+      const origin = (qrDomain || (typeof window !== "undefined" ? window.location.origin : "https://smol-cafe-web.vercel.app")).replace(/\/$/, "");
+      const tableUrl = `${origin}/t/table-${tableLabel.trim().toLowerCase()}`;
+      QRCode.toDataURL(tableUrl, {
+        width: 320,
+        margin: 1,
+        color: { dark: "#241F1C", light: "#FFFFFF" },
+        errorCorrectionLevel: "H",
+      })
+        .then(setAddQrPreviewUrl)
+        .catch(() => setAddQrPreviewUrl(""));
+    } else {
+      setAddQrPreviewUrl("");
+    }
+  }, [isAddModalOpen, tableLabel, qrDomain]);
+
+  // Real-time QR Generation for selected table
+  useEffect(() => {
+    if (viewingQrTable) {
+      const origin = (qrDomain || (typeof window !== "undefined" ? window.location.origin : "https://smol-cafe-web.vercel.app")).replace(/\/$/, "");
+      const tableUrl = `${origin}/t/table-${viewingQrTable.label.toLowerCase()}`;
+      QRCode.toDataURL(tableUrl, {
+        width: 480,
+        margin: 2,
+        color: {
+          dark: "#241F1C",
+          light: "#FFFFFF",
+        },
+        errorCorrectionLevel: "H",
+      })
+        .then(setQrDataUrl)
+        .catch(console.error);
+    } else {
+      setQrDataUrl("");
+      setCopied(false);
+    }
+  }, [viewingQrTable, qrDomain]);
+
+  // Batch QR Generation for all tables
+  useEffect(() => {
+    if (isBatchQrModalOpen && tables.length > 0) {
+      const origin = (qrDomain || (typeof window !== "undefined" ? window.location.origin : "https://smol-cafe-web.vercel.app")).replace(/\/$/, "");
+      const promises = tables.map(async (t) => {
+        const tableUrl = `${origin}/t/table-${t.label.toLowerCase()}`;
+        const url = await QRCode.toDataURL(tableUrl, {
+          width: 360,
+          margin: 2,
+          color: { dark: "#241F1C", light: "#FFFFFF" },
+          errorCorrectionLevel: "H",
+        });
+        return { label: t.label, url };
+      });
+
+      Promise.all(promises).then((results) => {
+        const map: Record<string, string> = {};
+        results.forEach((r) => {
+          map[r.label] = r.url;
+        });
+        setAllQrDataUrls(map);
+      });
+    }
+  }, [isBatchQrModalOpen, tables, qrDomain]);
+
   // Statistics
   const stats = useMemo(() => {
     const total = tables.length;
@@ -91,6 +173,22 @@ export const TableManager: React.FC<TableManagerProps> = ({
     const totalSeats = tables.reduce((sum, t) => sum + (t.seats || 0), 0);
     return { total, active, occupied, totalSeats };
   }, [tables]);
+
+  // Global Escape key listener to close all modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setViewingQrTable(null);
+        setIsBatchQrModalOpen(false);
+        setEditingTable(null);
+        setIsAddModalOpen(false);
+        setIsSectionsModalOpen(false);
+        setInspectingTag(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Section table counts
   const sectionCounts = useMemo(() => {
@@ -172,7 +270,10 @@ export const TableManager: React.FC<TableManagerProps> = ({
           setSections((prev) => [...prev, tableSection]);
         }
         setIsAddModalOpen(false);
-        setFeedback({ type: "success", text: res.message || "Table added successfully!" });
+        setIsAddSectionDropdownOpen(false);
+        setFeedback({ type: "success", text: `Table T-${res.table.label} added! Scannable QR stand & tags generated.` });
+        // Automatically open the new Table's QR Stand for instant preview & printing!
+        setViewingQrTable(res.table);
       } else {
         setFeedback({ type: "error", text: res.message || "Failed to add table." });
       }
@@ -295,173 +396,183 @@ export const TableManager: React.FC<TableManagerProps> = ({
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Feedback Toast */}
-      {feedback && (
-        <div
-          className={`flex items-center justify-between rounded-2xl p-4 text-xs font-mono transition-all border ${
-            feedback.type === "success"
-              ? "bg-emerald-50 text-emerald-900 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-800"
-              : "bg-rose-50 text-rose-900 border-rose-300 dark:bg-rose-950/80 dark:text-rose-200 dark:border-rose-800"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {feedback.type === "success" ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-            ) : (
-              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
-            )}
-            <span>{feedback.text}</span>
-          </div>
-          <button
-            onClick={() => setFeedback(null)}
-            className="text-stone-500 hover:text-stone-900 dark:hover:text-white"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Header & Quick Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif text-2xl font-bold text-[#241F1C] dark:text-white">
-              Dining Tables & Floor Sections
-            </h1>
-            <span className="rounded-full bg-[#B72E35]/15 dark:bg-[#B72E35]/30 text-[#B72E35] dark:text-[#FF6B6B] px-2.5 py-0.5 text-xs font-mono font-bold">
-              {tables.length} Tables
-            </span>
-          </div>
-          <p className="font-mono text-xs text-[#725039] dark:text-stone-400 mt-0.5">
-            Add, edit, and organize dining tables into zones with QR code & JSON Tag generation.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 shrink-0">
-          <button
-            onClick={() => setIsSectionsModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3.5 py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs"
-          >
-            <Layers className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />
-            <span>Manage Sections</span>
-          </button>
-
-          <button
-            onClick={handleOpenAdd}
-            className="flex items-center gap-1.5 rounded-2xl bg-[#B72E35] hover:bg-[#9B252B] px-4 py-2 text-xs font-mono font-bold text-white shadow-md shadow-red-950/20 active:scale-95 transition"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Table</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3.5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Total Tables</span>
-            <Armchair className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />
-          </div>
-          <p className="mt-1 text-2xl font-serif font-bold text-[#241F1C] dark:text-white">{stats.total}</p>
-        </div>
-
-        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3.5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Occupied</span>
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          </div>
-          <p className="mt-1 text-2xl font-serif font-bold text-emerald-700 dark:text-emerald-400">
-            {stats.occupied} <span className="text-xs font-mono font-normal text-stone-500">active now</span>
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3.5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Total Capacity</span>
-            <Users className="h-4 w-4 text-[#725039] dark:text-stone-400" />
-          </div>
-          <p className="mt-1 text-2xl font-serif font-bold text-[#241F1C] dark:text-white">
-            {stats.totalSeats} <span className="text-xs font-mono font-normal text-stone-500">guests</span>
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3.5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Floor Sections</span>
-            <Layers className="h-4 w-4 text-[#754CFF]" />
-          </div>
-          <p className="mt-1 text-2xl font-serif font-bold text-[#241F1C] dark:text-white">{sections.length}</p>
-        </div>
-      </div>
-
-      {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
-        {/* Section Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-          <button
-            onClick={() => setSelectedSection("ALL")}
-            className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-mono font-bold transition ${
-              selectedSection === "ALL"
-                ? "bg-[#241F1C] text-white dark:bg-white dark:text-[#241F1C] shadow-xs"
-                : "bg-[#FAF4EB] text-[#725039] border border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800 hover:bg-[#F3E7D3]"
+    <div className="p-3.5 sm:p-5 lg:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto print:p-0 print:m-0 print:max-w-none">
+      {/* Main Admin Dashboard Content (Hidden Completely When Printing QR Stands) */}
+      <div className="print:hidden space-y-4 sm:space-y-6">
+        {/* Feedback Toast */}
+        {feedback && (
+          <div
+            className={`flex items-center justify-between rounded-2xl p-4 text-xs font-mono transition-all border ${
+              feedback.type === "success"
+                ? "bg-emerald-50 text-emerald-900 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-800"
+                : "bg-rose-50 text-rose-900 border-rose-300 dark:bg-rose-950/80 dark:text-rose-200 dark:border-rose-800"
             }`}
           >
-            All Sections ({tables.length})
-          </button>
+            <div className="flex items-center gap-2">
+              {feedback.type === "success" ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+              )}
+              <span>{feedback.text}</span>
+            </div>
+            <button
+              onClick={() => setFeedback(null)}
+              className="text-stone-500 hover:text-stone-900 dark:hover:text-white cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
-          {sections.map((sec) => {
-            const count = sectionCounts[sec] || 0;
-            return (
-              <button
-                key={sec}
-                onClick={() => setSelectedSection(sec)}
-                className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-mono font-bold transition ${
-                  selectedSection === sec
-                    ? "bg-[#B72E35] text-white shadow-xs"
-                    : "bg-[#FAF4EB] text-[#725039] border border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800 hover:bg-[#F3E7D3]"
-                }`}
-              >
-                {sec} ({count})
-              </button>
-            );
-          })}
+        {/* Header & Quick Action Buttons */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-serif text-xl sm:text-2xl font-bold text-[#241F1C] dark:text-white">
+                Dining Tables &amp; Floor Sections
+              </h1>
+              <span className="rounded-full bg-[#B72E35]/15 dark:bg-[#B72E35]/30 text-[#B72E35] dark:text-[#FF6B6B] px-2.5 py-0.5 text-xs font-mono font-bold shrink-0">
+                {tables.length} Tables
+              </span>
+            </div>
+            <p className="font-mono text-xs text-[#725039] dark:text-stone-400 mt-0.5">
+              Add, edit, and organize dining tables into zones with QR code &amp; JSON Tag generation.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
+            <button
+              onClick={() => setIsBatchQrModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs whitespace-nowrap cursor-pointer"
+            >
+              <QrCode className="h-3.5 w-3.5 text-[#B72E35] dark:text-[#F2C84B]" />
+              <span>Print All QRs ({tables.length})</span>
+            </button>
+
+            <button
+              onClick={() => setIsSectionsModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs whitespace-nowrap cursor-pointer"
+            >
+              <Layers className="h-3.5 w-3.5 text-[#754CFF] dark:text-[#C4B5FD]" />
+              <span>Manage Sections</span>
+            </button>
+
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center gap-1.5 rounded-2xl bg-[#B72E35] hover:bg-[#9B252B] px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-mono font-bold text-white shadow-md shadow-red-950/20 active:scale-95 transition whitespace-nowrap cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Table</span>
+            </button>
+          </div>
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-full sm:w-64 shrink-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search table or section..."
-            className="w-full rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 pl-9 pr-3 py-1.5 text-xs font-mono text-[#241F1C] dark:text-white placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-[#B72E35]"
-          />
-        </div>
-      </div>
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 sm:p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] sm:text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Total Tables</span>
+              <Armchair className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />
+            </div>
+            <p className="mt-1 text-xl sm:text-2xl font-serif font-bold text-[#241F1C] dark:text-white">{stats.total}</p>
+          </div>
 
-      {/* Tables Floor Grid */}
-      {filteredTables.length === 0 ? (
-        <div className="text-center py-16 rounded-3xl border border-dashed border-[#C9AE8B]/50 dark:border-stone-800 bg-[#FAF4EB]/40 dark:bg-stone-900/40 p-6">
-          <Armchair className="h-10 w-10 text-stone-400 mx-auto mb-2 opacity-50" />
-          <p className="font-serif text-base font-bold text-[#241F1C] dark:text-white">No Tables Found</p>
-          <p className="font-mono text-xs text-stone-500 mt-1">
-            {searchQuery
-              ? `No tables match "${searchQuery}". Try another search.`
-              : `No tables currently assigned to "${selectedSection}".`}
-          </p>
-          <button
-            onClick={handleOpenAdd}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#B72E35] px-3.5 py-1.5 text-xs font-mono text-white font-bold"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Table to This Section</span>
-          </button>
+          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 sm:p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] sm:text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Occupied</span>
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <p className="mt-1 text-xl sm:text-2xl font-serif font-bold text-emerald-700 dark:text-emerald-400 truncate">
+              {stats.occupied} <span className="text-xs font-mono font-normal text-stone-500">active</span>
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 sm:p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] sm:text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Total Capacity</span>
+              <Users className="h-4 w-4 text-[#725039] dark:text-stone-400" />
+            </div>
+            <p className="mt-1 text-xl sm:text-2xl font-serif font-bold text-[#241F1C] dark:text-white truncate">
+              {stats.totalSeats} <span className="text-xs font-mono font-normal text-stone-500">seats</span>
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 sm:p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] sm:text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Floor Sections</span>
+              <Layers className="h-4 w-4 text-[#754CFF]" />
+            </div>
+            <p className="mt-1 text-xl sm:text-2xl font-serif font-bold text-[#241F1C] dark:text-white">{sections.length}</p>
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+
+        {/* Filter & Search Bar */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
+          {/* Section Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 min-w-0">
+            <button
+              onClick={() => setSelectedSection("ALL")}
+              className={`shrink-0 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold transition cursor-pointer ${
+                selectedSection === "ALL"
+                  ? "bg-[#241F1C] text-white dark:bg-white dark:text-[#241F1C] shadow-xs"
+                  : "bg-[#FAF4EB] text-[#725039] border border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800 hover:bg-[#F3E7D3]"
+              }`}
+            >
+              All Sections ({tables.length})
+            </button>
+
+            {sections.map((sec) => {
+              const count = sectionCounts[sec] || 0;
+              return (
+                <button
+                  key={sec}
+                  onClick={() => setSelectedSection(sec)}
+                  className={`shrink-0 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold transition cursor-pointer ${
+                    selectedSection === sec
+                      ? "bg-[#B72E35] text-white shadow-xs"
+                      : "bg-[#FAF4EB] text-[#725039] border border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800 hover:bg-[#F3E7D3]"
+                  }`}
+                >
+                  {sec} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search Input */}
+          <div className="relative w-full lg:w-60 shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search table or section..."
+              className="w-full rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 pl-9 pr-3 py-1.5 text-xs font-mono text-[#241F1C] dark:text-white placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-[#B72E35]"
+            />
+          </div>
+        </div>
+
+        {/* Tables Floor Grid */}
+        {filteredTables.length === 0 ? (
+          <div className="text-center py-16 rounded-3xl border border-dashed border-[#C9AE8B]/50 dark:border-stone-800 bg-[#FAF4EB]/40 dark:bg-stone-900/40 p-6">
+            <Armchair className="h-10 w-10 text-stone-400 mx-auto mb-2 opacity-50" />
+            <p className="font-serif text-base font-bold text-[#241F1C] dark:text-white">No Tables Found</p>
+            <p className="font-mono text-xs text-stone-500 mt-1">
+              {searchQuery
+                ? `No tables match "${searchQuery}". Try another search.`
+                : `No tables currently assigned to "${selectedSection}".`}
+            </p>
+            <button
+              onClick={handleOpenAdd}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#B72E35] px-3.5 py-1.5 text-xs font-mono text-white font-bold cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Table to This Section</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
           {filteredTables.map((t) => {
             const cleanNum = t.label.padStart(2, "0");
             const isOcc = t.isOccupied;
@@ -579,8 +690,29 @@ export const TableManager: React.FC<TableManagerProps> = ({
               </div>
             );
           })}
+
+          {/* Add New Table Quick Card in Grid */}
+          <button
+            onClick={handleOpenAdd}
+            type="button"
+            className="flex flex-col items-center justify-center min-h-[260px] rounded-3xl border-2 border-dashed border-[#C9AE8B]/60 dark:border-stone-700 hover:border-[#B72E35] dark:hover:border-[#B72E35] bg-[#FAF4EB]/50 dark:bg-[#1A1715]/40 hover:bg-[#FAF4EB] dark:hover:bg-[#1A1715] p-6 text-center transition group shadow-xs hover:shadow-md cursor-pointer"
+          >
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#B72E35]/10 text-[#B72E35] group-hover:bg-[#B72E35] group-hover:text-white transition-all duration-300 group-hover:scale-110 shadow-xs mb-3">
+              <Plus className="h-7 w-7" />
+            </div>
+            <h4 className="font-serif text-base font-bold text-[#241F1C] dark:text-white group-hover:text-[#B72E35] transition">
+              + Add New Table
+            </h4>
+            <p className="text-xs font-mono text-stone-500 mt-1 max-w-[180px]">
+              Create table, auto-generate QR code & customer tag instantly
+            </p>
+            <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#B72E35] bg-[#B72E35]/10 px-3 py-1 rounded-full group-hover:bg-[#B72E35] group-hover:text-white transition">
+              <QrCode className="h-3 w-3" /> Auto QR Ready
+            </span>
+          </button>
         </div>
       )}
+      </div>
 
       {/* ========================================================================= */}
       {/* MODAL 1: ADD TABLE                                                        */}
@@ -621,21 +753,99 @@ export const TableManager: React.FC<TableManagerProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1">
-                  Floor Section / Zone
+              {/* Floor Section / Zone - Custom Aesthetic Café Selector */}
+              <div className="relative">
+                <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1.5 flex items-center justify-between">
+                  <span>Floor Section / Zone</span>
+                  <span className="text-[10.5px] font-normal text-stone-500">Tap to select zone</span>
                 </label>
-                <select
-                  value={tableSection}
-                  onChange={(e) => setTableSection(e.target.value)}
-                  className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-2 text-sm font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+
+                {/* Custom Dropdown Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setIsAddSectionDropdownOpen(!isAddSectionDropdownOpen)}
+                  className="w-full flex items-center justify-between rounded-2xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-left text-sm font-mono text-[#241F1C] dark:text-white hover:border-[#B72E35] focus:outline-none focus:ring-2 focus:ring-[#B72E35] shadow-xs transition"
                 >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${getSectionBadgeClass(
+                        tableSection
+                      )}`}
+                    >
+                      {tableSection}
+                    </span>
+                  </div>
+                  <ChevronDown
+                    className={`h-4 w-4 text-stone-400 transition-transform duration-200 ${
+                      isAddSectionDropdownOpen ? "rotate-180 text-[#B72E35]" : ""
+                    }`}
+                  />
+                </button>
+
+                {/* Custom Dropdown Menu Popover */}
+                {isAddSectionDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setIsAddSectionDropdownOpen(false)}
+                    />
+                    <div className="absolute top-full left-0 right-0 mt-1.5 z-30 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1C1816] p-2 shadow-xl space-y-1 animate-scale-in max-h-52 overflow-y-auto">
+                      {sections.map((sec) => {
+                        const isSelected = tableSection === sec;
+                        const count = tables.filter((t) => t.section === sec).length;
+
+                        return (
+                          <button
+                            key={sec}
+                            type="button"
+                            onClick={() => {
+                              setTableSection(sec);
+                              setIsAddSectionDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-mono transition text-left ${
+                              isSelected
+                                ? "bg-[#F3E7D3] dark:bg-stone-800 font-bold text-[#241F1C] dark:text-white border border-[#C9AE8B]/50 dark:border-stone-600 shadow-xs"
+                                : "text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-800/60"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-block text-[10.5px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${getSectionBadgeClass(
+                                  sec
+                                )}`}
+                              >
+                                {sec}
+                              </span>
+                              <span className="text-[10.5px] text-stone-400">({count} tables)</span>
+                            </div>
+                            {isSelected && <Check className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {/* Quick Pill Badges for 1-click selection */}
+                <div className="flex flex-wrap gap-1.5 pt-2">
                   {sections.map((sec) => (
-                    <option key={sec} value={sec}>
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => {
+                        setTableSection(sec);
+                        setIsAddSectionDropdownOpen(false);
+                      }}
+                      className={`text-[10.5px] font-mono font-bold px-2.5 py-1 rounded-xl border transition ${
+                        tableSection === sec
+                          ? "bg-[#B72E35] text-white border-[#B72E35] shadow-xs"
+                          : "bg-white/80 dark:bg-stone-900/80 text-stone-600 dark:text-stone-400 border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3]"
+                      }`}
+                    >
                       {sec}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
 
               <div>
@@ -650,7 +860,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
                       onClick={() => setTableSeats(s)}
                       className={`flex-1 rounded-xl py-1.5 text-xs font-mono font-bold border transition ${
                         tableSeats === s
-                          ? "bg-[#B72E35] text-white border-[#B72E35]"
+                          ? "bg-[#B72E35] text-white border-[#B72E35] shadow-xs"
                           : "bg-white dark:bg-stone-900 text-[#725039] dark:text-stone-400 border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3]"
                       }`}
                     >
@@ -673,10 +883,40 @@ export const TableManager: React.FC<TableManagerProps> = ({
                 />
               </div>
 
+              {/* Real-time QR Preview Card */}
+              {tableLabel.trim() && (
+                <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3]/40 dark:bg-stone-900/60 p-3 flex items-center gap-3.5">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-white p-1 border border-[#C9AE8B]/40 shadow-xs">
+                    {addQrPreviewUrl ? (
+                      <img src={addQrPreviewUrl} alt="Live QR Preview" className="h-full w-full object-contain" />
+                    ) : (
+                      <QrCode className="h-8 w-8 text-stone-400 animate-pulse" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-[#B72E35]" />
+                      <span className="text-[11px] font-mono font-bold text-[#241F1C] dark:text-white uppercase tracking-wider">
+                        Auto QR Ready
+                      </span>
+                    </div>
+                    <p className="font-mono text-[11px] text-[#725039] dark:text-stone-300 truncate mt-0.5">
+                      {qrDomain.replace(/\/$/, "")}/t/table-{tableLabel.trim().toLowerCase()}
+                    </p>
+                    <p className="text-[10px] text-stone-500 mt-0.5">
+                      Stand card, print sheet & token generated automatically on save.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#C9AE8B]/20 dark:border-stone-800">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setIsAddSectionDropdownOpen(false);
+                  }}
                   className="rounded-xl px-4 py-2 text-xs font-mono text-stone-600 dark:text-stone-400 hover:bg-black/5 dark:hover:bg-white/5"
                 >
                   Cancel
@@ -713,7 +953,10 @@ export const TableManager: React.FC<TableManagerProps> = ({
                 </div>
               </div>
               <button
-                onClick={() => setEditingTable(null)}
+                onClick={() => {
+                  setEditingTable(null);
+                  setIsEditSectionDropdownOpen(false);
+                }}
                 className="text-stone-400 hover:text-stone-600 dark:hover:text-white"
               >
                 <X className="h-5 w-5" />
@@ -734,21 +977,99 @@ export const TableManager: React.FC<TableManagerProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1">
-                  Floor Section / Zone
+              {/* Floor Section / Zone - Custom Aesthetic Café Selector */}
+              <div className="relative">
+                <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1.5 flex items-center justify-between">
+                  <span>Floor Section / Zone</span>
+                  <span className="text-[10.5px] font-normal text-stone-500">Tap to select zone</span>
                 </label>
-                <select
-                  value={tableSection}
-                  onChange={(e) => setTableSection(e.target.value)}
-                  className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-2 text-sm font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+
+                {/* Custom Dropdown Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setIsEditSectionDropdownOpen(!isEditSectionDropdownOpen)}
+                  className="w-full flex items-center justify-between rounded-2xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-left text-sm font-mono text-[#241F1C] dark:text-white hover:border-[#B72E35] focus:outline-none focus:ring-2 focus:ring-[#B72E35] shadow-xs transition"
                 >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${getSectionBadgeClass(
+                        tableSection
+                      )}`}
+                    >
+                      {tableSection}
+                    </span>
+                  </div>
+                  <ChevronDown
+                    className={`h-4 w-4 text-stone-400 transition-transform duration-200 ${
+                      isEditSectionDropdownOpen ? "rotate-180 text-[#B72E35]" : ""
+                    }`}
+                  />
+                </button>
+
+                {/* Custom Dropdown Menu Popover */}
+                {isEditSectionDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setIsEditSectionDropdownOpen(false)}
+                    />
+                    <div className="absolute top-full left-0 right-0 mt-1.5 z-30 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1C1816] p-2 shadow-xl space-y-1 animate-scale-in max-h-52 overflow-y-auto">
+                      {sections.map((sec) => {
+                        const isSelected = tableSection === sec;
+                        const count = tables.filter((t) => t.section === sec).length;
+
+                        return (
+                          <button
+                            key={sec}
+                            type="button"
+                            onClick={() => {
+                              setTableSection(sec);
+                              setIsEditSectionDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-mono transition text-left ${
+                              isSelected
+                                ? "bg-[#F3E7D3] dark:bg-stone-800 font-bold text-[#241F1C] dark:text-white border border-[#C9AE8B]/50 dark:border-stone-600 shadow-xs"
+                                : "text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-800/60"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-block text-[10.5px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${getSectionBadgeClass(
+                                  sec
+                                )}`}
+                              >
+                                {sec}
+                              </span>
+                              <span className="text-[10.5px] text-stone-400">({count} tables)</span>
+                            </div>
+                            {isSelected && <Check className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {/* Quick Pill Badges for 1-click selection */}
+                <div className="flex flex-wrap gap-1.5 pt-2">
                   {sections.map((sec) => (
-                    <option key={sec} value={sec}>
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => {
+                        setTableSection(sec);
+                        setIsEditSectionDropdownOpen(false);
+                      }}
+                      className={`text-[10.5px] font-mono font-bold px-2.5 py-1 rounded-xl border transition ${
+                        tableSection === sec
+                          ? "bg-[#B72E35] text-white border-[#B72E35] shadow-xs"
+                          : "bg-white/80 dark:bg-stone-900/80 text-stone-600 dark:text-stone-400 border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3]"
+                      }`}
+                    >
                       {sec}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
 
               <div>
@@ -763,7 +1084,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
                       onClick={() => setTableSeats(s)}
                       className={`flex-1 rounded-xl py-1.5 text-xs font-mono font-bold border transition ${
                         tableSeats === s
-                          ? "bg-[#B72E35] text-white border-[#B72E35]"
+                          ? "bg-[#B72E35] text-white border-[#B72E35] shadow-xs"
                           : "bg-white dark:bg-stone-900 text-[#725039] dark:text-stone-400 border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3]"
                       }`}
                     >
@@ -791,7 +1112,10 @@ export const TableManager: React.FC<TableManagerProps> = ({
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#C9AE8B]/20 dark:border-stone-800">
                 <button
                   type="button"
-                  onClick={() => setEditingTable(null)}
+                  onClick={() => {
+                    setEditingTable(null);
+                    setIsEditSectionDropdownOpen(false);
+                  }}
                   className="rounded-xl px-4 py-2 text-xs font-mono text-stone-600 dark:text-stone-400 hover:bg-black/5 dark:hover:bg-white/5"
                 >
                   Cancel
@@ -939,65 +1263,460 @@ export const TableManager: React.FC<TableManagerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 5: QR CODE VIEWER                                                   */}
+      {/* MODAL 5: REAL ARTISANAL TABLE QR STAND VIEWER                             */}
       {/* ========================================================================= */}
-      {viewingQrTable && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="relative w-full max-w-sm rounded-3xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1A1715] p-6 shadow-2xl text-center space-y-4">
+      {viewingQrTable && (() => {
+        const origin = (qrDomain || (typeof window !== "undefined" ? window.location.origin : "https://smol-cafe-web.vercel.app")).replace(/\/$/, "");
+        const tableUrl = `${origin}/t/table-${viewingQrTable.label.toLowerCase()}`;
+
+        return (
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setViewingQrTable(null);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in overflow-y-auto print:p-0 print:bg-transparent print:static print:block"
+          >
+            {/* Prominent Floating Close Button (Always Visible On-Screen) */}
             <button
               onClick={() => setViewingQrTable(null)}
-              className="absolute right-4 top-4 text-stone-400 hover:text-stone-600 dark:hover:text-white"
+              className="fixed top-4 right-4 sm:top-6 sm:right-6 z-60 flex items-center justify-center h-11 w-11 rounded-full bg-[#241F1C] text-white hover:bg-black shadow-2xl border-2 border-white/30 transition hover:scale-110 active:scale-95 cursor-pointer print:hidden"
+              title="Close (Esc)"
             >
-              <X className="h-5 w-5" />
+              <X className="h-6 w-6" />
             </button>
 
-            <div>
-              <span className="font-serif text-2xl font-bold text-[#241F1C] dark:text-white block">
-                Table T-{viewingQrTable.label}
-              </span>
-              <span className="text-xs font-mono text-[#B72E35] dark:text-[#F2C84B] font-bold">
-                {viewingQrTable.section}
-              </span>
-            </div>
-
-            {/* QR Simulation Box */}
-            <div className="mx-auto w-48 h-48 rounded-2xl bg-white p-4 shadow-md border-2 border-stone-800 flex flex-col items-center justify-center space-y-2">
-              <QrCode className="h-32 w-32 text-stone-950" strokeWidth={1.5} />
-              <span className="text-[10px] font-mono font-bold text-stone-700 uppercase">
-                table-{viewingQrTable.label.toLowerCase()}
-              </span>
-            </div>
-
-            <p className="text-[11px] font-mono text-stone-500">
-              Scans open: <code className="text-[#B72E35]">/t/table-{viewingQrTable.label.toLowerCase()}</code>
-            </p>
-
-            <div className="flex items-center justify-center gap-2 pt-2">
-              <Link
-                href={`/t/table-${viewingQrTable.label.toLowerCase()}`}
-                target="_blank"
-                className="flex items-center gap-1 rounded-xl bg-[#241F1C] dark:bg-stone-800 text-white px-3.5 py-2 text-xs font-mono font-bold hover:bg-stone-800 transition"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                <span>Open Live Table</span>
-              </Link>
-
+            <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 sm:p-6 shadow-2xl space-y-4 text-center my-auto print:my-0 print:p-0 print:border-none print:shadow-none print:bg-transparent print:max-h-none print:max-w-none">
               <button
-                onClick={() => window.print()}
-                className="flex items-center gap-1 rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2 text-xs font-mono font-bold text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3] transition"
+                onClick={() => setViewingQrTable(null)}
+                className="absolute right-4 top-4 text-stone-500 hover:text-stone-800 dark:hover:text-white p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition print:hidden"
+                title="Close"
               >
-                <Printer className="h-3.5 w-3.5" />
-                <span>Print QR</span>
+                <X className="h-5 w-5" />
               </button>
+
+              {/* Modal Header (Hidden on Print) */}
+              <div className="print:hidden space-y-1 pr-6">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-[#B72E35] dark:text-[#F2C84B] font-bold">
+                  Official Table QR Stand
+                </span>
+                <h3 className="font-serif text-2xl font-bold text-[#241F1C] dark:text-white">
+                  Table T-{viewingQrTable.label}
+                </h3>
+                <p className="text-xs font-mono text-[#725039] dark:text-stone-400">
+                  {viewingQrTable.section} • {viewingQrTable.seats} Seater
+                </p>
+
+                {/* Domain Selector Pill */}
+                <div className="flex items-center justify-center gap-1.5 pt-1 text-[10.5px] font-mono">
+                  <span className="text-stone-500 font-bold">Domain:</span>
+                  <button
+                    onClick={() => setQrDomain("https://smol-cafe-web.vercel.app")}
+                    className={`px-2.5 py-0.5 rounded-full border transition font-bold ${
+                      qrDomain === "https://smol-cafe-web.vercel.app"
+                        ? "bg-[#B72E35] text-white border-[#B72E35] shadow-xs"
+                        : "bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border-stone-300 dark:border-stone-700 hover:border-stone-400"
+                    }`}
+                  >
+                    ⚡ Vercel Live
+                  </button>
+                  <button
+                    onClick={() => setQrDomain(typeof window !== "undefined" ? window.location.origin : "http://localhost:3000")}
+                    className={`px-2.5 py-0.5 rounded-full border transition font-bold ${
+                      qrDomain !== "https://smol-cafe-web.vercel.app"
+                        ? "bg-[#241F1C] text-white border-[#241F1C] shadow-xs"
+                        : "bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border-stone-300 dark:border-stone-700 hover:border-stone-400"
+                    }`}
+                  >
+                    💻 Localhost
+                  </button>
+                </div>
+              </div>
+
+              {/* Printable Table Stand Card (Real Scannable QR) */}
+              <div
+                id="printable-table-stand"
+                style={{ breakInside: "avoid", pageBreakInside: "avoid" }}
+                className="smol-printable-root mx-auto w-full max-w-[320px] rounded-3xl bg-white text-[#241F1C] p-5 shadow-lg border-2 border-stone-800 space-y-2.5 relative overflow-hidden print:shadow-none print:border-2 print:border-stone-900 print:m-auto print:break-inside-avoid print:max-w-[300px]"
+              >
+                {/* Brand Header with Smol Café Logo */}
+                <div className="border-b border-stone-200 pb-2 flex flex-col items-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/current_logo_transparent_on_cream.png"
+                    alt="smol café"
+                    className="h-14 w-auto object-contain mx-auto mb-1"
+                  />
+                  <span className="text-[8.5px] font-mono tracking-widest text-stone-500 uppercase font-bold">
+                    Tapovan, Rishikesh
+                  </span>
+                </div>
+
+                {/* Table Number Pill */}
+                <div className="py-0.5">
+                  <div className="inline-block rounded-xl bg-[#241F1C] text-[#FAF4EB] px-4 py-1 shadow-sm print:bg-[#241F1C] print:text-white">
+                    <span className="text-[9.5px] font-mono font-bold tracking-widest uppercase block">
+                      SEATING TABLE
+                    </span>
+                    <span className="font-serif text-2xl font-black leading-none block">
+                      {viewingQrTable.label}
+                    </span>
+                  </div>
+                  <span className="block text-[9.5px] font-mono text-stone-600 font-bold mt-1 uppercase tracking-wide">
+                    {viewingQrTable.section}
+                  </span>
+                </div>
+
+                {/* Real High-Resolution Scannable QR Code */}
+                <div className="relative mx-auto w-48 h-48 bg-white rounded-2xl p-2 border border-stone-300 flex items-center justify-center shadow-inner print:shadow-none">
+                  {qrDataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={qrDataUrl}
+                      alt={`Real QR Code for Table ${viewingQrTable.label}`}
+                      className="w-full h-full object-contain rounded-xl"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-stone-400 space-y-1">
+                      <QrCode className="h-10 w-10 animate-pulse" />
+                      <span className="text-[10px] font-mono">Generating QR...</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Customer Instructions */}
+                <div className="space-y-0.5">
+                  <p className="text-xs font-serif font-bold text-[#241F1C]">
+                    Scan to View Menu &amp; Order
+                  </p>
+                  <p className="text-[9px] font-mono text-stone-500 leading-tight">
+                    Point your phone camera • No app download required
+                  </p>
+                </div>
+
+                {/* Wi-Fi Details & Direct URL Footer */}
+                <div className="border-t border-stone-200 pt-1.5 text-[8.5px] font-mono text-stone-500 space-y-0.5">
+                  <div className="font-bold text-[#B72E35]">
+                    {tableUrl.replace(/^https?:\/\//, "")}
+                  </div>
+                  <div className="text-stone-400">
+                    Wi-Fi: <span className="text-stone-700 font-bold">smol-guest</span> | Pass: <span className="text-stone-700 font-bold">coffee123</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Direct Table Link Bar with Copy (Hidden on Print) */}
+              <div className="flex items-center justify-between rounded-xl bg-white dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 p-2 text-xs font-mono print:hidden">
+                <span className="truncate text-[11px] text-[#725039] dark:text-stone-300 max-w-[220px] text-left">
+                  {tableUrl}
+                </span>
+                <button
+                  onClick={() => {
+                    if (navigator.clipboard) {
+                      navigator.clipboard.writeText(tableUrl);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }
+                  }}
+                  className="flex items-center gap-1 rounded-lg bg-[#FAF4EB] dark:bg-stone-800 border border-[#C9AE8B]/30 px-2.5 py-1 text-[11px] text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] transition shrink-0"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3 w-3 text-emerald-600" />
+                      <span className="text-emerald-600 font-bold">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Action Buttons Toolbar (Hidden on Print) */}
+              <div className="grid grid-cols-3 gap-2 pt-1 print:hidden">
+                <Link
+                  href={`/t/table-${viewingQrTable.label.toLowerCase()}`}
+                  target="_blank"
+                  className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-[#241F1C] dark:bg-stone-800 text-white p-2.5 text-[11px] font-mono font-bold hover:bg-stone-800 dark:hover:bg-stone-700 transition"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>Open Table</span>
+                </Link>
+
+                <button
+                  onClick={() => {
+                    if (qrDataUrl) {
+                      const link = document.createElement("a");
+                      link.href = qrDataUrl;
+                      link.download = `smol-cafe-table-${viewingQrTable.label.toLowerCase()}-qr.png`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }
+                  }}
+                  disabled={!qrDataUrl}
+                  className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-[11px] font-mono font-bold text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3] transition disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />
+                  <span>Download PNG</span>
+                </button>
+
+                <button
+                  onClick={() => window.print()}
+                  className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-[11px] font-mono font-bold text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3] transition"
+                >
+                  <Printer className="h-4 w-4 text-[#754CFF] dark:text-[#C4B5FD]" />
+                  <span>Print Stand</span>
+                </button>
+              </div>
+
+              {/* Bottom Full-Width Close Button (Hidden on Print) */}
+              <div className="pt-1 print:hidden">
+                <button
+                  onClick={() => setViewingQrTable(null)}
+                  className="w-full py-2.5 rounded-2xl bg-stone-200/80 hover:bg-stone-300 dark:bg-stone-800 dark:hover:bg-stone-700 text-[#241F1C] dark:text-white text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <X className="h-4 w-4" />
+                  <span>Close Preview</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* ========================================================================= */}
+      {/* MODAL 6: BATCH PRINT ALL TABLE STANDS                                      */}
+      {/* ========================================================================= */}
+      {isBatchQrModalOpen && (() => {
+        const origin = (qrDomain || (typeof window !== "undefined" ? window.location.origin : "https://smol-cafe-web.vercel.app")).replace(/\/$/, "");
+
+        return (
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setIsBatchQrModalOpen(false);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in overflow-y-auto print:p-0 print:m-0 print:bg-transparent print:static print:block print:w-full"
+          >
+            {/* Prominent Floating Close Button (Always Visible On-Screen) */}
+            <button
+              onClick={() => setIsBatchQrModalOpen(false)}
+              className="fixed top-4 right-4 sm:top-6 sm:right-6 z-60 flex items-center justify-center h-11 w-11 rounded-full bg-[#241F1C] text-white hover:bg-black shadow-2xl border-2 border-white/30 transition hover:scale-110 active:scale-95 cursor-pointer print:hidden"
+              title="Close (Esc)"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            <div className="smol-printable-root relative w-full max-w-5xl rounded-3xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1A1715] p-6 shadow-2xl space-y-6 my-auto max-h-[90vh] flex flex-col print:my-0 print:p-0 print:border-none print:shadow-none print:bg-transparent print:max-h-none print:max-w-none print:w-full">
+              {/* Header (Hidden on Print) */}
+              <div className="flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-4 print:hidden">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <QrCode className="h-5 w-5 text-[#B72E35] dark:text-[#F2C84B]" />
+                    <h3 className="font-serif text-2xl font-bold text-[#241F1C] dark:text-white">
+                      All Dining Table QR Stands ({tables.length} Tables)
+                    </h3>
+                  </div>
+                  <p className="text-xs font-mono text-[#725039] dark:text-stone-400 mt-0.5">
+                    Real scannable table stand cards formatted for printing and cafe deployment
+                  </p>
+                  
+                  {/* Domain Selector Pill */}
+                  <div className="flex items-center gap-1.5 pt-2 text-[10.5px] font-mono">
+                    <span className="text-stone-500 font-bold">Domain:</span>
+                    <button
+                      onClick={() => setQrDomain("https://smol-cafe-web.vercel.app")}
+                      className={`px-2.5 py-0.5 rounded-full border transition font-bold ${
+                        qrDomain === "https://smol-cafe-web.vercel.app"
+                          ? "bg-[#B72E35] text-white border-[#B72E35] shadow-xs"
+                          : "bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border-stone-300 dark:border-stone-700 hover:border-stone-400"
+                      }`}
+                    >
+                      ⚡ Vercel Live (smol-cafe-web.vercel.app)
+                    </button>
+                    <button
+                      onClick={() => setQrDomain(typeof window !== "undefined" ? window.location.origin : "http://localhost:3000")}
+                      className={`px-2.5 py-0.5 rounded-full border transition font-bold ${
+                        qrDomain !== "https://smol-cafe-web.vercel.app"
+                          ? "bg-[#241F1C] text-white border-[#241F1C] shadow-xs"
+                          : "bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border-stone-300 dark:border-stone-700 hover:border-stone-400"
+                      }`}
+                    >
+                      💻 Localhost
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-1.5 rounded-xl bg-[#B72E35] hover:bg-[#9B252B] text-white px-4 py-2 text-xs font-mono font-bold shadow-md transition"
+                  >
+                    <Printer className="h-4 w-4" />
+                    <span>Print All Stands</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsBatchQrModalOpen(false)}
+                    className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-white rounded-xl hover:bg-black/5"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* 2-Column Grid on Print for Perfect A4 Page Fit (No Side Cutoff) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pr-2 pb-4 print:grid-cols-2 print:gap-4 print:overflow-visible print:p-0 print:w-full print:m-0">
+                {tables.map((table) => {
+                  const tableUrl = `${origin}/t/table-${table.label.toLowerCase()}`;
+                  const qrUrl = allQrDataUrls[table.label];
+
+                  return (
+                    <div
+                      key={table.id}
+                      style={{ breakInside: "avoid", pageBreakInside: "avoid" }}
+                      className="rounded-3xl bg-white text-[#241F1C] p-5 shadow-md border-2 border-stone-800 space-y-3 text-center flex flex-col justify-between print:shadow-none print:border-2 print:border-stone-900 print:break-inside-avoid print:p-3.5 print:space-y-2 print:rounded-2xl print:w-full"
+                    >
+                      <div className="border-b border-stone-200 pb-1.5 flex flex-col items-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/current_logo_transparent_on_cream.png"
+                          alt="smol café"
+                          className="h-10 w-auto object-contain mx-auto mb-1"
+                        />
+                        <span className="text-[7.5px] font-mono tracking-widest text-stone-500 uppercase font-bold">
+                          Tapovan, Rishikesh
+                        </span>
+                      </div>
+
+                      <div>
+                        <div className="inline-block rounded-xl bg-[#241F1C] text-[#FAF4EB] px-3 py-0.5 print:bg-[#241F1C] print:text-white">
+                          <span className="text-[8.5px] font-mono font-bold tracking-widest uppercase block">
+                            TABLE
+                          </span>
+                          <span className="font-serif text-xl font-black leading-none block">
+                            {table.label}
+                          </span>
+                        </div>
+                        <span className="block text-[9px] font-mono text-stone-600 font-bold mt-1 uppercase">
+                          {table.section} • {table.seats} Seats
+                        </span>
+                      </div>
+
+                      <div className="mx-auto w-36 h-36 bg-white rounded-xl p-1 border border-stone-300 flex items-center justify-center print:w-32 print:h-32">
+                        {qrUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={qrUrl}
+                            alt={`Table ${table.label} QR`}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <QrCode className="h-8 w-8 text-stone-400 animate-pulse" />
+                        )}
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] font-serif font-bold text-[#241F1C]">
+                          Scan to View Menu &amp; Order
+                        </p>
+                        <p className="text-[8px] font-mono text-stone-500">
+                          {tableUrl.replace(/^https?:\/\//, "")}
+                        </p>
+                      </div>
+
+                      {/* Card Action Buttons (Hidden on Print) */}
+                      <div className="pt-2 border-t border-stone-200 flex items-center justify-center gap-2 print:hidden">
+                        <Link
+                          href={`/t/table-${table.label.toLowerCase()}`}
+                          target="_blank"
+                          className="flex items-center gap-1 rounded-lg bg-[#FAF4EB] hover:bg-[#F3E7D3] border border-stone-300 px-2.5 py-1 text-[10px] font-mono font-bold text-stone-800"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          <span>Test URL</span>
+                        </Link>
+
+                        <button
+                          onClick={() => {
+                            if (qrUrl) {
+                              const link = document.createElement("a");
+                              link.href = qrUrl;
+                              link.download = `smol-cafe-table-${table.label.toLowerCase()}-qr.png`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }
+                          }}
+                          className="flex items-center gap-1 rounded-lg bg-stone-900 text-white px-2.5 py-1 text-[10px] font-mono font-bold"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Save PNG</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* JSON Tag Inspector Modal */}
       {inspectingTag && (
         <JsonTagInspectorModal tag={inspectingTag} onClose={() => setInspectingTag(null)} />
       )}
+
+      {/* Print Specific CSS Rules */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            margin: 8mm;
+            size: portrait;
+          }
+          *, *::before, *::after {
+            box-sizing: border-box !important;
+          }
+          html, body {
+            background-color: #ffffff !important;
+            background: #ffffff !important;
+            color: #241F1C !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            overflow: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          /* Hide non-printable background admin UI when printing */
+          body * {
+            visibility: hidden !important;
+          }
+          .smol-printable-root,
+          .smol-printable-root * {
+            visibility: visible !important;
+          }
+          .smol-printable-root {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block !important;
+            background: transparent !important;
+          }
+          /* Explicitly hidden during print */
+          .print\\:hidden,
+          header, nav, aside, footer {
+            display: none !important;
+            visibility: hidden !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
+

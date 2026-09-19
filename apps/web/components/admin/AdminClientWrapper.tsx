@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { AdminLoginGate } from "./AdminLoginGate";
 import { AdminTowerDashboard } from "./AdminTowerDashboard";
+import type { AdminOverviewData } from "@/app/admin/actions";
 
 interface AdminClientWrapperProps {
   initialMetrics?: {
@@ -10,9 +11,10 @@ interface AdminClientWrapperProps {
     activeOrdersCount?: number;
     lowStockCount?: number;
   };
+  initialOverviewData?: AdminOverviewData;
 }
 
-export const AdminClientWrapper: React.FC<AdminClientWrapperProps> = ({ initialMetrics }) => {
+export const AdminClientWrapper: React.FC<AdminClientWrapperProps> = ({ initialMetrics, initialOverviewData }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -40,5 +42,10 @@ export const AdminClientWrapper: React.FC<AdminClientWrapperProps> = ({ initialM
     return <AdminLoginGate onSuccess={() => setIsAuthenticated(true)} />;
   }
 
-  return <AdminTowerDashboard initialMetrics={initialMetrics} />;
+  return (
+    <AdminTowerDashboard
+      initialMetrics={initialMetrics}
+      initialOverviewData={initialOverviewData}
+    />
+  );
 };
