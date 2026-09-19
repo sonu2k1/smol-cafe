@@ -53,6 +53,18 @@ export interface PlacePaidOrderOptions {
   instructions?: string;
 }
 
+// In-memory idempotency deduplication cache for concurrent mobile clicks
+const inFlightOrderMap = new Map<string, { promise: Promise<PlaceOrderResult>; timestamp: number }>();
+
+function cleanExpiredInFlight() {
+  const now = Date.now();
+  for (const [key, item] of inFlightOrderMap.entries()) {
+    if (now - item.timestamp > 15000) {
+      inFlightOrderMap.delete(key);
+    }
+  }
+}
+
 /**
  * Server Action: Places an order within a single atomic PostgreSQL transaction
  * enforcing server-side price re-validation, inventory reservation, and reward redemption.
@@ -64,8 +76,18 @@ export async function placeOrderAction(
   instructions?: string,
   sessionOverride?: TableSessionData
 ): Promise<PlaceOrderResult> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
+  cleanExpiredInFlight();
+
+  // Deduplicate exact concurrent requests (double tap prevention)
+  const dedupKey = `${idempotencyKey}_${items.length}`;
+  const existingInFlight = inFlightOrderMap.get(dedupKey);
+  if (existingInFlight && Date.now() - existingInFlight.timestamp < 10000) {
+    return existingInFlight.promise;
+  }
+
+  const executionPromise = (async (): Promise<PlaceOrderResult> => {
+    const requestId = generateRequestId();
+    const startTime = Date.now();
 
   // 1. Verify Active Table Session from Signed Cookie or fallback to default table
   let session = sessionOverride || (await getTableSessionCookie());
@@ -259,6 +281,10 @@ export async function placeOrderAction(
       message: "An unexpected error occurred while placing your order.",
     };
   }
+  })();
+
+  inFlightOrderMap.set(dedupKey, { promise: executionPromise, timestamp: Date.now() });
+  return executionPromise;
 }
 
 export interface PlacePaidOrderOptions {

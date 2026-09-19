@@ -146,12 +146,12 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
 
   // Real-Time Event Listener & Polling Fallback Loop
   useEffect(() => {
-    // 1. Fast 2s Polling
+    // 1. Smart Fallback Polling (6s interval when tab is visible, WebSocket handles instant push)
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshOrders();
       }
-    }, 2000);
+    }, 6000);
 
     // 2. Cross-Interface Real-Time Sync Subscription
     const unsubscribe = subscribeToSyncEvents(() => {
