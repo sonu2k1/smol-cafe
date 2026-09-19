@@ -12,7 +12,8 @@ import type { OrderStatus } from "@smol-cafe/db";
 import { KitchenTicketCard } from "./KitchenTicketCard";
 import { EtaAccuracyReview } from "./EtaAccuracyReview";
 import { KitchenMenuManager } from "./KitchenMenuManager";
-import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed, RotateCcw, Trash2 } from "lucide-react";
+import { KitchenCookbookView } from "./KitchenCookbookView";
+import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed, RotateCcw, Trash2, BookOpen } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
@@ -29,7 +30,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [showEtaAnalytics, setShowEtaAnalytics] = useState(false);
-  const [currentView, setCurrentView] = useState<"TICKETS" | "MENU_STOCK">("TICKETS");
+  const [currentView, setCurrentView] = useState<"TICKETS" | "MENU_STOCK" | "COOKBOOK">("TICKETS");
   const [mounted, setMounted] = useState(false);
   const prevOrderCountRef = useRef(initialOrders.length);
   // Track ongoing optimistic transitions to prevent polling flicker/snap-back
@@ -297,6 +298,17 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
               <UtensilsCrossed className="h-3.5 w-3.5 shrink-0" />
               <span>Daily Menu &amp; 86</span>
             </button>
+            <button
+              onClick={() => setCurrentView("COOKBOOK")}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                currentView === "COOKBOOK"
+                  ? "bg-[#B72E35] text-white shadow-xs"
+                  : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+              <span>Chef&apos;s Cookbook &amp; SOP</span>
+            </button>
           </div>
 
           {/* Right Action Controls */}
@@ -390,42 +402,53 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
         </div>
 
         {/* Tablet & Mobile View Switcher Row (< xl screens, including iPads / tablets) */}
-        <div className="xl:hidden flex items-center justify-between gap-2 pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/60 mt-2">
+        <div className="xl:hidden flex items-center justify-between gap-1.5 pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/60 mt-2 overflow-x-auto">
           <div className="flex flex-1 items-center gap-1 rounded-xl bg-[#EFE7DC] dark:bg-[#151110] p-1 border border-[#C9AE8B]/30 dark:border-stone-800">
             <button
               onClick={() => setCurrentView("TICKETS")}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-mono text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+              className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg font-mono text-[11px] font-bold transition cursor-pointer whitespace-nowrap ${
                 currentView === "TICKETS"
                   ? "bg-[#B72E35] text-white shadow-xs"
                   : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
               }`}
             >
-              <Coffee className="h-3.5 w-3.5 shrink-0" />
-              <span>Live Tickets ({orders.filter((o) => o.status !== "SERVED").length})</span>
+              <Coffee className="h-3 w-3 shrink-0" />
+              <span>Tickets ({orders.filter((o) => o.status !== "SERVED").length})</span>
             </button>
             <button
               onClick={() => setCurrentView("MENU_STOCK")}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-mono text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+              className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg font-mono text-[11px] font-bold transition cursor-pointer whitespace-nowrap ${
                 currentView === "MENU_STOCK"
                   ? "bg-[#B72E35] text-white shadow-xs"
                   : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
               }`}
             >
-              <UtensilsCrossed className="h-3.5 w-3.5 shrink-0" />
-              <span>Daily Menu &amp; 86</span>
+              <UtensilsCrossed className="h-3 w-3 shrink-0" />
+              <span>Menu &amp; 86</span>
+            </button>
+            <button
+              onClick={() => setCurrentView("COOKBOOK")}
+              className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg font-mono text-[11px] font-bold transition cursor-pointer whitespace-nowrap ${
+                currentView === "COOKBOOK"
+                  ? "bg-[#B72E35] text-white shadow-xs"
+                  : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-white"
+              }`}
+            >
+              <BookOpen className="h-3 w-3 shrink-0 text-amber-400" />
+              <span>Cookbook</span>
             </button>
           </div>
 
           <button
             onClick={() => setShowEtaAnalytics(!showEtaAnalytics)}
-            className={`flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs font-mono transition cursor-pointer shrink-0 whitespace-nowrap ${
+            className={`flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-[11px] font-mono transition cursor-pointer shrink-0 whitespace-nowrap ${
               showEtaAnalytics
                 ? "border-[#B72E35] bg-[#B72E35]/15 text-[#B72E35] dark:text-[#F2C84B]"
                 : "border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] text-[#725039] dark:text-[#C9AE8B]"
             }`}
             title="Toggle Station Load"
           >
-            <span>⏱ ETA Load</span>
+            <span>⏱ ETA</span>
           </button>
         </div>
 
@@ -453,7 +476,11 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
         )}
       </header>
 
-      {currentView === "MENU_STOCK" ? (
+      {currentView === "COOKBOOK" ? (
+        <main className="flex-1 min-w-0">
+          <KitchenCookbookView />
+        </main>
+      ) : currentView === "MENU_STOCK" ? (
         <main className="flex-1 min-w-0">
           <KitchenMenuManager />
         </main>
