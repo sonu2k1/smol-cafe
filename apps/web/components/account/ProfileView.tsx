@@ -178,7 +178,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       <header className="sticky top-0 z-40 border-b border-[#C9AE8B]/40 dark:border-white/10 bg-[#F3E7D3]/90 dark:bg-[#181412]/90 px-4 py-3.5 backdrop-blur-md transition-colors duration-200">
         <div className="mx-auto flex max-w-md items-center justify-between">
           <Link
-            href="/"
+            href="/home"
             className="flex h-9 w-9 items-center justify-center rounded-xl text-[#241F1C] dark:text-[#FAF4EB] transition hover:bg-black/5 dark:hover:bg-white/10 active:scale-95"
             aria-label="Back to home"
           >

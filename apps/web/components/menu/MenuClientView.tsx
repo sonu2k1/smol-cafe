@@ -115,7 +115,7 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
         <div className="mx-auto flex max-w-md items-center justify-between">
           {/* Back Button */}
           <Link
-            href="/"
+            href="/home"
             className="flex h-9 w-9 items-center justify-center rounded-xl text-[#241F1C] dark:text-[#FAF4EB] transition hover:bg-black/5 dark:hover:bg-white/10 active:scale-95"
             aria-label="Back to home"
           >

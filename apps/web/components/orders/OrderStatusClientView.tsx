@@ -179,10 +179,9 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
         <div className="mx-auto flex max-w-md items-start justify-between gap-2.5">
           <div className="flex items-start gap-2 min-w-0">
             {/* Back Button */}
-            <button
-              type="button"
-              onClick={() => router.back()}
-              aria-label="Go back"
+            <Link
+              href="/home"
+              aria-label="Back to home"
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#241F1C] dark:text-[#FAF4EB] transition hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 cursor-pointer -ml-1 mt-0.5"
             >
               <svg
@@ -196,7 +195,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
               >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-            </button>
+            </Link>
 
             <div className="min-w-0">
               <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-[#B72E35] dark:text-[#FF5B52]">
