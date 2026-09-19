@@ -43,6 +43,16 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "smol café",
   description: "A warm, literary neighbourhood café with a day-to-night personality in Rishikesh.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "smol café",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
 };
 
 import { LayoutShell } from "@/components/navigation/LayoutShell";
