@@ -98,11 +98,12 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
     const handleFocus = () => refreshData();
     window.addEventListener("focus", handleFocus);
 
+    // Smart fallback polling: 7s when tab is active (Realtime sync events handle instant push)
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshData();
       }
-    }, 3000);
+    }, 7000);
 
     const unsubscribe = subscribeToSyncEvents(() => {
       refreshData();

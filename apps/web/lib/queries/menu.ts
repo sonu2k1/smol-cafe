@@ -92,52 +92,44 @@ function getFallbackCatalog(): CategoryWithItems[] {
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-/**
- * Fetches active menu categories, items, and effective prices directly from the database,
- * falling back to the full 59-item master catalog if the database is offline or unseeded.
- */
-export async function getMenuCatalog(): Promise<CategoryWithItems[]> {
+import { unstable_cache } from "next/cache";
+
+async function fetchMenuCatalogDirectly(): Promise<CategoryWithItems[]> {
   try {
     const supabase = createAdminClient();
-
-    // 1. Fetch Categories
-    const { data: categories, error: catErr } = await supabase
-      .from("menu_categories")
-      .select("*")
-      .order("sort_order", { ascending: true });
-
-    if (catErr || !categories || categories.length === 0) {
-      return getFallbackCatalog();
-    }
-
-    // 2. Fetch Menu Items
-    const { data: items, error: itemErr } = await supabase
-      .from("menu_items")
-      .select("*")
-      .in("status", ["ACTIVE", "AVAILABLE", "SCHEDULED"]);
-
-    if (itemErr || !items || items.length === 0) {
-      return getFallbackCatalog();
-    }
-
-    const itemIds = (items as MenuItem[]).map((i) => i.id);
-
-    // 3. Fetch Active Prices
     const nowIso = new Date().toISOString();
-    const { data: prices } = await supabase
-      .from("menu_prices")
-      .select("*")
-      .in("menu_item_id", itemIds)
-      .lte("effective_from", nowIso)
-      .or(`effective_to.is.null,effective_to.gt.${nowIso}`)
-      .order("effective_from", { ascending: false });
 
-    // 4. Fetch Latest Item Versions
-    const { data: versions } = await supabase
-      .from("menu_item_versions")
-      .select("*")
-      .in("menu_item_id", itemIds)
-      .order("created_at", { ascending: false });
+    // Run all 4 queries in parallel rather than serial waterfalls
+    const [categoriesRes, itemsRes, pricesRes, versionsRes] = await Promise.all([
+      supabase
+        .from("menu_categories")
+        .select("*")
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("menu_items")
+        .select("*")
+        .in("status", ["ACTIVE", "AVAILABLE", "SCHEDULED"]),
+      supabase
+        .from("menu_prices")
+        .select("*")
+        .lte("effective_from", nowIso)
+        .or(`effective_to.is.null,effective_to.gt.${nowIso}`)
+        .order("effective_from", { ascending: false }),
+      supabase
+        .from("menu_item_versions")
+        .select("*")
+        .order("created_at", { ascending: false }),
+    ]);
+
+    const categories = categoriesRes.data;
+    const items = itemsRes.data;
+
+    if (!categories || categories.length === 0 || !items || items.length === 0) {
+      return getFallbackCatalog();
+    }
+
+    const prices = pricesRes.data;
+    const versions = versionsRes.data;
 
     const priceMap = new Map<string, number>();
     for (const p of (prices as unknown as MenuPrice[]) || []) {
@@ -195,3 +187,19 @@ export async function getMenuCatalog(): Promise<CategoryWithItems[]> {
     return getFallbackCatalog();
   }
 }
+
+/**
+ * Cached getter for menu catalog.
+ * Caches for 60 seconds and supports on-demand tag revalidation ("menu-catalog").
+ */
+export const getMenuCatalog = unstable_cache(
+  async (): Promise<CategoryWithItems[]> => {
+    return fetchMenuCatalogDirectly();
+  },
+  ["smol_menu_catalog_v2"],
+  {
+    revalidate: 60,
+    tags: ["menu-catalog"],
+  }
+);
+
