@@ -54,9 +54,16 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
 
   try {
     // 1. Fetch active orders across all 4 KDS phases: New, Preparing, Ready, and recent Completed
-    const activeStatuses = isMockDatabase()
-      ? ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED", "PREPARING", "READY", "SERVED", "COMPLETED"]
-      : ["SUBMITTED", "ACCEPTED", "PREPARING", "READY", "SERVED"];
+    const activeStatuses = [
+      "SUBMITTED",
+      "PENDING_CONFIRMATION",
+      "CONFIRMED",
+      "ACCEPTED",
+      "PREPARING",
+      "READY",
+      "SERVED",
+      "COMPLETED",
+    ];
 
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
