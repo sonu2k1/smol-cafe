@@ -12,7 +12,7 @@ import type { OrderStatus } from "@smol-cafe/db";
 import { KitchenTicketCard } from "./KitchenTicketCard";
 import { EtaAccuracyReview } from "./EtaAccuracyReview";
 import { KitchenMenuManager } from "./KitchenMenuManager";
-import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed, RotateCcw } from "lucide-react";
+import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed, RotateCcw, Trash2 } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
@@ -51,6 +51,24 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
     setDismissedTicketIds((prev) => {
       const updated = new Set(prev);
       updated.add(orderId);
+      try {
+        sessionStorage.setItem("smol_kds_dismissed_tickets", JSON.stringify(Array.from(updated)));
+      } catch {
+        // safe
+      }
+      return updated;
+    });
+  };
+
+  const handleClearAllCompleted = () => {
+    const completedToDismiss = orders.filter(
+      (o) => ["SERVED", "COMPLETED", "CLOSED"].includes(o.status) && !dismissedTicketIds.has(o.id)
+    );
+    if (completedToDismiss.length === 0) return;
+
+    setDismissedTicketIds((prev) => {
+      const updated = new Set(prev);
+      completedToDismiss.forEach((o) => updated.add(o.id));
       try {
         sessionStorage.setItem("smol_kds_dismissed_tickets", JSON.stringify(Array.from(updated)));
       } catch {
@@ -547,9 +565,22 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                 completed
               </h2>
             </div>
-            <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#725039] dark:text-[#C9AE8B]">
-              {completedOrders.length}
-            </span>
+            <div className="flex items-center gap-1.5">
+              {completedOrders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllCompleted}
+                  className="flex items-center gap-1 rounded-full border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#F3E7D3] dark:bg-[#241F1C] px-2 py-0.5 font-mono text-[10px] font-bold text-[#725039] dark:text-[#C9AE8B] hover:text-[#B72E35] dark:hover:text-[#F2C84B] hover:border-[#B72E35] transition active:scale-95 cursor-pointer shadow-2xs"
+                  title="Clear all completed tickets from view"
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                  <span>Clear All</span>
+                </button>
+              )}
+              <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#725039] dark:text-[#C9AE8B]">
+                {completedOrders.length}
+              </span>
+            </div>
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto pr-1">
