@@ -15,6 +15,7 @@ import {
 import { bypassPaymentAction } from "@/app/bill/actions";
 import { getFoodImage } from "@/lib/food-images";
 import type { MenuItemWithDetails } from "@/lib/queries/menu";
+import { getLoyaltyAccountAction, redeemLoyaltyPointsAction, type LoyaltyAccountDetails } from "@/app/account/loyalty-actions";
 import { TableArchedCard } from "@/components/table/TableArchedCard";
 import {
   CheckCircle2,
@@ -26,6 +27,9 @@ import {
   Lock,
   Zap,
   Clock,
+  Sparkles,
+  Gift,
+  Award,
 } from "lucide-react";
 
 interface CartDrawerProps {
@@ -68,6 +72,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
   const [isBypassing, setIsBypassing] = useState(false);
   const [celebrationData, setCelebrationData] = useState<PostPaymentCelebrationModalProps | null>(null);
+  const [loyaltyData, setLoyaltyData] = useState<LoyaltyAccountDetails | null>(null);
+  const [redeemPoints, setRedeemPoints] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{
     orderNo: number;
     orderId: string;
@@ -75,14 +81,35 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
     totalPaise: number;
   } | null>(null);
 
+  // Fetch customer loyalty pass details
+  useEffect(() => {
+    if (isCartOpen) {
+      getLoyaltyAccountAction().then((res) => {
+        setLoyaltyData(res);
+      }).catch((err) => console.warn("Could not load loyalty account:", err));
+    }
+  }, [isCartOpen]);
+
   const displayTable = (tableLabel || "07").replace(/^(table|t)[-\s_]*/i, "").trim().padStart(2, "0");
   const itemsTotal = items.reduce(
     (sum, it) => sum + Math.round((it.item.pricePaise / 100) * it.qty),
     0
   );
-  const taxesAndCharges = Math.round(itemsTotal * 0.06);
-  const grandTotal = itemsTotal + taxesAndCharges;
-  const totalRupees = itemsTotal;
+
+  // Customer Loyalty Rules: ₹10 = 1 pt, Max 20% of bill value
+  const userBalance = loyaltyData?.account?.current_balance_cached ?? 145;
+  const maxDiscountPercent = loyaltyData?.config?.maxBillDiscountPercent ?? 20;
+  const maxDiscountRupees = Math.min(userBalance, Math.floor(itemsTotal * (maxDiscountPercent / 100)));
+  const pointsDiscountRupees = redeemPoints ? maxDiscountRupees : 0;
+  const effectiveItemsTotal = Math.max(0, itemsTotal - pointsDiscountRupees);
+  const taxesAndCharges = Math.round(effectiveItemsTotal * 0.06);
+  const grandTotal = effectiveItemsTotal + taxesAndCharges;
+  const totalRupees = effectiveItemsTotal;
+
+  // Potential points earned on this order
+  const rupeesPerPt = loyaltyData?.config?.rupeesPerPoint ?? 10;
+  const slowMultiplier = loyaltyData?.config?.slowPeriodActive ? (loyaltyData?.config?.slowPeriodMultiplier ?? 2) : 1;
+  const pointsEarnable = Math.floor(effectiveItemsTotal / rupeesPerPt) * slowMultiplier;
 
   // Group items by category: COFFEE, CHAI, FOOD
   const groupedItems = useMemo(() => {
@@ -491,10 +518,33 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                       <span className="text-[#725039] dark:text-[#C9AE8B]">Items Total</span>
                       <span>₹{itemsTotal}</span>
                     </div>
+
+                    {/* Smol Club Points Discount Row */}
+                    {pointsDiscountRupees > 0 && (
+                      <div className="flex items-center justify-between text-[#B72E35] dark:text-[#FF5B52] font-bold bg-[#B72E35]/10 dark:bg-[#B72E35]/20 px-2 py-1 rounded-lg">
+                        <span className="flex items-center gap-1 text-[12px]">
+                          <Award className="w-3.5 h-3.5 text-[#B72E35] dark:text-[#FF5B52]" />
+                          Smol Points (Max {maxDiscountPercent}%)
+                        </span>
+                        <span>-₹{pointsDiscountRupees}</span>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between">
                       <span className="text-[#725039] dark:text-[#C9AE8B]">Taxes &amp; Charges</span>
                       <span>₹{taxesAndCharges}</span>
                     </div>
+                  </div>
+
+                  {/* Points Earning Notice */}
+                  <div className="mt-2.5 px-2.5 py-1.5 rounded-xl bg-[#F2C84B]/20 border border-[#F2C84B]/40 text-[11px] font-mono text-[#725039] dark:text-[#FAF4EB] flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#B72E35] dark:text-[#F2C84B]" />
+                      Earn on this order:
+                    </span>
+                    <span className="font-bold text-[#B72E35] dark:text-[#F2C84B]">
+                      +{pointsEarnable} pts {slowMultiplier > 1 ? "(2× Happy Hour!)" : ""}
+                    </span>
                   </div>
 
                   {/* Solid Horizontal Line Divider in Biscuit */}
@@ -509,6 +559,46 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                       ₹{grandTotal}
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Smol Club Loyalty Points Card Toggle in Settle Up */}
+              <div className="rounded-[1.25rem] border border-[#B72E35]/30 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 space-y-2.5 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-[#B72E35]/15 flex items-center justify-center text-[#B72E35] dark:text-[#F2C84B]">
+                      <Gift className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-serif font-bold text-[14px] text-[#241F1C] dark:text-[#FAF4EB] leading-none">
+                        Smol Club Points
+                      </h4>
+                      <p className="font-mono text-[10.5px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
+                        Balance: <strong className="text-[#B72E35] dark:text-[#F2C84B]">{userBalance} pts</strong> (₹{userBalance})
+                      </p>
+                    </div>
+                  </div>
+
+                  {userBalance > 0 && maxDiscountRupees > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setRedeemPoints(!redeemPoints)}
+                      className={`px-3 py-1.5 rounded-full font-serif text-[12px] font-bold transition shadow-xs cursor-pointer ${
+                        redeemPoints
+                          ? "bg-[#B72E35] text-[#F3E7D3] hover:bg-[#9E252C]"
+                          : "bg-[#F3E7D3] dark:bg-stone-800 text-[#725039] dark:text-[#FAF4EB] hover:bg-[#EAE0D2] border border-[#C9AE8B]/50"
+                      }`}
+                    >
+                      {redeemPoints ? `Applied ₹${maxDiscountRupees} Off ✓` : `Claim 20% Off (-₹${maxDiscountRupees})`}
+                    </button>
+                  ) : (
+                    <span className="font-mono text-[10px] text-[#725039]/70">No points yet</span>
+                  )}
+                </div>
+
+                <div className="border-t border-[#C9AE8B]/20 dark:border-white/5 pt-1.5 flex items-center justify-between text-[10.5px] font-mono text-[#725039] dark:text-[#C9AE8B]">
+                  <span>₹10 spent = 1 point</span>
+                  <span>Max {maxDiscountPercent}% discount per order</span>
                 </div>
               </div>
 
@@ -776,6 +866,57 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Smol Club Rewards Points Bar */}
+                <div className="px-3 pt-2 pb-1">
+                  <div className="rounded-[1.25rem] border border-[#B72E35]/30 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#1A1513] p-3 shadow-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-[#B72E35]/15 flex items-center justify-center shrink-0 text-[#B72E35] dark:text-[#F2C84B]">
+                          <Award className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-serif font-bold text-[13.5px] text-[#241F1C] dark:text-[#FAF4EB]">
+                              Smol Club Rewards
+                            </span>
+                            <span className="rounded-full bg-[#B72E35] text-[#F3E7D3] px-2 py-0.2 font-mono text-[9.5px] font-bold">
+                              {userBalance} pts (₹{userBalance})
+                            </span>
+                          </div>
+                          <p className="font-mono text-[10.5px] text-[#725039] dark:text-[#C9AE8B] truncate">
+                            Earn 1 pt / ₹10 • Max {maxDiscountPercent}% off next bill
+                          </p>
+                        </div>
+                      </div>
+
+                      {userBalance > 0 && maxDiscountRupees > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setRedeemPoints(!redeemPoints)}
+                          className={`shrink-0 px-2.5 py-1.5 rounded-full font-serif text-[11.5px] font-bold transition shadow-xs cursor-pointer ${
+                            redeemPoints
+                              ? "bg-[#B72E35] text-[#F3E7D3] hover:bg-[#9E252C]"
+                              : "bg-[#F3E7D3] dark:bg-stone-800 text-[#725039] dark:text-[#FAF4EB] hover:bg-[#EAE0D2] border border-[#C9AE8B]/50"
+                          }`}
+                        >
+                          {redeemPoints ? `₹${maxDiscountRupees} OFF ✓` : `Use 20% Off`}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Happy Hour Bonus Notice */}
+                    {slowMultiplier > 1 && (
+                      <div className="mt-2 pt-1.5 border-t border-[#C9AE8B]/20 dark:border-white/5 flex items-center justify-between text-[10.5px] font-mono text-[#B72E35] dark:text-[#F2C84B]">
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" />
+                          Slow Period active:
+                        </span>
+                        <span className="font-bold">2× points on this order!</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Upsell Card: "Make it a moment?" with Dusty Pool accent & Butter Taxi button */}

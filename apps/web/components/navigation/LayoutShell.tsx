@@ -3,6 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { RoleSwitcherBar } from "@/components/navigation/RoleSwitcherBar";
+import { InstallAppPrompt } from "@/components/common/InstallAppPrompt";
 
 interface LayoutShellProps {
   children: React.ReactNode;
@@ -44,6 +45,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
     <>
       {showRoleSwitcher && <RoleSwitcherBar />}
       {children}
+      <InstallAppPrompt />
     </>
   );
 };
