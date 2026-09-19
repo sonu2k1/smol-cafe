@@ -281,6 +281,7 @@ export const BottomNavBar: React.FC = () => {
               <Link
                 key={item.label}
                 href={item.href}
+                prefetch={true}
                 aria-label={item.label}
                 onClick={() => setActiveIndex(index)}
                 className="group relative z-20 flex flex-1 items-center justify-center transition-transform duration-150 active:scale-95 touch-manipulation focus:outline-none py-1"
