@@ -98,11 +98,11 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
         }
       }
 
-      // Automatically connect and route after brief success feedback
+      // Automatically connect and route immediately after snappy haptic feedback
       setTimeout(() => {
         stopCamera();
         onSelectTable(tableLabel);
-      }, 750);
+      }, 200);
     },
     [onSelectTable, stopCamera]
   );

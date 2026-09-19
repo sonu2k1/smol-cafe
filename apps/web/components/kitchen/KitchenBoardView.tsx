@@ -12,7 +12,7 @@ import type { OrderStatus } from "@smol-cafe/db";
 import { KitchenTicketCard } from "./KitchenTicketCard";
 import { EtaAccuracyReview } from "./EtaAccuracyReview";
 import { KitchenMenuManager } from "./KitchenMenuManager";
-import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed, RotateCcw } from "lucide-react";
+import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed, RotateCcw, Trash2 } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
@@ -32,6 +32,8 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
   const [currentView, setCurrentView] = useState<"TICKETS" | "MENU_STOCK">("TICKETS");
   const [mounted, setMounted] = useState(false);
   const prevOrderCountRef = useRef(initialOrders.length);
+  // Track ongoing optimistic transitions to prevent polling flicker/snap-back
+  const optimisticLocksRef = useRef<Map<string, { status: OrderStatus; timestamp: number }>>(new Map());
 
   useEffect(() => {
     setMounted(true);
@@ -49,6 +51,24 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
     setDismissedTicketIds((prev) => {
       const updated = new Set(prev);
       updated.add(orderId);
+      try {
+        sessionStorage.setItem("smol_kds_dismissed_tickets", JSON.stringify(Array.from(updated)));
+      } catch {
+        // safe
+      }
+      return updated;
+    });
+  };
+
+  const handleClearAllCompleted = () => {
+    const completedToDismiss = orders.filter(
+      (o) => ["SERVED", "COMPLETED", "CLOSED"].includes(o.status) && !dismissedTicketIds.has(o.id)
+    );
+    if (completedToDismiss.length === 0) return;
+
+    setDismissedTicketIds((prev) => {
+      const updated = new Set(prev);
+      completedToDismiss.forEach((o) => updated.add(o.id));
       try {
         sessionStorage.setItem("smol_kds_dismissed_tickets", JSON.stringify(Array.from(updated)));
       } catch {
@@ -100,7 +120,31 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
           playChime();
         }
         prevOrderCountRef.current = result.orders.length;
-        setOrders(result.orders);
+
+        // Clean up expired optimistic locks (> 8000ms)
+        const now = Date.now();
+        for (const [id, lock] of optimisticLocksRef.current.entries()) {
+          if (now - lock.timestamp > 8000) {
+            optimisticLocksRef.current.delete(id);
+          }
+        }
+
+        // Merge server snapshot with any active in-flight optimistic locks
+        const mergedOrders = result.orders.map((serverOrder) => {
+          const activeLock = optimisticLocksRef.current.get(serverOrder.id);
+          if (activeLock) {
+            if (serverOrder.status === activeLock.status) {
+              // Server status has caught up, release lock
+              optimisticLocksRef.current.delete(serverOrder.id);
+              return serverOrder;
+            }
+            // Server hasn't caught up yet, keep the optimistic status so it doesn't flicker/snap back!
+            return { ...serverOrder, status: activeLock.status };
+          }
+          return serverOrder;
+        });
+
+        setOrders(mergedOrders);
         setLastRefreshedAt(new Date());
       }
     } catch (err) {
@@ -120,12 +164,12 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
 
   // Real-Time Event Listener & Polling Fallback Loop
   useEffect(() => {
-    // 1. Fast 2s Polling
+    // 1. Smart Fallback Polling (6s interval when tab is visible, WebSocket handles instant push)
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshOrders();
       }
-    }, 2000);
+    }, 6000);
 
     // 2. Cross-Interface Real-Time Sync Subscription
     const unsubscribe = subscribeToSyncEvents(() => {
@@ -149,12 +193,15 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
     fromStatus: OrderStatus,
     toStatus: OrderStatus
   ) => {
-    // 1. Apply Optimistic Update
+    // 1. Record optimistic lock with timestamp
+    optimisticLocksRef.current.set(orderId, { status: toStatus, timestamp: Date.now() });
+
+    // 2. Apply Instant Optimistic Update in UI
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: toStatus } : o))
     );
 
-    // 2. Execute Server Action
+    // 3. Execute Server Action
     const result = await transitionOrderStatusAction(orderId, fromStatus, toStatus);
 
     if (result.success) {
@@ -165,6 +212,8 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
         timestamp: Date.now(),
       });
     } else {
+      // Revert optimistic lock if rejected by server
+      optimisticLocksRef.current.delete(orderId);
       if (result.error === "STATUS_MISMATCH") {
         setConflictMessage(result.message || "Order status changed by another device.");
       }
@@ -516,9 +565,22 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
                 completed
               </h2>
             </div>
-            <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#725039] dark:text-[#C9AE8B]">
-              {completedOrders.length}
-            </span>
+            <div className="flex items-center gap-1.5">
+              {completedOrders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllCompleted}
+                  className="flex items-center gap-1 rounded-full border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#F3E7D3] dark:bg-[#241F1C] px-2 py-0.5 font-mono text-[10px] font-bold text-[#725039] dark:text-[#C9AE8B] hover:text-[#B72E35] dark:hover:text-[#F2C84B] hover:border-[#B72E35] transition active:scale-95 cursor-pointer shadow-2xs"
+                  title="Clear all completed tickets from view"
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                  <span>Clear All</span>
+                </button>
+              )}
+              <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#725039] dark:text-[#C9AE8B]">
+                {completedOrders.length}
+              </span>
+            </div>
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto pr-1">
