@@ -32,6 +32,8 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
   const [currentView, setCurrentView] = useState<"TICKETS" | "MENU_STOCK">("TICKETS");
   const [mounted, setMounted] = useState(false);
   const prevOrderCountRef = useRef(initialOrders.length);
+  // Track ongoing optimistic transitions to prevent polling flicker/snap-back
+  const optimisticLocksRef = useRef<Map<string, { status: OrderStatus; timestamp: number }>>(new Map());
 
   useEffect(() => {
     setMounted(true);
@@ -100,7 +102,31 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
           playChime();
         }
         prevOrderCountRef.current = result.orders.length;
-        setOrders(result.orders);
+
+        // Clean up expired optimistic locks (> 8000ms)
+        const now = Date.now();
+        for (const [id, lock] of optimisticLocksRef.current.entries()) {
+          if (now - lock.timestamp > 8000) {
+            optimisticLocksRef.current.delete(id);
+          }
+        }
+
+        // Merge server snapshot with any active in-flight optimistic locks
+        const mergedOrders = result.orders.map((serverOrder) => {
+          const activeLock = optimisticLocksRef.current.get(serverOrder.id);
+          if (activeLock) {
+            if (serverOrder.status === activeLock.status) {
+              // Server status has caught up, release lock
+              optimisticLocksRef.current.delete(serverOrder.id);
+              return serverOrder;
+            }
+            // Server hasn't caught up yet, keep the optimistic status so it doesn't flicker/snap back!
+            return { ...serverOrder, status: activeLock.status };
+          }
+          return serverOrder;
+        });
+
+        setOrders(mergedOrders);
         setLastRefreshedAt(new Date());
       }
     } catch (err) {
@@ -149,12 +175,15 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
     fromStatus: OrderStatus,
     toStatus: OrderStatus
   ) => {
-    // 1. Apply Optimistic Update
+    // 1. Record optimistic lock with timestamp
+    optimisticLocksRef.current.set(orderId, { status: toStatus, timestamp: Date.now() });
+
+    // 2. Apply Instant Optimistic Update in UI
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: toStatus } : o))
     );
 
-    // 2. Execute Server Action
+    // 3. Execute Server Action
     const result = await transitionOrderStatusAction(orderId, fromStatus, toStatus);
 
     if (result.success) {
@@ -165,6 +194,8 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
         timestamp: Date.now(),
       });
     } else {
+      // Revert optimistic lock if rejected by server
+      optimisticLocksRef.current.delete(orderId);
       if (result.error === "STATUS_MISMATCH") {
         setConflictMessage(result.message || "Order status changed by another device.");
       }
