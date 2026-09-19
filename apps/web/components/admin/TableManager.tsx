@@ -396,9 +396,9 @@ export const TableManager: React.FC<TableManagerProps> = ({
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto print:p-0 print:m-0 print:max-w-none">
+    <div className="p-3.5 sm:p-5 lg:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto print:p-0 print:m-0 print:max-w-none">
       {/* Main Admin Dashboard Content (Hidden Completely When Printing QR Stands) */}
-      <div className="print:hidden space-y-6">
+      <div className="print:hidden space-y-4 sm:space-y-6">
         {/* Feedback Toast */}
         {feedback && (
           <div
@@ -418,7 +418,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
             </div>
             <button
               onClick={() => setFeedback(null)}
-              className="text-stone-500 hover:text-stone-900 dark:hover:text-white"
+              className="text-stone-500 hover:text-stone-900 dark:hover:text-white cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
@@ -426,153 +426,153 @@ export const TableManager: React.FC<TableManagerProps> = ({
         )}
 
         {/* Header & Quick Action Buttons */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif text-2xl font-bold text-[#241F1C] dark:text-white">
-              Dining Tables & Floor Sections
-            </h1>
-            <span className="rounded-full bg-[#B72E35]/15 dark:bg-[#B72E35]/30 text-[#B72E35] dark:text-[#FF6B6B] px-2.5 py-0.5 text-xs font-mono font-bold">
-              {tables.length} Tables
-            </span>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-serif text-xl sm:text-2xl font-bold text-[#241F1C] dark:text-white">
+                Dining Tables &amp; Floor Sections
+              </h1>
+              <span className="rounded-full bg-[#B72E35]/15 dark:bg-[#B72E35]/30 text-[#B72E35] dark:text-[#FF6B6B] px-2.5 py-0.5 text-xs font-mono font-bold shrink-0">
+                {tables.length} Tables
+              </span>
+            </div>
+            <p className="font-mono text-xs text-[#725039] dark:text-stone-400 mt-0.5">
+              Add, edit, and organize dining tables into zones with QR code &amp; JSON Tag generation.
+            </p>
           </div>
-          <p className="font-mono text-xs text-[#725039] dark:text-stone-400 mt-0.5">
-            Add, edit, and organize dining tables into zones with QR code & JSON Tag generation.
-          </p>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            onClick={() => setIsBatchQrModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3.5 py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs"
-          >
-            <QrCode className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />
-            <span>Print All QRs ({tables.length})</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
+            <button
+              onClick={() => setIsBatchQrModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs whitespace-nowrap cursor-pointer"
+            >
+              <QrCode className="h-3.5 w-3.5 text-[#B72E35] dark:text-[#F2C84B]" />
+              <span>Print All QRs ({tables.length})</span>
+            </button>
 
-          <button
-            onClick={() => setIsSectionsModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3.5 py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs"
-          >
-            <Layers className="h-4 w-4 text-[#754CFF] dark:text-[#C4B5FD]" />
-            <span>Manage Sections</span>
-          </button>
+            <button
+              onClick={() => setIsSectionsModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs whitespace-nowrap cursor-pointer"
+            >
+              <Layers className="h-3.5 w-3.5 text-[#754CFF] dark:text-[#C4B5FD]" />
+              <span>Manage Sections</span>
+            </button>
 
-          <button
-            onClick={handleOpenAdd}
-            className="flex items-center gap-1.5 rounded-2xl bg-[#B72E35] hover:bg-[#9B252B] px-4 py-2 text-xs font-mono font-bold text-white shadow-md shadow-red-950/20 active:scale-95 transition"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Table</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3.5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Total Tables</span>
-            <Armchair className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center gap-1.5 rounded-2xl bg-[#B72E35] hover:bg-[#9B252B] px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-mono font-bold text-white shadow-md shadow-red-950/20 active:scale-95 transition whitespace-nowrap cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Table</span>
+            </button>
           </div>
-          <p className="mt-1 text-2xl font-serif font-bold text-[#241F1C] dark:text-white">{stats.total}</p>
         </div>
 
-        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3.5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Occupied</span>
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 sm:p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] sm:text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Total Tables</span>
+              <Armchair className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />
+            </div>
+            <p className="mt-1 text-xl sm:text-2xl font-serif font-bold text-[#241F1C] dark:text-white">{stats.total}</p>
           </div>
-          <p className="mt-1 text-2xl font-serif font-bold text-emerald-700 dark:text-emerald-400">
-            {stats.occupied} <span className="text-xs font-mono font-normal text-stone-500">active now</span>
-          </p>
-        </div>
 
-        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3.5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Total Capacity</span>
-            <Users className="h-4 w-4 text-[#725039] dark:text-stone-400" />
+          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 sm:p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] sm:text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Occupied</span>
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <p className="mt-1 text-xl sm:text-2xl font-serif font-bold text-emerald-700 dark:text-emerald-400 truncate">
+              {stats.occupied} <span className="text-xs font-mono font-normal text-stone-500">active</span>
+            </p>
           </div>
-          <p className="mt-1 text-2xl font-serif font-bold text-[#241F1C] dark:text-white">
-            {stats.totalSeats} <span className="text-xs font-mono font-normal text-stone-500">guests</span>
-          </p>
-        </div>
 
-        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3.5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Floor Sections</span>
-            <Layers className="h-4 w-4 text-[#754CFF]" />
+          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 sm:p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] sm:text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Total Capacity</span>
+              <Users className="h-4 w-4 text-[#725039] dark:text-stone-400" />
+            </div>
+            <p className="mt-1 text-xl sm:text-2xl font-serif font-bold text-[#241F1C] dark:text-white truncate">
+              {stats.totalSeats} <span className="text-xs font-mono font-normal text-stone-500">seats</span>
+            </p>
           </div>
-          <p className="mt-1 text-2xl font-serif font-bold text-[#241F1C] dark:text-white">{sections.length}</p>
-        </div>
-      </div>
 
-      {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
-        {/* Section Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-          <button
-            onClick={() => setSelectedSection("ALL")}
-            className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-mono font-bold transition ${
-              selectedSection === "ALL"
-                ? "bg-[#241F1C] text-white dark:bg-white dark:text-[#241F1C] shadow-xs"
-                : "bg-[#FAF4EB] text-[#725039] border border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800 hover:bg-[#F3E7D3]"
-            }`}
-          >
-            All Sections ({tables.length})
-          </button>
-
-          {sections.map((sec) => {
-            const count = sectionCounts[sec] || 0;
-            return (
-              <button
-                key={sec}
-                onClick={() => setSelectedSection(sec)}
-                className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-mono font-bold transition ${
-                  selectedSection === sec
-                    ? "bg-[#B72E35] text-white shadow-xs"
-                    : "bg-[#FAF4EB] text-[#725039] border border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800 hover:bg-[#F3E7D3]"
-                }`}
-              >
-                {sec} ({count})
-              </button>
-            );
-          })}
+          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 sm:p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] sm:text-[11px] font-mono uppercase text-[#725039] dark:text-stone-400">Floor Sections</span>
+              <Layers className="h-4 w-4 text-[#754CFF]" />
+            </div>
+            <p className="mt-1 text-xl sm:text-2xl font-serif font-bold text-[#241F1C] dark:text-white">{sections.length}</p>
+          </div>
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-full sm:w-64 shrink-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search table or section..."
-            className="w-full rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 pl-9 pr-3 py-1.5 text-xs font-mono text-[#241F1C] dark:text-white placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-[#B72E35]"
-          />
-        </div>
-      </div>
+        {/* Filter & Search Bar */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
+          {/* Section Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 min-w-0">
+            <button
+              onClick={() => setSelectedSection("ALL")}
+              className={`shrink-0 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold transition cursor-pointer ${
+                selectedSection === "ALL"
+                  ? "bg-[#241F1C] text-white dark:bg-white dark:text-[#241F1C] shadow-xs"
+                  : "bg-[#FAF4EB] text-[#725039] border border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800 hover:bg-[#F3E7D3]"
+              }`}
+            >
+              All Sections ({tables.length})
+            </button>
 
-      {/* Tables Floor Grid */}
-      {filteredTables.length === 0 ? (
-        <div className="text-center py-16 rounded-3xl border border-dashed border-[#C9AE8B]/50 dark:border-stone-800 bg-[#FAF4EB]/40 dark:bg-stone-900/40 p-6">
-          <Armchair className="h-10 w-10 text-stone-400 mx-auto mb-2 opacity-50" />
-          <p className="font-serif text-base font-bold text-[#241F1C] dark:text-white">No Tables Found</p>
-          <p className="font-mono text-xs text-stone-500 mt-1">
-            {searchQuery
-              ? `No tables match "${searchQuery}". Try another search.`
-              : `No tables currently assigned to "${selectedSection}".`}
-          </p>
-          <button
-            onClick={handleOpenAdd}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#B72E35] px-3.5 py-1.5 text-xs font-mono text-white font-bold"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Table to This Section</span>
-          </button>
+            {sections.map((sec) => {
+              const count = sectionCounts[sec] || 0;
+              return (
+                <button
+                  key={sec}
+                  onClick={() => setSelectedSection(sec)}
+                  className={`shrink-0 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold transition cursor-pointer ${
+                    selectedSection === sec
+                      ? "bg-[#B72E35] text-white shadow-xs"
+                      : "bg-[#FAF4EB] text-[#725039] border border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800 hover:bg-[#F3E7D3]"
+                  }`}
+                >
+                  {sec} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search Input */}
+          <div className="relative w-full lg:w-60 shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search table or section..."
+              className="w-full rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 pl-9 pr-3 py-1.5 text-xs font-mono text-[#241F1C] dark:text-white placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-[#B72E35]"
+            />
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+
+        {/* Tables Floor Grid */}
+        {filteredTables.length === 0 ? (
+          <div className="text-center py-16 rounded-3xl border border-dashed border-[#C9AE8B]/50 dark:border-stone-800 bg-[#FAF4EB]/40 dark:bg-stone-900/40 p-6">
+            <Armchair className="h-10 w-10 text-stone-400 mx-auto mb-2 opacity-50" />
+            <p className="font-serif text-base font-bold text-[#241F1C] dark:text-white">No Tables Found</p>
+            <p className="font-mono text-xs text-stone-500 mt-1">
+              {searchQuery
+                ? `No tables match "${searchQuery}". Try another search.`
+                : `No tables currently assigned to "${selectedSection}".`}
+            </p>
+            <button
+              onClick={handleOpenAdd}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#B72E35] px-3.5 py-1.5 text-xs font-mono text-white font-bold cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Table to This Section</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
           {filteredTables.map((t) => {
             const cleanNum = t.label.padStart(2, "0");
             const isOcc = t.isOccupied;

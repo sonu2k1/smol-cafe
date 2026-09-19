@@ -711,12 +711,12 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
         </div>
       )}
 
-      {/* Desktop Sidebar Navigation */}
-      <aside className="w-64 shrink-0 border-r border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] flex flex-col justify-between hidden md:flex transition-colors duration-200">
-        <div className="p-5 space-y-6">
+      {/* Desktop / Tablet Sidebar Navigation */}
+      <aside className="w-52 md:w-56 lg:w-60 xl:w-64 shrink-0 border-r border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] flex flex-col justify-between hidden md:flex transition-all duration-200">
+        <div className="p-3.5 lg:p-5 space-y-4 lg:space-y-6">
           {/* Admin Logo Showcase */}
-          <div className="flex justify-center items-center py-2 border-b border-[#C9AE8B]/30 dark:border-stone-800/60 pb-5">
-            <div className="relative h-36 w-28 shrink-0 select-none">
+          <div className="flex justify-center items-center py-1 lg:py-2 border-b border-[#C9AE8B]/30 dark:border-stone-800/60 pb-3.5 lg:pb-5">
+            <div className="relative h-24 w-20 md:h-28 md:w-24 lg:h-36 lg:w-28 shrink-0 select-none">
               <Image
                 src="/admin-logo.png"
                 alt="smol café admin logo"
@@ -735,7 +735,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
           </div>
 
           {/* Navigation Links */}
-          <nav className="space-y-1.5 text-xs font-medium">
+          <nav className="space-y-1 lg:space-y-1.5 text-xs font-medium">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -743,19 +743,19 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 transition cursor-pointer ${
+                  className={`flex w-full items-center justify-between rounded-xl px-2.5 lg:px-3.5 py-2 lg:py-2.5 transition cursor-pointer ${
                     isActive
                       ? "bg-[#B72E35] text-white font-bold shadow-md"
                       : "text-[#725039] hover:bg-[#F3E7D3] hover:text-[#241F1C] dark:text-stone-400 dark:hover:bg-stone-800/80 dark:hover:text-white"
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
+                  <div className="flex items-center gap-2 lg:gap-2.5 min-w-0">
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
                   </div>
                   {item.badge && (
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-mono ${
+                      className={`rounded-full px-1.5 lg:px-2 py-0.5 text-[9px] lg:text-[10px] font-mono shrink-0 ${
                         isActive
                           ? "bg-white/20 text-white"
                           : "bg-[#F3E7D3] dark:bg-stone-800 text-[#725039] dark:text-stone-400"
@@ -771,17 +771,17 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
         </div>
 
         {/* User & Back to Portals Footer */}
-        <div className="border-t border-[#C9AE8B]/40 dark:border-stone-800 p-4 space-y-2">
+        <div className="border-t border-[#C9AE8B]/40 dark:border-stone-800 p-3 lg:p-4 space-y-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-mono text-[#725039] dark:text-stone-400">Owner Access</span>
+            <span className="font-mono text-[#725039] dark:text-stone-400 text-[11px]">Owner Access</span>
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
           <Link
             href="/menu"
-            className="flex items-center justify-between rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 px-3 py-2 text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-800 transition"
+            className="flex items-center justify-between rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3] dark:bg-stone-900 px-2.5 lg:px-3 py-1.5 lg:py-2 text-[11px] lg:text-xs text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-800 transition"
           >
-            <span>Switch to Customer QR</span>
-            <ExternalLink className="h-3 w-3 text-[#725039] dark:text-stone-500" />
+            <span className="truncate">Customer QR</span>
+            <ExternalLink className="h-3 w-3 text-[#725039] dark:text-stone-500 shrink-0" />
           </Link>
         </div>
       </aside>
@@ -789,7 +789,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto pb-28 md:pb-6">
         {/* Top App Header */}
-        <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#1C1917]/95 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-md flex items-center justify-between transition-colors duration-200 gap-2">
+        <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#1C1917]/95 px-3.5 sm:px-5 lg:px-6 py-2.5 sm:py-3.5 backdrop-blur-md flex items-center justify-between transition-colors duration-200 gap-2">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             {/* Hamburger Button for Mobile */}
             <button

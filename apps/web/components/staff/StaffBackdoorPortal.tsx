@@ -149,9 +149,9 @@ export const StaffBackdoorPortal: React.FC = () => {
       </header>
 
       {/* Main Role Selection & Keypad Card */}
-      <main className="mx-auto my-auto w-full max-w-lg space-y-5 py-6">
+      <main className="mx-auto my-auto w-full max-w-lg space-y-4 sm:space-y-5 py-4 sm:py-6">
         {/* Role Selector 3-Column Tabs */}
-        <div className="grid grid-cols-3 gap-2.5 rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3]/60 dark:bg-[#1F1B18] p-2 shadow-xs">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3]/60 dark:bg-[#1F1B18] p-1.5 sm:p-2 shadow-xs">
           {roles.map((r) => {
             const isSelected = selectedRole === r.id;
 
@@ -164,17 +164,17 @@ export const StaffBackdoorPortal: React.FC = () => {
                   setPin("");
                   setErrorMessage(null);
                 }}
-                className={`flex flex-col items-center justify-center rounded-2xl py-3 px-2 text-center transition-all duration-300 cursor-pointer ${
+                className={`flex flex-col items-center justify-center rounded-2xl py-2 sm:py-3 px-1 sm:px-2 text-center transition-all duration-300 cursor-pointer ${
                   isSelected
-                    ? "bg-white dark:bg-[#2B2521] shadow-md border-2 border-[#B72E35] dark:border-[#C9AE8B]/70 scale-[1.04]"
+                    ? "bg-white dark:bg-[#2B2521] shadow-md border-2 border-[#B72E35] dark:border-[#8B5CF6] scale-[1.02] sm:scale-[1.04]"
                     : "bg-transparent hover:bg-white/50 dark:hover:bg-white/5 opacity-60 hover:opacity-90"
                 }`}
               >
                 <div
-                  className={`relative flex items-center justify-center rounded-2xl mb-2 transition-all duration-300 p-2 ${
+                  className={`relative flex items-center justify-center rounded-2xl mb-1 sm:mb-2 transition-all duration-300 p-1 sm:p-2 ${
                     isSelected
-                      ? "h-24 w-24 bg-[#FAF4EB] dark:bg-stone-800 shadow-xs"
-                      : "h-14 w-14 bg-black/5 dark:bg-white/5"
+                      ? "h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24 bg-[#FAF4EB] dark:bg-stone-800 shadow-xs"
+                      : "h-11 w-11 sm:h-14 sm:w-14 bg-black/5 dark:bg-white/5"
                   }`}
                 >
                   <Image
@@ -182,21 +182,21 @@ export const StaffBackdoorPortal: React.FC = () => {
                     alt={r.name}
                     width={80}
                     height={80}
-                    className={`object-contain w-auto dark:hidden transition-all duration-300 ${isSelected ? "h-20" : "h-11"}`}
+                    className={`object-contain w-auto dark:hidden transition-all duration-300 ${isSelected ? "h-11 sm:h-16 md:h-20" : "h-8 sm:h-11"}`}
                   />
                   <Image
                     src={r.darkLogo}
                     alt={r.name}
                     width={80}
                     height={80}
-                    className={`object-contain w-auto hidden dark:block transition-all duration-300 ${isSelected ? "h-20" : "h-11"}`}
+                    className={`object-contain w-auto hidden dark:block transition-all duration-300 ${isSelected ? "h-11 sm:h-16 md:h-20" : "h-8 sm:h-11"}`}
                   />
                 </div>
                 <span
                   className={`font-serif font-bold line-clamp-1 transition-all duration-300 ${
                     isSelected
-                      ? "text-sm text-[#241F1C] dark:text-white"
-                      : "text-xs text-[#725039] dark:text-stone-400"
+                      ? "text-[11px] sm:text-sm text-[#241F1C] dark:text-white"
+                      : "text-[10px] sm:text-xs text-[#725039] dark:text-stone-400"
                   }`}
                 >
                   {r.name}
@@ -207,41 +207,41 @@ export const StaffBackdoorPortal: React.FC = () => {
         </div>
 
         {/* Selected Station Card (Warm Artisanal Container) */}
-        <div className="rounded-3xl border border-[#C9AE8B]/50 dark:border-stone-800 bg-white dark:bg-[#1E1A17] p-6 sm:p-7 shadow-xl space-y-5 transition-colors">
-          <div className="flex items-start justify-between">
-            <div>
+        <div className="rounded-3xl border border-[#C9AE8B]/50 dark:border-stone-800 bg-white dark:bg-[#1E1A17] p-4 sm:p-6 md:p-7 shadow-xl space-y-4 sm:space-y-5 transition-colors">
+          <div className="flex items-start justify-between gap-3 sm:gap-4">
+            <div className="min-w-0 flex-1">
               <span
-                className={`inline-block rounded-full px-3 py-0.5 font-mono text-[10px] uppercase font-bold tracking-wider border ${currentRoleConfig.badgeBg}`}
+                className={`inline-block rounded-full px-2.5 sm:px-3 py-0.5 font-mono text-[9px] sm:text-[10px] uppercase font-bold tracking-wider border ${currentRoleConfig.badgeBg}`}
               >
                 STATION AUTHORIZATION
               </span>
-              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#241F1C] dark:text-white mt-1.5">
+              <h2 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold text-[#241F1C] dark:text-white mt-1">
                 {currentRoleConfig.name}
               </h2>
-              <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] mt-0.5">
+              <p className="font-serif italic text-[11px] sm:text-xs text-[#725039] dark:text-[#C9AE8B] mt-0.5 leading-snug">
                 {currentRoleConfig.tagline}
               </p>
             </div>
-            <div className="relative flex h-28 w-28 items-center justify-center rounded-3xl bg-[#FAF4EB] dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-md p-3">
+            <div className="relative flex h-16 w-16 sm:h-24 sm:w-24 md:h-28 md:w-28 shrink-0 items-center justify-center rounded-2xl sm:rounded-3xl bg-[#FAF4EB] dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-md p-1.5 sm:p-3">
               <Image
                 src={currentRoleConfig.lightLogo}
                 alt={currentRoleConfig.name}
                 width={88}
                 height={88}
-                className="object-contain h-20 w-auto dark:hidden"
+                className="object-contain h-12 sm:h-18 md:h-20 w-auto dark:hidden"
               />
               <Image
                 src={currentRoleConfig.darkLogo}
                 alt={currentRoleConfig.name}
                 width={88}
                 height={88}
-                className="object-contain h-20 w-auto hidden dark:block"
+                className="object-contain h-12 sm:h-18 md:h-20 w-auto hidden dark:block"
               />
             </div>
           </div>
 
           {errorMessage && (
-            <div className="flex items-center gap-2 rounded-2xl border border-rose-300 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 p-3.5 text-xs text-rose-900 dark:text-rose-300 font-serif animate-fade-in">
+            <div className="flex items-center gap-2 rounded-2xl border border-rose-300 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 p-3 text-xs text-rose-900 dark:text-rose-300 font-serif animate-fade-in">
               <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
               <span>{errorMessage}</span>
             </div>
@@ -254,14 +254,14 @@ export const StaffBackdoorPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPin(!showPin)}
-                className="text-[11px] text-[#B72E35] flex items-center gap-1 hover:underline cursor-pointer"
+                className="text-[11px] text-[#B72E35] dark:text-[#A78BFA] flex items-center gap-1 hover:underline cursor-pointer"
               >
                 {showPin ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                 <span>{showPin ? "Hide" : "Show"}</span>
               </button>
             </div>
 
-            <div className="flex gap-2.5">
+            <div className="flex items-center gap-2 sm:gap-2.5 w-full">
               <input
                 type={showPin ? "text" : "password"}
                 maxLength={8}
@@ -273,23 +273,20 @@ export const StaffBackdoorPortal: React.FC = () => {
                     handleQuickLogin(selectedRole, pin);
                   }
                 }}
-                className="flex-1 rounded-2xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#141210] px-4 py-3 font-mono text-xl font-black text-center tracking-widest text-[#241F1C] dark:text-white placeholder-stone-400 dark:placeholder-stone-600 focus:border-[#B72E35] focus:outline-none focus:ring-2 focus:ring-[#B72E35] shadow-inner"
+                className="min-w-0 flex-1 rounded-2xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#141210] px-3 sm:px-4 py-2.5 sm:py-3 font-mono text-base sm:text-xl font-black text-center tracking-widest text-[#241F1C] dark:text-white placeholder-stone-400 dark:placeholder-stone-600 focus:border-[#B72E35] dark:focus:border-[#8B5CF6] focus:outline-none focus:ring-2 focus:ring-[#B72E35] dark:focus:ring-[#8B5CF6] shadow-inner"
               />
               <button
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => handleQuickLogin(selectedRole, pin)}
-                className="flex items-center justify-center gap-1.5 rounded-2xl bg-[#B72E35] hover:bg-[#9E242B] px-6 font-mono text-sm font-bold text-white shadow-md active:scale-95 transition disabled:opacity-50 cursor-pointer"
+                className="flex items-center justify-center gap-1.5 rounded-2xl bg-[#B72E35] hover:bg-[#9E242B] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED] dark:shadow-[0_0_16px_rgba(139,92,246,0.35)] px-3.5 sm:px-6 py-2.5 sm:py-3 font-mono text-xs sm:text-sm font-bold text-white shadow-md active:scale-95 transition disabled:opacity-50 cursor-pointer shrink-0 whitespace-nowrap"
               >
                 <span>{isSubmitting ? "..." : "Unlock"}</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
               </button>
             </div>
           </div>
-
-
         </div>
-
       </main>
 
       {/* Footer */}

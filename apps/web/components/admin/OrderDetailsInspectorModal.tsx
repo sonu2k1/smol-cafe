@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { TableJsonTag, createTableJsonTag } from "@/lib/table-tag";
 import type { AdminOrderRecord } from "@/app/admin/actions";
 import type { OrderStatus } from "@smol-cafe/db";
@@ -228,8 +229,40 @@ export const OrderDetailsInspectorModal: React.FC<OrderDetailsInspectorModalProp
                   <CreditCard className="h-3 w-3 text-[#48BB78]" />
                   <span>Payment</span>
                 </div>
-                <div className="font-serif text-base font-bold text-[#241F1C] dark:text-white truncate">
-                  {order?.paymentMethod || "UPI"}
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  {(order?.paymentMethod || "UPI") === "UPI" ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-2xs">
+                      <Image
+                        src="/upi-logo-trimmed.png"
+                        alt="UPI"
+                        width={32}
+                        height={12}
+                        className="h-3.5 w-auto object-contain dark:hidden"
+                      />
+                      <Image
+                        src="/upi-logo-dark.png"
+                        alt="UPI"
+                        width={32}
+                        height={12}
+                        className="h-3.5 w-auto object-contain hidden dark:block"
+                      />
+                    </span>
+                  ) : order?.paymentMethod === "CARD" ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-2xs font-mono text-[11px] font-bold text-stone-800 dark:text-stone-200">
+                      <Image
+                        src="/icon_card_hd.png"
+                        alt="Card"
+                        width={16}
+                        height={16}
+                        className="h-4 w-auto object-contain drop-shadow-2xs"
+                      />
+                      <span>CARD</span>
+                    </span>
+                  ) : (
+                    <span className="font-serif text-base font-bold text-[#241F1C] dark:text-white truncate">
+                      {order?.paymentMethod}
+                    </span>
+                  )}
                 </div>
                 <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold truncate">
                   {order?.paymentStatus || "PAID"}

@@ -658,13 +658,39 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                             Table {rec.tableLabel}
                           </span>
                         </div>
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                          rec.paymentMethod === "UPI"
-                            ? "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800/50"
-                            : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50"
-                        }`}>
-                          {rec.paymentMethod}
-                        </span>
+                        {rec.paymentMethod === "UPI" ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-2xs">
+                            <Image
+                              src="/upi-logo-trimmed.png"
+                              alt="UPI"
+                              width={32}
+                              height={12}
+                              className="h-3 w-auto object-contain dark:hidden"
+                            />
+                            <Image
+                              src="/upi-logo-dark.png"
+                              alt="UPI"
+                              width={32}
+                              height={12}
+                              className="h-3 w-auto object-contain hidden dark:block"
+                            />
+                          </span>
+                        ) : rec.paymentMethod === "CARD" ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-2xs font-mono text-[10px] font-bold text-stone-800 dark:text-stone-200">
+                            <Image
+                              src="/icon_card_hd.png"
+                              alt="Card"
+                              width={16}
+                              height={16}
+                              className="h-3.5 w-auto object-contain drop-shadow-2xs"
+                            />
+                            <span>CARD</span>
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50">
+                            {rec.paymentMethod}
+                          </span>
+                        )}
                       </div>
 
                       {/* Bottom Row: Timestamp, Amount, and Chit Action */}
@@ -727,13 +753,39 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                             <td className="p-3.5 font-bold text-[#241F1C] dark:text-stone-200 whitespace-nowrap">{rec.id}</td>
                             <td className="p-3.5 text-[#8C6207] dark:text-[#F6AD55] font-bold whitespace-nowrap">Table {rec.tableLabel}</td>
                             <td className="p-3.5 whitespace-nowrap">
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                                rec.paymentMethod === "UPI"
-                                   ? "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800/50"
-                                  : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50"
-                              }`}>
-                                {rec.paymentMethod}
-                              </span>
+                              {rec.paymentMethod === "UPI" ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-2xs">
+                                  <Image
+                                    src="/upi-logo-trimmed.png"
+                                    alt="UPI"
+                                    width={32}
+                                    height={12}
+                                    className="h-3 w-auto object-contain dark:hidden"
+                                  />
+                                  <Image
+                                    src="/upi-logo-dark.png"
+                                    alt="UPI"
+                                    width={32}
+                                    height={12}
+                                    className="h-3 w-auto object-contain hidden dark:block"
+                                  />
+                                </span>
+                              ) : rec.paymentMethod === "CARD" ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-2xs font-mono text-[10px] font-bold text-stone-800 dark:text-stone-200">
+                                  <Image
+                                    src="/icon_card_hd.png"
+                                    alt="Card"
+                                    width={16}
+                                    height={16}
+                                    className="h-3.5 w-auto object-contain drop-shadow-2xs"
+                                  />
+                                  <span>CARD</span>
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50">
+                                  {rec.paymentMethod}
+                                </span>
+                              )}
                             </td>
                             <td className="p-3.5 font-bold text-[#241F1C] dark:text-white font-serif text-sm whitespace-nowrap">₹{rec.totalRupees}</td>
                             <td className="p-3.5 text-[#725039] dark:text-stone-400 text-[11px] whitespace-nowrap">

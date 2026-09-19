@@ -140,14 +140,14 @@ export default function RoleSelectionPage() {
             <div className="animate-fade-in-down mb-1.5 flex flex-col items-center relative">
               {/* Ambient Reddish (Day) / Electric Violet #754CFF (Night) Aura Glow behind logo */}
               <div
-                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-36 sm:w-44 h-40 sm:h-48 rounded-full blur-2xl pointer-events-none transition-all duration-500 ${
+                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-44 sm:w-52 h-48 sm:h-56 rounded-full blur-2xl pointer-events-none transition-all duration-500 ${
                   isDark
                     ? "bg-gradient-to-b from-[#754CFF]/50 via-[#754CFF]/35 to-transparent shadow-[0_0_40px_rgba(117,76,255,0.4)]"
                     : "bg-gradient-to-b from-[#B72E35]/35 via-[#B72E35]/25 to-transparent"
                 }`}
               />
 
-              <div className="relative h-[115px] w-[82px] sm:h-[135px] sm:w-[96px] transition-transform duration-300 hover:scale-105 animate-float cursor-pointer">
+              <div className="relative h-[145px] w-[104px] sm:h-[160px] sm:w-[114px] transition-transform duration-300 hover:scale-105 animate-float cursor-pointer">
                 {/* Day Mode Logo: Clean Arched Red Door with subtle reddish glow */}
                 <Image
                   src="/logo-transparent.png?v=2"
@@ -171,7 +171,7 @@ export default function RoleSelectionPage() {
               </div>
               {/* Soft 3D Grounding Pedestal Shadow */}
               <div
-                className={`h-2 w-18 sm:w-22 rounded-full mt-1.5 transition-all duration-300 blur-[2px] ${
+                className={`h-2 w-22 sm:w-26 rounded-full mt-1.5 transition-all duration-300 blur-[2px] ${
                   isDark ? "bg-black/50" : "bg-[#725039]/18"
                 }`}
               />
