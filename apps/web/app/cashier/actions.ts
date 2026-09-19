@@ -45,8 +45,15 @@ export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrd
   const supabase = createAdminClient();
 
   try {
-    // 1. Fetch incoming submitted/preparing orders
-    const pendingStatuses = ["SUBMITTED", "ACCEPTED", "PREPARING", "READY"];
+    // 1. Fetch incoming submitted/confirmed/preparing orders
+    const pendingStatuses = [
+      "SUBMITTED",
+      "PENDING_CONFIRMATION",
+      "CONFIRMED",
+      "ACCEPTED",
+      "PREPARING",
+      "READY",
+    ];
 
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
