@@ -130,27 +130,10 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
         }
 
         // Merge server snapshot with any active in-flight optimistic locks
-        const isSameOrEquivalentStatus = (statusA: string, statusB: string) => {
-          if (statusA === statusB) return true;
-          if (
-            ["SERVED", "COMPLETED", "CLOSED"].includes(statusA) &&
-            ["SERVED", "COMPLETED", "CLOSED"].includes(statusB)
-          ) {
-            return true;
-          }
-          if (
-            ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED"].includes(statusA) &&
-            ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED"].includes(statusB)
-          ) {
-            return true;
-          }
-          return false;
-        };
-
         const mergedOrders = result.orders.map((serverOrder) => {
           const activeLock = optimisticLocksRef.current.get(serverOrder.id);
           if (activeLock) {
-            if (isSameOrEquivalentStatus(serverOrder.status, activeLock.status)) {
+            if (serverOrder.status === activeLock.status) {
               // Server status has caught up, release lock
               optimisticLocksRef.current.delete(serverOrder.id);
               return serverOrder;
@@ -161,19 +144,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
           return serverOrder;
         });
 
-        setOrders((prevOrders) => {
-          const combined = [...mergedOrders];
-          for (const [id, lock] of optimisticLocksRef.current.entries()) {
-            if (!combined.some((o) => o.id === id)) {
-              const existingLocal = prevOrders.find((o) => o.id === id);
-              if (existingLocal) {
-                combined.push({ ...existingLocal, status: lock.status });
-              }
-            }
-          }
-          return combined;
-        });
-
+        setOrders(mergedOrders);
         setLastRefreshedAt(new Date());
       }
     } catch (err) {
