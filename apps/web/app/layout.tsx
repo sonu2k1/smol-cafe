@@ -37,7 +37,10 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#F3E7D3",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F3E7D3" },
+    { media: "(prefers-color-scheme: dark)", color: "#151110" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -46,7 +49,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "smol café",
   },
   icons: {
@@ -76,11 +79,18 @@ export default function RootLayout({
                 try {
                   var saved = localStorage.getItem('smol_theme');
                   var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  var isDark = saved ? (saved === 'night') : prefersDark;
+                  var isDark = saved ? (saved === 'night' || saved === 'dark') : prefersDark;
+                  var targetColor = isDark ? '#151110' : '#F3E7D3';
                   if (isDark) {
                     document.documentElement.classList.add('dark');
+                    document.documentElement.setAttribute('data-theme', 'night');
                   } else {
                     document.documentElement.classList.remove('dark');
+                    document.documentElement.setAttribute('data-theme', 'day');
+                  }
+                  var meta = document.querySelector('meta[name="theme-color"]');
+                  if (meta) {
+                    meta.setAttribute('content', targetColor);
                   }
                 } catch (e) {}
               })();
