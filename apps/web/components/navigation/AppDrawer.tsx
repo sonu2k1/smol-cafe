@@ -120,16 +120,15 @@ export const AppDrawer: React.FC<AppDrawerProps> = ({
             <span className="font-mono text-[11px] font-bold text-[#725039] uppercase">
               Seated Table:
             </span>
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5, 6].map((num) => {
-                const label = num.toString().padStart(2, "0");
-                const isSelected = tableLabel === label || (!tableLabel && num === 1);
+            <div className="flex items-center gap-1 overflow-x-auto py-0.5 max-w-[220px]">
+              {Array.from(new Set(["01", "02", "03", "04", "05", "06", ...(tableLabel ? [tableLabel.padStart(2, "0")] : [])])).map((label) => {
+                const isSelected = tableLabel === label || (!tableLabel && label === "01");
                 return (
                   <Link
-                    key={num}
+                    key={label}
                     href={`/t/table-${label}`}
                     onClick={onClose}
-                    className={`rounded-md px-2 py-0.5 font-mono text-xs font-bold transition-all duration-150 active:scale-95 ${
+                    className={`shrink-0 rounded-md px-2 py-0.5 font-mono text-xs font-bold transition-all duration-150 active:scale-95 ${
                       isSelected
                         ? "bg-[#B72E35] text-white shadow-xs scale-105"
                         : "border border-[#C9AE8B]/50 bg-[#F3E7D3] text-[#241F1C] hover:bg-[#EFE7DC]"

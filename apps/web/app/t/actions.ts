@@ -10,6 +10,7 @@ import {
   type TableSessionData,
 } from "@/lib/session";
 import type { TableQrToken, DiningTable, TableSession } from "@smol-cafe/db";
+import { TABLE_ZONES_CONFIG } from "@/lib/table-tag";
 
 export interface ResolveQrResult {
   success: boolean;
@@ -102,7 +103,7 @@ export async function resolveQrToken(
     // Fallback: match table number directly or resolve table by label
     if (!diningTable) {
       const match = plainToken.match(/(\d+)/);
-      const tableLabel = match ? match[1].padStart(2, "0") : "01";
+      const tableLabel = match ? match[1].padStart(2, "0") : plainToken;
 
       const { data: tableByLabel } = await supabase
         .from("dining_tables")
@@ -112,62 +113,14 @@ export async function resolveQrToken(
 
       if (tableByLabel) {
         diningTable = tableByLabel as unknown as DiningTable;
-      } else {
-        // Ensure default location exists
-        let locId: string | null = null;
-        const { data: loc } = await supabase.from("locations").select("id").limit(1).maybeSingle();
-        if (loc) {
-          locId = loc.id;
-        } else {
-          const { data: newLoc } = await supabase
-            .from("locations")
-            .insert({ name: "smol café · rishikesh", timezone: "Asia/Kolkata" })
-            .select("id")
-            .single();
-          locId = newLoc?.id || null;
-        }
-
-        if (locId) {
-          const { data: createdTable } = await supabase
-            .from("dining_tables")
-            .insert({
-              location_id: locId,
-              label: tableLabel,
-              seats: 2,
-              active: true,
-            })
-            .select("*")
-            .single();
-          if (createdTable) {
-            diningTable = createdTable as unknown as DiningTable;
-          }
-        }
       }
     }
 
     if (!diningTable) {
-      // Ultimate fallback: return a valid UUID session so downstream Postgres queries never throw 22P02
-      const match = plainToken.match(/(\d+)/);
-      const tableLabel = match ? match[1].padStart(2, "0") : "01";
-      const fallbackSessionId = crypto.randomUUID();
-      const sessionData: TableSessionData = {
-        sessionId: fallbackSessionId,
-        tableId: crypto.randomUUID(),
-        tableLabel,
-        locationId: crypto.randomUUID(),
-        locationName: "smol café · rishikesh",
-        openedAt: new Date().toISOString(),
-        customerSessionId: `cust_${fallbackSessionId}_${Date.now()}`,
-        verificationCode: "4821",
-        guestName: finalGuestName,
-        guestPhone: finalGuestPhone,
-      };
-      if (setCookie) {
-        await setTableSessionCookie(sessionData);
-      }
       return {
-        success: true,
-        session: sessionData,
+        success: false,
+        error: "INVALID_TOKEN",
+        message: "This table does not exist. Please scan a valid table QR or select your table from the welcome screen.",
       };
     }
 
@@ -351,6 +304,87 @@ export async function switchTableSessionAction(tableLabel: string): Promise<{ su
     success: result.success,
     message: result.message,
   };
+}
+
+export interface ClientTableInfo {
+  label: string;
+  zone: string;
+  capacity: number;
+  active: boolean;
+}
+
+/**
+ * Server Action: Fetches all active dining tables dynamically from Supabase database.
+ */
+export async function fetchActiveTablesAction(): Promise<ClientTableInfo[]> {
+  const defaultZoneMap: Record<string, string> = {
+    "01": "Indoor Cozy",
+    "02": "Indoor Cozy",
+    "03": "Courtyard Verandah",
+    "04": "Courtyard Verandah",
+    "05": "Brew Bar",
+    "06": "Brew Bar",
+    "07": "Garden Terrace",
+    "08": "Garden Terrace",
+    "09": "Indoor Cozy",
+    "10": "Indoor Cozy",
+    "11": "Garden Terrace",
+    "12": "Courtyard Verandah",
+  };
+
+  try {
+    const supabase = createAdminClient();
+    const { data: tablesData, error } = await supabase
+      .from("dining_tables")
+      .select("*")
+      .order("label", { ascending: true });
+
+    if (error || !tablesData || tablesData.length === 0) {
+      return Array.from({ length: 12 }, (_, i) => {
+        const label = (i + 1).toString().padStart(2, "0");
+        const info = TABLE_ZONES_CONFIG[label] || { zone: "Indoor Cozy", capacity: 2 };
+        return { label, zone: info.zone, capacity: info.capacity, active: true };
+      });
+    }
+
+    const sectionMap = globalThis.__SMOL_TABLE_SECTIONS_MAP__ || defaultZoneMap;
+
+    const mappedTables = tablesData
+      .filter((t: any) => t.active !== false)
+      .map((t: any) => {
+        const cleanNum = (t.label || "").toString().padStart(2, "0");
+        const zone =
+          sectionMap[t.id] ||
+          sectionMap[t.label] ||
+          sectionMap[cleanNum] ||
+          TABLE_ZONES_CONFIG[cleanNum]?.zone ||
+          "Indoor Cozy";
+        const capacity = t.seats || TABLE_ZONES_CONFIG[cleanNum]?.capacity || 2;
+        return {
+          label: cleanNum,
+          zone,
+          capacity,
+          active: t.active !== false,
+        };
+      });
+
+    // Natural sort tables by numeric value or alphanumeric string
+    return mappedTables.sort((a, b) => {
+      const numA = parseInt(a.label, 10);
+      const numB = parseInt(b.label, 10);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB;
+      }
+      return a.label.localeCompare(b.label);
+    });
+  } catch (err) {
+    console.error("fetchActiveTablesAction error:", err);
+    return Array.from({ length: 12 }, (_, i) => {
+      const label = (i + 1).toString().padStart(2, "0");
+      const info = TABLE_ZONES_CONFIG[label] || { zone: "Indoor Cozy", capacity: 2 };
+      return { label, zone: info.zone, capacity: info.capacity, active: true };
+    });
+  }
 }
 
 

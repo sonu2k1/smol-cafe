@@ -265,6 +265,13 @@ export const CustomerHomeClientView: React.FC<CustomerHomeClientProps> = ({
               >
                 <span>👤</span> Loyalty &amp; Rewards
               </Link>
+              <Link
+                href="/"
+                onClick={() => setIsSideMenuOpen(false)}
+                className="flex items-center gap-3 text-[#241F1C] dark:text-[#FAF4EB] hover:text-[#B72E35] dark:hover:text-[#FF5B52]"
+              >
+                <span>✨</span> Welcome Screen
+              </Link>
             </div>
 
             {/* Footer note in Drawer */}

@@ -104,12 +104,11 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
           <p className="mt-2 text-xs text-stone-600 dark:text-stone-400">
             Please scan the QR code on your table stand or tap a table below to view live orders:
           </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {[1, 2, 3, 4, 5, 6].map((num) => {
-              const label = num.toString().padStart(2, "0");
+          <div className="mt-4 flex flex-wrap justify-center gap-2 max-h-40 overflow-y-auto">
+            {Array.from({ length: 13 }, (_, i) => (i + 1).toString().padStart(2, "0")).map((label) => {
               return (
                 <a
-                  key={num}
+                  key={label}
                   href={`/t/table-${label}`}
                   className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-xs hover:bg-amber-100 dark:border-amber-700 dark:bg-stone-800 dark:text-amber-200"
                 >
@@ -180,8 +179,8 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
           <div className="flex items-start gap-2 min-w-0">
             {/* Back Button */}
             <Link
-              href="/home"
-              aria-label="Back to home"
+              href="/smol-menu"
+              aria-label="Back to menu"
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#241F1C] dark:text-[#FAF4EB] transition hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 cursor-pointer -ml-1 mt-0.5"
             >
               <svg
@@ -428,7 +427,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
                 <Link
-                  href="/menu"
+                  href="/smol-menu"
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-[#B72E35] px-6 py-2.5 font-serif text-xs font-bold text-white shadow-md hover:bg-[#91242C] transition active:scale-95"
                 >
                   <span>Browse Menu &amp; Order →</span>

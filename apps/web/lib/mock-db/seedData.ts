@@ -192,6 +192,7 @@ const DEFAULT_ZONES: Record<string, string> = {
   "10": "Indoor Cozy",
   "11": "Garden Terrace",
   "12": "Courtyard Verandah",
+  "13": "Indoor Cozy",
 };
 
 // 12 Dining Tables
