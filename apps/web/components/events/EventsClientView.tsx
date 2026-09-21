@@ -61,7 +61,7 @@ export const EventsClientView: React.FC<EventsClientViewProps> = ({ initialEvent
       <header className="sticky top-0 z-40 border-b border-[#E8DFD3]/80 bg-[#F5EFEB]/90 px-4 py-3.5 backdrop-blur-md">
         <div className="mx-auto flex max-w-md items-center justify-between">
           <Link
-            href="/"
+            href="/home"
             className="flex h-9 w-9 items-center justify-center rounded-xl text-[#1C1917] transition hover:bg-black/5 active:scale-95"
             aria-label="Back to home"
           >

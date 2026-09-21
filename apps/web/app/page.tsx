@@ -40,6 +40,7 @@ export default function RoleSelectionPage() {
     setIsDark(next);
     applyTheme(next);
     localStorage.setItem("smol_theme", next ? "night" : "day");
+    window.dispatchEvent(new CustomEvent("smol_theme_changed", { detail: next }));
   };
 
   return (

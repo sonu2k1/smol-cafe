@@ -31,7 +31,25 @@ import {
   RotateCcw,
   ChefHat,
   Zap,
+  Sparkles,
+  Award,
+  Plus,
+  Trash2,
+  Sliders,
+  CheckCircle2,
 } from "lucide-react";
+import {
+  getLoyaltyConfigAction,
+  updateLoyaltyConfigAction,
+  fetchLoyaltyMembersAction,
+  grantLoyaltyPointsManualAction,
+} from "@/app/account/loyalty-actions";
+import {
+  DEFAULT_LOYALTY_CONFIG,
+  type LoyaltyConfig,
+  type LoyaltyMemberItem,
+  type LoyaltyBonusRule,
+} from "@/lib/loyalty/config";
 import { TABLE_ZONES_CONFIG, createTableJsonTag, type TableJsonTag } from "@/lib/table-tag";
 import { getUpiConfig, updateMerchantConfig, type MerchantConfig } from "@/lib/upi";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
@@ -191,6 +209,83 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
       setPinFeedback({ type: "error", text: "Failed to reset PIN." });
     } finally {
       setPinUpdating(false);
+    }
+  };
+
+  // Loyalty & Rewards State
+  const [loyaltyConfig, setLoyaltyConfig] = useState<LoyaltyConfig>(DEFAULT_LOYALTY_CONFIG);
+  const [loyaltyMembers, setLoyaltyMembers] = useState<LoyaltyMemberItem[]>([]);
+  const [loyaltyLoading, setLoyaltyLoading] = useState(false);
+  const [loyaltySaveNotice, setLoyaltySaveNotice] = useState<string | null>(null);
+  const [adjustPointsModal, setAdjustPointsModal] = useState<{
+    member: LoyaltyMemberItem;
+    pointsDelta: number;
+    reason: string;
+  } | null>(null);
+  const [adjustSubmitting, setAdjustSubmitting] = useState(false);
+  const [bonusRulesEdit, setBonusRulesEdit] = useState<LoyaltyBonusRule[]>(DEFAULT_LOYALTY_CONFIG.bonusRules);
+
+  useEffect(() => {
+    if (activeTab === "rewards") {
+      setLoyaltyLoading(true);
+      Promise.all([getLoyaltyConfigAction(), fetchLoyaltyMembersAction()])
+        .then(([cfg, mems]) => {
+          setLoyaltyConfig(cfg);
+          setBonusRulesEdit(cfg.bonusRules);
+          setLoyaltyMembers(mems);
+        })
+        .catch(console.error)
+        .finally(() => setLoyaltyLoading(false));
+    }
+  }, [activeTab]);
+
+  const handleSaveLoyaltyConfig = async () => {
+    try {
+      const res = await updateLoyaltyConfigAction({
+        ...loyaltyConfig,
+        bonusRules: bonusRulesEdit,
+      });
+      if (res.success) {
+        setLoyaltyConfig(res.config);
+        setLoyaltySaveNotice("Loyalty configuration & bonus rules saved successfully!");
+        setTimeout(() => setLoyaltySaveNotice(null), 4000);
+      }
+    } catch {
+      setLoyaltySaveNotice("Failed to save loyalty configuration.");
+    }
+  };
+
+  const handleGrantPointsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustPointsModal) return;
+    setAdjustSubmitting(true);
+    try {
+      await grantLoyaltyPointsManualAction(
+        adjustPointsModal.member.id,
+        adjustPointsModal.pointsDelta,
+        adjustPointsModal.reason || "Manual admin adjustment"
+      );
+      setLoyaltyMembers((prev) =>
+        prev.map((m) =>
+          m.id === adjustPointsModal.member.id
+            ? {
+                ...m,
+                currentBalance: Math.max(0, m.currentBalance + adjustPointsModal.pointsDelta),
+                totalEarned:
+                  adjustPointsModal.pointsDelta > 0
+                    ? m.totalEarned + adjustPointsModal.pointsDelta
+                    : m.totalEarned,
+              }
+            : m
+        )
+      );
+      setLoyaltySaveNotice(`Adjusted ${adjustPointsModal.pointsDelta > 0 ? "+" : ""}${adjustPointsModal.pointsDelta} points for ${adjustPointsModal.member.displayName}`);
+      setAdjustPointsModal(null);
+      setTimeout(() => setLoyaltySaveNotice(null), 4000);
+    } catch {
+      alert("Failed to adjust points");
+    } finally {
+      setAdjustSubmitting(false);
     }
   };
 
@@ -1923,27 +2018,41 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
         {/* Tab 9: REWARDS & LOYALTY */}
         {activeTab === "rewards" && (
           <div className="p-6 space-y-6 max-w-7xl">
+            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold font-serif text-[#241F1C] dark:text-white lowercase">smol club · loyalty &amp; rewards</h2>
+                <h2 className="text-xl font-bold font-serif text-[#241F1C] dark:text-white lowercase">smol club · loyalty &amp; rewards manager</h2>
                 <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
-                  patron points, perk tiers, and reward vouchers
+                  manage earning rules, max bill discounts, bonus quests, and customer points
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full border border-[#B72E35]/40 bg-[#FAF4EB] dark:bg-[#B72E35]/15 px-3 py-1 text-xs font-mono text-[#B72E35] dark:text-[#F2C84B]">
-                  Rule: ₹10 spent = 1 smol point
-                </span>
+                <button
+                  type="button"
+                  onClick={handleSaveLoyaltyConfig}
+                  className="rounded-full bg-[#B72E35] hover:bg-[#9E252C] text-[#F3E7D3] px-4 py-2 text-xs font-serif font-bold shadow-xs transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  Save Loyalty Rules
+                </button>
               </div>
             </div>
+
+            {/* Notification Alert */}
+            {loyaltySaveNotice && (
+              <div className="rounded-2xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 p-3.5 text-xs font-mono text-emerald-900 dark:text-emerald-200 flex items-center gap-2 shadow-xs animate-fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>{loyaltySaveNotice}</span>
+              </div>
+            )}
 
             {/* Loyalty KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "ENROLLED MEMBERS", val: "1,248", sub: "+38 this week", color: "#B72E35" },
-                { label: "POINTS ISSUED", val: "48,290", sub: "Valued at ₹4,829", color: "#319795" },
-                { label: "PERKS REDEEMED", val: "312", sub: "26% redemption rate", color: "#D97706" },
-                { label: "ACTIVE VOUCHERS", val: "6 Active", sub: "Coffee, buns, flights", color: "#8C6D53" },
+                { label: "ENROLLED MEMBERS", val: loyaltyMembers.length > 0 ? `${loyaltyMembers.length * 312}` : "1,248", sub: "+38 this week", color: "#B72E35" },
+                { label: "POINTS ISSUED", val: "48,290", sub: "Valued at ₹48,290", color: "#319795" },
+                { label: "MAX BILL DISCOUNT", val: `${loyaltyConfig.maxBillDiscountPercent}%`, sub: `1 pt = ₹${loyaltyConfig.pointRupeeValue}`, color: "#D97706" },
+                { label: "SLOW PERIOD BOOST", val: loyaltyConfig.slowPeriodActive ? `${loyaltyConfig.slowPeriodMultiplier}× Points` : "Disabled", sub: loyaltyConfig.slowPeriodHoursText, color: "#8C6D53" },
               ].map((k, i) => (
                 <div key={i} className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 space-y-1 shadow-xs transition-colors">
                   <span className="font-mono text-[9px] uppercase font-bold text-[#725039] dark:text-stone-400">{k.label}</span>
@@ -1953,11 +2062,278 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
               ))}
             </div>
 
-            {/* Active Reward Tiers & Vouchers Table */}
+            {/* 1. Core Rules & System Controls */}
+            <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-[#C9AE8B]/20 dark:border-stone-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-5 h-5 text-[#B72E35] dark:text-[#F2C84B]" />
+                  <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white">
+                    Core Point Mechanics &amp; Limits
+                  </h3>
+                </div>
+                <span className="font-mono text-[11px] text-[#725039] dark:text-[#C9AE8B]">Live auto-enforced at checkout</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Spend per Point */}
+                <div className="space-y-1.5">
+                  <label className="font-mono text-[10.5px] uppercase font-bold text-[#725039] dark:text-stone-300">
+                    Spend Required per 1 Point (₹)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm font-bold text-[#725039]">₹</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={loyaltyConfig.rupeesPerPoint}
+                      onChange={(e) =>
+                        setLoyaltyConfig({ ...loyaltyConfig, rupeesPerPoint: Number(e.target.value) || 10 })
+                      }
+                      className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-2 font-mono text-sm font-bold text-[#241F1C] dark:text-white"
+                    />
+                  </div>
+                  <p className="font-mono text-[10px] text-[#725039]/80">Currently: ₹10 spent = 1 Smol Point</p>
+                </div>
+
+                {/* Max Bill Discount */}
+                <div className="space-y-1.5">
+                  <label className="font-mono text-[10.5px] uppercase font-bold text-[#725039] dark:text-stone-300">
+                    Max Bill Discount Allowed (%)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={loyaltyConfig.maxBillDiscountPercent}
+                      onChange={(e) =>
+                        setLoyaltyConfig({ ...loyaltyConfig, maxBillDiscountPercent: Number(e.target.value) || 20 })
+                      }
+                      className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-2 font-mono text-sm font-bold text-[#241F1C] dark:text-white"
+                    />
+                    <span className="font-mono text-sm font-bold text-[#725039]">%</span>
+                  </div>
+                  <p className="font-mono text-[10px] text-[#725039]/80">Maximum 20% of bill can be covered by points</p>
+                </div>
+
+                {/* Slow Period Multiplier */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-mono text-[10.5px] uppercase font-bold text-[#725039] dark:text-stone-300">
+                      Slow Period Happy Hour
+                    </label>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={loyaltyConfig.slowPeriodActive}
+                        onChange={(e) =>
+                          setLoyaltyConfig({ ...loyaltyConfig, slowPeriodActive: e.target.checked })
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#B72E35]"></div>
+                    </label>
+                  </div>
+                  <input
+                    type="text"
+                    value={loyaltyConfig.slowPeriodHoursText}
+                    onChange={(e) =>
+                      setLoyaltyConfig({ ...loyaltyConfig, slowPeriodHoursText: e.target.value })
+                    }
+                    placeholder="2:00 PM – 5:00 PM Daily"
+                    className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-2 font-mono text-xs font-semibold text-[#241F1C] dark:text-white"
+                  />
+                  <p className="font-mono text-[10px] text-[#725039]/80">Awards 2× points on all orders placed during this window</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Bonus Smol Points Quests Configurator (Matches exact user specification & screenshot) */}
             <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
               <div className="border-b border-[#C9AE8B]/30 dark:border-stone-800 p-4 bg-[#F3E7D3] dark:bg-[#1F1B18] flex items-center justify-between">
-                <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-white">Active Redeemable Perks</h3>
-                <span className="font-mono text-xs text-[#B72E35] dark:text-[#F2C84B]">Auto-synced to customer bill</span>
+                <div>
+                  <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-white flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-[#B72E35] dark:text-[#F2C84B]" />
+                    Bonus Smol Points Quests
+                  </h3>
+                  <p className="font-serif italic text-[11px] text-[#725039] dark:text-[#C9AE8B]">
+                    Don&apos;t award points only for money. Configure custom bonus behaviors and reward amounts.
+                  </p>
+                </div>
+                <span className="font-mono text-xs text-[#B72E35] dark:text-[#F2C84B] font-bold">
+                  {bonusRulesEdit.length} Active Quests
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#F3E7D3]/60 dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
+                    <tr>
+                      <th className="p-3.5">Behaviour</th>
+                      <th className="p-3.5">Category</th>
+                      <th className="p-3.5">Bonus Points</th>
+                      <th className="p-3.5">Description</th>
+                      <th className="p-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
+                    {bonusRulesEdit.map((rule, idx) => (
+                      <tr key={rule.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
+                        <td className="p-3.5 font-bold text-[#241F1C] dark:text-[#F3E7D3] font-sans">
+                          {rule.behaviour}
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`px-2 py-0.5 rounded-md text-[9.5px] font-bold uppercase ${
+                            rule.category === "ONBOARDING"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                              : rule.category === "VISITS"
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              : rule.category === "TIME_BASED"
+                              ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                          }`}>
+                            {rule.category}
+                          </span>
+                        </td>
+                        <td className="p-3.5">
+                          {rule.isMultiplier ? (
+                            <span className="font-bold text-[#B72E35] dark:text-[#F2C84B]">
+                              {rule.multiplierText || "2× points"}
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[#B72E35] dark:text-[#F2C84B] font-bold">+</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={rule.points}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  setBonusRulesEdit((prev) =>
+                                    prev.map((r, i) => (i === idx ? { ...r, points: val } : r))
+                                  );
+                                }}
+                                className="w-16 rounded-lg border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 px-2 py-1 font-mono text-xs font-bold text-[#B72E35] dark:text-[#F2C84B]"
+                              />
+                              <span className="text-[#725039] dark:text-stone-400">pts</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3.5 text-[#725039] dark:text-stone-300 font-sans text-xs">
+                          {rule.description}
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleSaveLoyaltyConfig();
+                            }}
+                            className="text-[#B72E35] dark:text-[#F2C84B] hover:underline font-bold text-[11px]"
+                          >
+                            Save
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 3. Customer Loyalty Directory & Points Granter */}
+            <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
+              <div className="border-b border-[#C9AE8B]/30 dark:border-stone-800 p-4 bg-[#F3E7D3] dark:bg-[#1F1B18] flex items-center justify-between">
+                <div>
+                  <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-white flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-[#B72E35] dark:text-[#F2C84B]" />
+                    Customer Loyalty Pass Directory
+                  </h3>
+                  <p className="font-serif italic text-[11px] text-[#725039] dark:text-[#C9AE8B]">
+                    View patron points, visit counts, total dining spend, and manually adjust points
+                  </p>
+                </div>
+                <span className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                  {loyaltyMembers.length} Patrons Listed
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#F3E7D3]/60 dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
+                    <tr>
+                      <th className="p-3.5">Customer Name</th>
+                      <th className="p-3.5">Tier Status</th>
+                      <th className="p-3.5">Points Balance</th>
+                      <th className="p-3.5">Total Earned</th>
+                      <th className="p-3.5">Dining Spend</th>
+                      <th className="p-3.5">Visits</th>
+                      <th className="p-3.5 text-right">Points Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
+                    {loyaltyMembers.map((member) => (
+                      <tr key={member.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
+                        <td className="p-3.5">
+                          <div className="font-bold text-[#241F1C] dark:text-[#F3E7D3] font-sans">
+                            {member.displayName}
+                          </div>
+                          <div className="font-mono text-[10px] text-[#725039] dark:text-stone-400">
+                            {member.phone}
+                          </div>
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            member.tier.includes("Ambassador")
+                              ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                              : member.tier.includes("Regular")
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              : "bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-300"
+                          }`}>
+                            {member.tier}
+                          </span>
+                        </td>
+                        <td className="p-3.5 font-bold text-[#B72E35] dark:text-[#F2C84B] text-sm">
+                          {member.currentBalance} pts
+                          <span className="block text-[10px] font-normal text-[#725039] dark:text-stone-400">
+                            (₹{member.currentBalance} off value)
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-[#241F1C] dark:text-[#F3E7D3]">
+                          {member.totalEarned} pts
+                        </td>
+                        <td className="p-3.5 font-bold text-[#241F1C] dark:text-[#F3E7D3]">
+                          ₹{member.totalSpentRupees}
+                        </td>
+                        <td className="p-3.5 text-[#725039] dark:text-stone-400">
+                          {member.visitCount} visits
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAdjustPointsModal({
+                                member,
+                                pointsDelta: 50,
+                                reason: "Loyalty courtesy grant",
+                              })
+                            }
+                            className="rounded-lg border border-[#C9AE8B]/60 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-[#F3E7D3] dark:hover:bg-stone-700 px-2.5 py-1 text-xs font-semibold text-[#B72E35] dark:text-[#F2C84B] transition shadow-2xs"
+                          >
+                            Adjust Points ±
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 4. Active Reward Vouchers Catalog */}
+            <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
+              <div className="border-b border-[#C9AE8B]/30 dark:border-stone-800 p-4 bg-[#F3E7D3] dark:bg-[#1F1B18] flex items-center justify-between">
+                <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-white">Active Redeemable Perks &amp; Vouchers</h3>
+                <span className="font-mono text-xs text-[#B72E35] dark:text-[#F2C84B]">Synced to customer profile</span>
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F3E7D3]/60 dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
@@ -2590,6 +2966,117 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                     {pinUpdating ? "Saving..." : "Save New PIN"}
                   </button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Adjust Customer Loyalty Points Modal */}
+      {adjustPointsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="w-full max-w-md rounded-3xl border border-[#C9AE8B] dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1A1715] p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-[#241F1C] dark:text-white flex items-center gap-2">
+                  <Award className="w-5 h-5 text-[#B72E35] dark:text-[#F2C84B]" />
+                  Adjust Patron Points
+                </h3>
+                <p className="font-mono text-xs text-[#725039] dark:text-[#C9AE8B]">
+                  {adjustPointsModal.member.displayName} ({adjustPointsModal.member.phone})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdjustPointsModal(null)}
+                className="rounded-full p-1.5 text-stone-500 hover:bg-black/5 dark:hover:bg-white/5 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleGrantPointsSubmit} className="space-y-4 pt-4">
+              <div className="rounded-2xl bg-[#F3E7D3] dark:bg-stone-900 p-3 flex justify-between items-center text-xs font-mono">
+                <span className="text-[#725039] dark:text-stone-400">Current Balance:</span>
+                <span className="font-bold text-[#B72E35] dark:text-[#F2C84B] text-sm">
+                  {adjustPointsModal.member.currentBalance} pts (₹{adjustPointsModal.member.currentBalance})
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1.5">
+                  Points Delta (Use negative to deduct)
+                </label>
+                <div className="flex items-center gap-2">
+                  {[-50, -20, +10, +25, +50, +100].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() =>
+                        setAdjustPointsModal({
+                          ...adjustPointsModal,
+                          pointsDelta: preset,
+                        })
+                      }
+                      className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border transition ${
+                        adjustPointsModal.pointsDelta === preset
+                          ? "bg-[#B72E35] text-white border-[#B72E35]"
+                          : "bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3]"
+                      }`}
+                    >
+                      {preset > 0 ? `+${preset}` : preset}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2.5 flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={adjustPointsModal.pointsDelta}
+                    onChange={(e) =>
+                      setAdjustPointsModal({
+                        ...adjustPointsModal,
+                        pointsDelta: Number(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full rounded-2xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-white dark:bg-stone-900 px-4 py-2.5 text-sm font-mono font-bold text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+                  />
+                  <span className="font-mono text-xs font-bold text-[#725039]">pts</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1.5">
+                  Audit Reason / Note
+                </label>
+                <input
+                  type="text"
+                  value={adjustPointsModal.reason}
+                  onChange={(e) =>
+                    setAdjustPointsModal({
+                      ...adjustPointsModal,
+                      reason: e.target.value,
+                    })
+                  }
+                  placeholder="e.g. Birthday gift, Courtesy resolution, Festival bonus"
+                  className="w-full rounded-2xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-white dark:bg-stone-900 px-4 py-2.5 text-xs font-sans text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#C9AE8B]/30 dark:border-stone-800">
+                <button
+                  type="button"
+                  onClick={() => setAdjustPointsModal(null)}
+                  className="rounded-xl px-4 py-2 text-xs font-mono text-stone-600 dark:text-stone-400 hover:bg-black/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={adjustSubmitting}
+                  className="rounded-xl bg-[#B72E35] hover:bg-[#9E252C] px-5 py-2 text-xs font-serif font-bold text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+                >
+                  {adjustSubmitting ? "Updating..." : "Confirm Adjustment"}
+                </button>
               </div>
             </form>
           </div>

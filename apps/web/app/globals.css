@@ -21,6 +21,12 @@ html {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   background-color: #F3E7D3;
+  color-scheme: light;
+}
+
+html.dark {
+  background-color: #151110;
+  color-scheme: dark;
 }
 
 body {

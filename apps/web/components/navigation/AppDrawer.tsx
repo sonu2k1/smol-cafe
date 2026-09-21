@@ -24,6 +24,7 @@ import {
   BarChart2,
   X,
   Coffee,
+  Download,
 } from "lucide-react";
 
 interface AppDrawerProps {
@@ -119,16 +120,15 @@ export const AppDrawer: React.FC<AppDrawerProps> = ({
             <span className="font-mono text-[11px] font-bold text-[#725039] uppercase">
               Seated Table:
             </span>
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5, 6].map((num) => {
-                const label = num.toString().padStart(2, "0");
-                const isSelected = tableLabel === label || (!tableLabel && num === 1);
+            <div className="flex items-center gap-1 overflow-x-auto py-0.5 max-w-[220px]">
+              {Array.from(new Set(["01", "02", "03", "04", "05", "06", ...(tableLabel ? [tableLabel.padStart(2, "0")] : [])])).map((label) => {
+                const isSelected = tableLabel === label || (!tableLabel && label === "01");
                 return (
                   <Link
-                    key={num}
+                    key={label}
                     href={`/t/table-${label}`}
                     onClick={onClose}
-                    className={`rounded-md px-2 py-0.5 font-mono text-xs font-bold transition-all duration-150 active:scale-95 ${
+                    className={`shrink-0 rounded-md px-2 py-0.5 font-mono text-xs font-bold transition-all duration-150 active:scale-95 ${
                       isSelected
                         ? "bg-[#B72E35] text-white shadow-xs scale-105"
                         : "border border-[#C9AE8B]/50 bg-[#F3E7D3] text-[#241F1C] hover:bg-[#EFE7DC]"
@@ -185,6 +185,31 @@ export const AppDrawer: React.FC<AppDrawerProps> = ({
           ))}
         </div>
 
+
+        {/* App Install Action */}
+        <div className="p-3 border-t border-[#C9AE8B]/30 bg-[#FAF4EB]">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              window.dispatchEvent(new CustomEvent("open-install-prompt"));
+            }}
+            className="w-full flex items-center justify-between p-2.5 rounded-xl border border-[#B72E35]/30 bg-[#B72E35]/10 hover:bg-[#B72E35]/15 text-[#B72E35] transition-colors text-left group"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-[#B72E35] text-white">
+                <Download className="h-4 w-4 shrink-0" />
+              </div>
+              <div>
+                <span className="font-serif text-sm font-bold block leading-tight text-[#241F1C]">install smol app</span>
+                <span className="font-serif italic text-[11px] text-[#725039]">add to home screen</span>
+              </div>
+            </div>
+            <span className="text-[10px] uppercase font-mono tracking-wider bg-[#B72E35] text-white px-2 py-0.5 rounded font-semibold">
+              Install
+            </span>
+          </button>
+        </div>
 
         {/* Footer */}
         <div className="border-t border-[#E8DFD3] bg-[#F5EFEB] p-3 text-center">

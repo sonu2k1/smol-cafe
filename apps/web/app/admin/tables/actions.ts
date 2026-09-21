@@ -234,6 +234,8 @@ export async function createTableAction(input: CreateTableInput): Promise<{
 
     revalidatePath("/admin");
     revalidatePath("/admin/tables");
+    revalidatePath("/");
+    revalidatePath("/home");
 
     return {
       success: true,
@@ -325,6 +327,8 @@ export async function updateTableAction(
 
     revalidatePath("/admin");
     revalidatePath("/admin/tables");
+    revalidatePath("/");
+    revalidatePath("/home");
 
     return {
       success: true,
@@ -382,6 +386,8 @@ export async function deleteTableAction(tableId: string): Promise<{
 
     revalidatePath("/admin");
     revalidatePath("/admin/tables");
+    revalidatePath("/");
+    revalidatePath("/home");
 
     return { success: true, message: "Table deleted successfully." };
   } catch (err: any) {

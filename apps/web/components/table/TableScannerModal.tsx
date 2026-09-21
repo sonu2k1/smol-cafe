@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { TABLE_ZONES_CONFIG } from "@/lib/table-tag";
+import { fetchActiveTablesAction, type ClientTableInfo } from "@/app/t/actions";
 import { QrCode, Camera, Check, X, MapPin, RefreshCw, Sparkles, Upload } from "lucide-react";
 import jsQR from "jsqr";
 
@@ -12,6 +13,17 @@ interface TableScannerModalProps {
   initialTab?: "camera" | "picker";
 }
 
+const DEFAULT_TABLE_LIST: ClientTableInfo[] = Array.from({ length: 12 }, (_, i) => {
+  const label = (i + 1).toString().padStart(2, "0");
+  const info = TABLE_ZONES_CONFIG[label] || { zone: "Indoor Cozy", capacity: 2 };
+  return {
+    label,
+    zone: info.zone,
+    capacity: info.capacity,
+    active: true,
+  };
+});
+
 export const TableScannerModal: React.FC<TableScannerModalProps> = ({
   currentTable,
   onClose,
@@ -19,6 +31,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
   initialTab = "camera",
 }) => {
   const [activeTab, setActiveTab] = useState<"camera" | "picker">(initialTab);
+  const [tables, setTables] = useState<ClientTableInfo[]>(DEFAULT_TABLE_LIST);
   const [cameraState, setCameraState] = useState<
     "idle" | "requesting" | "needs_tap" | "active" | "denied" | "unsupported" | "error"
   >("idle");
@@ -45,15 +58,22 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
     }
   }, []);
 
-  const tableList = Array.from({ length: 12 }, (_, i) => {
-    const label = (i + 1).toString().padStart(2, "0");
-    const info = TABLE_ZONES_CONFIG[label] || { zone: "Indoor Cozy", capacity: 2 };
-    return {
-      label,
-      zone: info.zone,
-      capacity: info.capacity,
+  // Load dynamic tables from DB (including newly added tables like Table 13)
+  useEffect(() => {
+    let isMounted = true;
+    fetchActiveTablesAction()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setTables(data);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch dynamic active tables:", err);
+      });
+    return () => {
+      isMounted = false;
     };
-  });
+  }, []);
 
   // Stop camera tracks cleanly
   const stopCamera = useCallback(() => {
@@ -70,14 +90,14 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
     }
   }, []);
 
-  // Parse QR string to table code (e.g., "table-04", "T-04", "04", "https://.../t/table-04")
+  // Parse QR string to table code (e.g., "table-04", "T-04", "04", "https://.../t/table-13")
   const parseTableFromQR = (rawText: string): string | null => {
     if (!rawText) return null;
     const clean = rawText.trim();
-    const match = clean.match(/table[-_]?([0-9]{1,2})/i) || clean.match(/\bT?([0-9]{1,2})\b/i);
+    const match = clean.match(/table[-_]?([0-9]{1,3})/i) || clean.match(/\bT?([0-9]{1,3})\b/i);
     if (match) {
       const num = parseInt(match[1], 10);
-      if (num >= 1 && num <= 12) {
+      if (num >= 1 && num <= 999) {
         return num.toString().padStart(2, "0");
       }
     }
@@ -498,8 +518,8 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
                   one-click instant test
                 </span>
               </div>
-              <div className="flex justify-center gap-1.5 sm:gap-2">
-                {["01", "04", "07", "12"].map((lbl) => (
+              <div className="flex justify-center gap-1.5 sm:gap-2 flex-wrap">
+                {Array.from(new Set(["01", "04", "07", "12", ...(tables.length > 0 ? [tables[tables.length - 1].label] : [])])).map((lbl) => (
                   <button
                     key={lbl}
                     onClick={() => handleSimulateScan(lbl)}
@@ -528,14 +548,14 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
           </div>
         )}
 
-        {/* Tab 2: 12 Table Grid */}
+        {/* Tab 2: Dynamic Tables Grid */}
         {activeTab === "picker" && (
           <div className="space-y-3 overflow-y-auto pr-1 flex-1 min-h-0 -mr-1" style={{ maxHeight: "calc(90vh - 220px)" }}>
             <p className="font-serif italic text-[11px] text-[#725039] dark:text-[#C9AE8B] px-0.5">
               tap the table stand number at your seat
             </p>
             <div className="grid grid-cols-3 gap-2.5">
-              {tableList.map((t) => {
+              {tables.map((t) => {
                 const isSelected = currentTable === t.label;
                 return (
                   <button

@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { TableArchedCard } from "./TableArchedCard";
-import { switchTableSessionAction } from "@/app/t/actions";
+import { switchTableSessionAction, fetchActiveTablesAction } from "@/app/t/actions";
 import { X, Check, Utensils, QrCode, ArrowLeft, RefreshCw, Trash2, Plus } from "lucide-react";
 
 export interface TableItemView {
@@ -42,6 +42,19 @@ export const TableClientView: React.FC<TableClientViewProps> = ({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeItemModal, setActiveItemModal] = useState<TableItemView | null>(null);
   const [switchingTable, setSwitchingTable] = useState<string | null>(null);
+  const [availableTables, setAvailableTables] = useState<string[]>(() =>
+    Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"))
+  );
+
+  React.useEffect(() => {
+    fetchActiveTablesAction()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setAvailableTables(data.map((t) => t.label));
+        }
+      })
+      .catch((err) => console.warn("Could not fetch tables in TableClientView:", err));
+  }, []);
 
   // Toggle upsell Conversation Board
   const toggleConversationBoard = () => {
@@ -370,10 +383,8 @@ export const TableClientView: React.FC<TableClientViewProps> = ({
                 <p className="font-mono text-[10px] uppercase font-bold tracking-wider text-[#725039] mb-2">
                   Switch Active Table:
                 </p>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {Array.from({ length: 12 }, (_, i) =>
-                    (i + 1).toString().padStart(2, "0")
-                  ).map((lbl) => (
+                <div className="grid grid-cols-4 gap-1.5 max-h-36 overflow-y-auto">
+                  {Array.from(new Set([...availableTables, currentTableLabel])).map((lbl) => (
                     <button
                       key={lbl}
                       type="button"

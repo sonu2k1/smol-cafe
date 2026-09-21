@@ -3,6 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { RoleSwitcherBar } from "@/components/navigation/RoleSwitcherBar";
+import { InstallAppPrompt } from "@/components/common/InstallAppPrompt";
 
 interface LayoutShellProps {
   children: React.ReactNode;
@@ -40,10 +41,45 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
 
   const showRoleSwitcher = !isCustomerFacingRoute && isStaffWorkspace;
 
+  // Real-time synchronization of mobile status bar color (<meta name="theme-color">)
+  React.useEffect(() => {
+    const updateMetaThemeColor = () => {
+      const isDark = document.documentElement.classList.contains("dark");
+      const targetColor = isDark ? "#151110" : "#F3E7D3";
+
+      let meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement("meta");
+        meta.setAttribute("name", "theme-color");
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute("content", targetColor);
+    };
+
+    updateMetaThemeColor();
+
+    const observer = new MutationObserver(() => {
+      updateMetaThemeColor();
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme"],
+    });
+
+    window.addEventListener("smol_theme_changed", updateMetaThemeColor);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("smol_theme_changed", updateMetaThemeColor);
+    };
+  }, []);
+
   return (
     <>
       {showRoleSwitcher && <RoleSwitcherBar />}
       {children}
+      <InstallAppPrompt />
     </>
   );
 };
