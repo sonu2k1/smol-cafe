@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>smol café — Complete Today's Changelog & Ecosystem Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cafe-creme: #F3E7D3;
+      --warm-creme: #FAF4EB;
+      --card-bg: #FAF4EB;
+      --espresso-ink: #241F1C;
+      --smol-cherry: #B72E35;
+      --smol-cherry-hover: #9E242A;
+      --butter-taxi: #F2C84B;
+      --biscuit: #C9AE8B;
+      --biscuit-light: #D9C5AB;
+      --walnut: #725039;
+      --emerald-dark: #065F46;
+      --emerald-bg: #ECFDF5;
+      --emerald-border: #A7F3D0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--cafe-creme);
+      color: var(--espresso-ink);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.5;
+      padding: 30px 20px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Header & Branding */
+    .header-card {
+      background: var(--warm-creme);
+      border: 1.5px solid var(--biscuit);
+      border-radius: 24px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 20px rgba(36, 31, 28, 0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, var(--smol-cherry), var(--butter-taxi), var(--smol-cherry));
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .brand-title {
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 38px;
+      font-weight: 800;
+      color: var(--smol-cherry);
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
+
+    .brand-subtitle {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: var(--walnut);
+      font-weight: 500;
+      margin-top: 6px;
+    }
+
+    .meta-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .meta-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: var(--cafe-creme);
+      border: 1px solid var(--biscuit);
+      color: var(--walnut);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .meta-pill.success {
+      background: var(--emerald-bg);
+      border-color: var(--emerald-border);
+      color: var(--emerald-dark);
+    }
+
+    .meta-pill.commit {
+      background: #EDE8F5;
+      border-color: #D1C4E9;
+      color: #4A148C;
+    }
+
+    /* KPI Banner */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px dashed var(--biscuit);
+    }
+
+    .kpi-box {
+      background: rgba(243, 231, 211, 0.5);
+      border: 1px solid var(--biscuit);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .kpi-number {
+      font-family: 'EB Garamond', serif;
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--smol-cherry);
+      line-height: 1;
+    }
+
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--walnut);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    .kpi-sub {
+      font-size: 10px;
+      color: var(--walnut);
+      opacity: 0.8;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Palette Swatches */
+    .palette-strip {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .swatch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--warm-creme);
+      border: 1px solid var(--biscuit);
+      padding: 5px 12px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .swatch-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    /* Section Title */
+    .section-title {
+      font-family: 'EB Garamond', serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--espresso-ink);
+      margin: 32px 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--biscuit);
+    }
+
+    /* Phase Cards */
+    .phase-card {
+      background: var(--warm-creme);
+      border: 1.5px solid var(--biscuit);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 10px rgba(36, 31, 28, 0.03);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .phase-card:hover {
+      box-shadow: 0 6px 18px rgba(36, 31, 28, 0.08);
+      border-color: var(--smol-cherry);
+    }
+
+    .phase-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .phase-badge-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .phase-num {
+      background: var(--smol-cherry);
+      color: white;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 8px;
+    }
+
+    .phase-title {
+      font-family: 'EB Garamond', serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--espresso-ink);
+    }
+
+    .status-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: var(--emerald-bg);
+      border: 1px solid var(--emerald-border);
+      color: var(--emerald-dark);
+    }
+
+    .feature-list {
+      list-style: none;
+      margin-top: 12px;
+    }
+
+    .feature-list li {
+      position: relative;
+      padding-left: 22px;
+      margin-bottom: 8px;
+      font-size: 12.5px;
+      color: var(--espresso-ink);
+    }
+
+    .feature-list li::before {
+      content: "☕";
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-size: 11px;
+    }
+
+    .file-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(201, 174, 139, 0.4);
+    }
+
+    .file-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      background: var(--cafe-creme);
+      border: 1px solid var(--biscuit);
+      color: var(--walnut);
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    /* Role Credential Table */
+    .data-table-container {
+      background: var(--warm-creme);
+      border: 1.5px solid var(--biscuit);
+      border-radius: 20px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 10px rgba(36, 31, 28, 0.04);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .data-table th {
+      background: var(--cafe-creme);
+      color: var(--walnut);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 14px 16px;
+      border-bottom: 1.5px solid var(--biscuit);
+    }
+
+    .data-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(201, 174, 139, 0.3);
+      color: var(--espresso-ink);
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table tr:hover {
+      background: rgba(243, 231, 211, 0.4);
+    }
+
+    .pin-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      background: #FEE2E2;
+      border: 1px solid #FECACA;
+      color: #991B1B;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+
+    /* Mobile Box Comparison */
+    .mobile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .mobile-card {
+      background: var(--warm-creme);
+      border: 1.5px solid var(--biscuit);
+      border-radius: 20px;
+      padding: 20px;
+    }
+
+    .mobile-card h4 {
+      font-family: 'EB Garamond', serif;
+      font-size: 18px;
+      color: var(--smol-cherry);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Invariant Test Strip */
+    .test-box {
+      background: #181412;
+      border: 1px solid #382F2A;
+      color: #F3E7D3;
+      border-radius: 18px;
+      padding: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .test-pass {
+      color: #34D399;
+      font-weight: 700;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--walnut);
+      font-family: 'EB Garamond', serif;
+      font-size: 15px;
+      border-top: 1px solid var(--biscuit);
+      margin-top: 40px;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 16px 10px;
+      }
+      .header-card {
+        padding: 20px;
+      }
+      .brand-title {
+        font-size: 28px;
+      }
+      .data-table-container {
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- Header Card -->
+    <div class="header-card">
+      <div class="header-top">
+        <div>
+          <h1 class="brand-title">smol café · Executive Changelog</h1>
+          <p class="brand-subtitle">Comprehensive record of all 9 operational phases, mobile polish & system enhancements completed today</p>
+        </div>
+        <div class="meta-pills">
+          <span class="meta-pill success">● All 9 Phases Complete</span>
+          <span class="meta-pill success">✓ 7/7 Invariants Pass</span>
+          <span class="meta-pill">Date: 21 September 2026</span>
+          <span class="meta-pill commit">Branch: optimizations</span>
+        </div>
+      </div>
+
+      <!-- KPI Summary -->
+      <div class="kpi-grid">
+        <div class="kpi-box">
+          <div class="kpi-number">9 / 9</div>
+          <div class="kpi-label">Phases Delivered</div>
+          <div class="kpi-sub">100% Operational</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-number">5</div>
+          <div class="kpi-label">Staff Stations</div>
+          <div class="kpi-sub">Customer/KDS/Barista/Cashier/Admin</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-number">40</div>
+          <div class="kpi-label">Files Updated/Created</div>
+          <div class="kpi-sub">+6,432 / -1,243 lines</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-number">0</div>
+          <div class="kpi-label">TypeScript Errors</div>
+          <div class="kpi-sub">3 Workspaces Verified</div>
+        </div>
+      </div>
+
+      <!-- Brand Palette Compliance Strip -->
+      <div class="palette-strip">
+        <div class="swatch"><div class="swatch-color" style="background:#F3E7D3;"></div>Café Crème (#F3E7D3)</div>
+        <div class="swatch"><div class="swatch-color" style="background:#FAF4EB;"></div>Warm Crème (#FAF4EB)</div>
+        <div class="swatch"><div class="swatch-color" style="background:#B72E35;"></div>Smol Cherry (#B72E35)</div>
+        <div class="swatch"><div class="swatch-color" style="background:#F2C84B;"></div>Butter Taxi (#F2C84B)</div>
+        <div class="swatch"><div class="swatch-color" style="background:#C9AE8B;"></div>Biscuit Border (#C9AE8B)</div>
+        <div class="swatch"><div class="swatch-color" style="background:#241F1C;"></div>Espresso Ink (#241F1C)</div>
+      </div>
+    </div>
+
+    <!-- Section 1: Phase Deep Dive -->
+    <h2 class="section-title">Delivered Architecture & Phase Breakdown</h2>
+
+    <!-- Phase 1 -->
+    <div class="phase-card">
+      <div class="phase-header">
+        <div class="phase-badge-title">
+          <span class="phase-num">PHASE 01</span>
+          <h3 class="phase-title">Realtime Multi-Panel Synchronization Mesh</h3>
+        </div>
+        <span class="status-badge">100% Complete</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>Cross-Station Sync Bus (<code>sync-events.ts</code>)</strong>: Multi-tab BroadcastChannel & Web Audio event bus connecting Customer, Kitchen KDS, Barista Desk, Cashier POS, and Admin Tower.</li>
+        <li><strong>Instant Item 86'd Reaction</strong>: Sold out/availability changes immediately apply a black & white filter with an authentic red stamp on customer menus without page refresh.</li>
+        <li><strong>Table Layout Mesh Sync</strong>: Dynamic table creation, deletion, and renaming instantly reflect across all devices.</li>
+      </ul>
+      <div class="file-tags">
+        <span class="file-tag">lib/sync-events.ts</span>
+        <span class="file-tag">components/menu/MenuClientView.tsx</span>
+        <span class="file-tag">components/admin/TableManager.tsx</span>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="phase-card">
+      <div class="phase-header">
+        <div class="phase-badge-title">
+          <span class="phase-num">PHASE 02</span>
+          <h3 class="phase-title">Customer Tax Invoices, Thermal Slip Printing & Audio Synthesis</h3>
+        </div>
+        <span class="status-badge">100% Complete</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>1-Click Thermal Print & PDF (<code>print.ts</code>)</strong>: Authentic 80mm café thermal receipt and tax invoice generation with GSTIN, FSSAI, Table #, Guest Name, CGST/SGST breakdown, and Google Maps review link.</li>
+        <li><strong>Historical Past Bills Viewer (<code>PastBillsModal.tsx</code>)</strong>: Enables multi-round dining guests to review and print previous order rounds.</li>
+        <li><strong>Web Audio API Alert Synthesizer (<code>sound.ts</code>)</strong>: Built-in commercial multi-frequency audio alerts for new kitchen orders (3-tone chime) and ready orders without external audio assets.</li>
+      </ul>
+      <div class="file-tags">
+        <span class="file-tag">lib/print.ts</span>
+        <span class="file-tag">lib/sound.ts</span>
+        <span class="file-tag">components/orders/OrderReceiptModal.tsx</span>
+        <span class="file-tag">components/orders/PastBillsModal.tsx</span>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="phase-card">
+      <div class="phase-header">
+        <div class="phase-badge-title">
+          <span class="phase-num">PHASE 03</span>
+          <h3 class="phase-title">Kitchen KDS & 86 Item Availability Manager</h3>
+        </div>
+        <span class="status-badge">100% Complete</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>Station-Based 86'd Controls (<code>KitchenMenuManager.tsx</code>)</strong>: 1-tap "86 Station" and "Restore All" buttons with live inventory stock broadcast.</li>
+        <li><strong>Multi-Stage Kanban KDS (<code>KitchenBoardView.tsx</code>)</strong>: Real-time ticket filtering (Hot Kitchen, Bakery, Cold Bar), table search, and active preparation timers with color-coded urgency.</li>
+      </ul>
+      <div class="file-tags">
+        <span class="file-tag">app/kitchen/menu-actions.ts</span>
+        <span class="file-tag">components/kitchen/KitchenMenuManager.tsx</span>
+        <span class="file-tag">components/kitchen/KitchenBoardView.tsx</span>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="phase-card">
+      <div class="phase-header">
+        <div class="phase-badge-title">
+          <span class="phase-num">PHASE 04</span>
+          <h3 class="phase-title">Dedicated Barista Brew Station (<code>/barista</code>)</h3>
+        </div>
+        <span class="status-badge">100% Complete</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>Beverage-Only Extraction Queue</strong>: Server-side routing separating coffees, pour-overs, lattes, cold brews, and shakes onto the Barista screen.</li>
+        <li><strong>Specialty Espresso Extraction Timer (<code>EspressoShotTimer.tsx</code>)</strong>: Millisecond-precision shot timer with golden extraction target window (24–28s) and audio chimes.</li>
+        <li><strong>1-Tap Brew Stage Workflow</strong>: <code>START BREWING</code> → <code>MARK BREW READY ☕</code> → <code>DELIVERED</code>.</li>
+      </ul>
+      <div class="file-tags">
+        <span class="file-tag">app/barista/actions.ts</span>
+        <span class="file-tag">app/barista/page.tsx</span>
+        <span class="file-tag">components/barista/BaristaBoardView.tsx</span>
+        <span class="file-tag">components/barista/EspressoShotTimer.tsx</span>
+      </div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div class="phase-card">
+      <div class="phase-header">
+        <div class="phase-badge-title">
+          <span class="phase-num">PHASE 05</span>
+          <h3 class="phase-title">Dynamic Phone-Number-Driven Loyalty System</h3>
+        </div>
+        <span class="status-badge">100% Complete</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>Real Database Phone Persistence (<code>loyalty-actions.ts</code>)</strong>: Uses customer phone numbers as unique keys, calculating visit count, tier progression (Seedling, Brew Enthusiast, Grand Connoisseur), and points balance.</li>
+        <li><strong>SMS PIN Authentication Modal (<code>ProfileClient.tsx</code>)</strong>: Clean login with instant point claiming and real-time ledger updates.</li>
+        <li><strong>Instant Checkout Bill Discount (<code>CartDrawer.tsx</code>)</strong>: 1-tap points redemption (100 pts = ₹10 discount) deducting points and adjusting final order bill seamlessly.</li>
+      </ul>
+      <div class="file-tags">
+        <span class="file-tag">app/account/loyalty-actions.ts</span>
+        <span class="file-tag">components/profile/ProfileClient.tsx</span>
+        <span class="file-tag">components/cart/CartDrawer.tsx</span>
+      </div>
+    </div>
+
+    <!-- Phase 6 -->
+    <div class="phase-card">
+      <div class="phase-header">
+        <div class="phase-badge-title">
+          <span class="phase-num">PHASE 06</span>
+          <h3 class="phase-title">Admin Grocery & Low-Stock Radar GRN</h3>
+        </div>
+        <span class="status-badge">100% Complete</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>Interactive Goods Received Note (GRN) Logging (<code>ProcurementManager.tsx</code>)</strong>: Real-time ingredient stock radar, low-stock threshold alerts, and supplier quick actions.</li>
+        <li><strong>Brand Kit Compliance</strong>: Styled with Café Crème canvas (<code>#F3E7D3</code>), warm crème cards (<code>#FAF4EB</code>), and biscuit borders.</li>
+      </ul>
+      <div class="file-tags">
+        <span class="file-tag">app/admin/procurement/actions.ts</span>
+        <span class="file-tag">components/admin/ProcurementManager.tsx</span>
+        <span class="file-tag">components/admin/AdminTowerDashboard.tsx</span>
+      </div>
+    </div>
+
+    <!-- Phase 7 -->
+    <div class="phase-card">
+      <div class="phase-header">
+        <div class="phase-badge-title">
+          <span class="phase-num">PHASE 07</span>
+          <h3 class="phase-title">Table Floor Management, Dynamic QR Generator & Camera Scanner</h3>
+        </div>
+        <span class="status-badge">100% Complete</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>Dynamic Thermal QR Printing</strong>: High-density QR code generation with isolated iframe printing for table acrylic stands.</li>
+        <li><strong>Live Camera Scanner (<code>TableQrScannerModal.tsx</code>)</strong>: Autofocus camera scanner instantly routing guests and staff to <code>/t/[tableNo]</code>.</li>
+      </ul>
+      <div class="file-tags">
+        <span class="file-tag">components/admin/TableManager.tsx</span>
+        <span class="file-tag">components/table/TableQrScannerModal.tsx</span>
+      </div>
+    </div>
+
+    <!-- Phase 8 -->
+    <div class="phase-card">
+      <div class="phase-header">
+        <div class="phase-badge-title">
+          <span class="phase-num">PHASE 08</span>
+          <h3 class="phase-title">Offline Resiliency, Local Queue Buffering & Auto-Sync</h3>
+        </div>
+        <span class="status-badge">100% Complete</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>Offline Order Queue Engine (<code>offline-queue.ts</code>)</strong>: Buffers orders in localStorage when network drops, assigning temporary tickets (<code>#OFF-XXXX</code>) and auto-syncing upon reconnection.</li>
+        <li><strong>Catalog Snapshot Cache (<code>offline-cache.ts</code>)</strong>: Locally snapshots all 59 menu items and table layouts for instant zero-internet browsing.</li>
+        <li><strong>Universal Top Sync Banner (<code>OfflineSyncBanner.tsx</code>)</strong>: Live connection health monitoring, queued order count badge, and manual "Sync Now" button.</li>
+      </ul>
+      <div class="file-tags">
+        <span class="file-tag">lib/offline-queue.ts</span>
+        <span class="file-tag">lib/offline-cache.ts</span>
+        <span class="file-tag">components/common/OfflineSyncBanner.tsx</span>
+        <span class="file-tag">components/cart/CartDrawer.tsx</span>
+      </div>
+    </div>
+
+    <!-- Phase 9 -->
+    <div class="phase-card">
+      <div class="phase-header">
+        <div class="phase-badge-title">
+          <span class="phase-num">PHASE 09</span>
+          <h3 class="phase-title">End-to-End Multi-Panel Hardening & Role Switcher Integration</h3>
+        </div>
+        <span class="status-badge">100% Complete</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>Unified Role Switcher Bar (<code>RoleSwitcherBar.tsx</code>)</strong>: Staff top bar enabling instant switching between Customer, Kitchen, Barista, Cashier, and Admin views with live sync status.</li>
+        <li><strong>Staff Backdoor Portal (<code>StaffBackdoorPortal.tsx</code>)</strong>: Secure PIN-gated gateway with individual PIN keys for all 4 operational staff roles.</li>
+      </ul>
+      <div class="file-tags">
+        <span class="file-tag">components/navigation/RoleSwitcherBar.tsx</span>
+        <span class="file-tag">components/staff/StaffBackdoorPortal.tsx</span>
+        <span class="file-tag">components/navigation/LayoutShell.tsx</span>
+      </div>
+    </div>
+
+    <!-- Section 2: Mobile Responsiveness Fixes -->
+    <h2 class="section-title">Mobile Screen Optimizations (Admin Tower)</h2>
+    
+    <div class="mobile-grid">
+      <div class="mobile-card">
+        <h4>📱 Menu Catalog Responsive Cards</h4>
+        <p style="font-size:12px; color:var(--walnut);">
+          Replaced horizontal squished tables with dedicated touch-friendly cards for mobile viewports (<code>md:hidden</code>). Clean index counter (<code>#01</code>), price badges, and easy-tap <code>IN STOCK</code> / <code>SOLD OUT</code> toggles with zero mis-clicks.
+        </p>
+      </div>
+      <div class="mobile-card">
+        <h4>💳 Payments Ledger Mobile Cards</h4>
+        <p style="font-size:12px; color:var(--walnut);">
+          Converted wide multi-column transaction tables to elevated mobile cards showing full Transaction IDs without column wrapping, payment mode pills (<code>UPI Direct QR</code> / <code>Cash</code>), and settlement status badges.
+        </p>
+      </div>
+      <div class="mobile-card">
+        <h4>⚓ Floating Dock Clearance</h4>
+        <p style="font-size:12px; color:var(--walnut);">
+          Added comfortable <code>pb-32</code> & <code>pb-36</code> bottom padding across all admin dashboards to ensure the glassmorphic floating bottom navbar never overlaps table rows or action buttons.
+        </p>
+      </div>
+    </div>
+
+    <!-- Section 3: Station Matrix & Quick PINs -->
+    <h2 class="section-title">Staff Station Matrix & Quick Access Keys</h2>
+    
+    <div class="data-table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Station Name</th>
+            <th>Direct URL</th>
+            <th>Backdoor Portal URL</th>
+            <th>Quick PIN</th>
+            <th>Primary Function</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Customer Experience</strong></td>
+            <td><code>/menu</code> or <code>/t/1</code></td>
+            <td>—</td>
+            <td><span style="color:#065F46; font-weight:600;">No PIN (Public)</span></td>
+            <td>Table orders, bill review, loyalty discounts & invoices</td>
+          </tr>
+          <tr>
+            <td><strong>Kitchen KDS</strong></td>
+            <td><code>/kitchen</code></td>
+            <td><code>/smol-backdoor/kitchen</code></td>
+            <td><span class="pin-badge">7711</span></td>
+            <td>Live food ticket queue, prep timers & 86 item manager</td>
+          </tr>
+          <tr>
+            <td><strong>Barista Desk</strong></td>
+            <td><code>/barista</code></td>
+            <td><code>/smol-backdoor/barista</code></td>
+            <td><span class="pin-badge">1234</span></td>
+            <td>Beverage extraction queue, shot timer (24–28s) & brew stages</td>
+          </tr>
+          <tr>
+            <td><strong>Cashier Desk</strong></td>
+            <td><code>/cashier</code></td>
+            <td><code>/smol-backdoor/cashier</code></td>
+            <td><span class="pin-badge">4422</span></td>
+            <td>Order verification queue, cash settlement & bill split</td>
+          </tr>
+          <tr>
+            <td><strong>Admin Control Tower</strong></td>
+            <td><code>/admin</code></td>
+            <td><code>/smol-backdoor/admin</code></td>
+            <td><span class="pin-badge">9900</span></td>
+            <td>Executive KPIs, GRN inventory radar, tables & staff RBAC</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Section 4: Invariants Test Sign-off -->
+    <h2 class="section-title">Verification & Quality Sign-Off</h2>
+    
+    <div class="test-box">
+      <div style="color:var(--butter-taxi); font-weight:700; margin-bottom:10px;">
+        🧪 RELEASE-BLOCKING INVARIANTS TEST SUITE RESULTS (7/7 PASS)
+      </div>
+      <div>[Test 1] Double-Tapping 'Place Order' with Identical Idempotency Key -> <span class="test-pass">PASSED</span></div>
+      <div>[Test 2] Mid-Browse Price Change Rejection & 409 Diff Guarantee -> <span class="test-pass">PASSED</span></div>
+      <div>[Test 3] Concurrency Race Condition for Last Stock Unit -> <span class="test-pass">PASSED</span></div>
+      <div>[Test 4] Kitchen Double-Tapping Status Transition (Optimistic Lock) -> <span class="test-pass">PASSED</span></div>
+      <div>[Test 5] Duplicate Razorpay Webhook Idempotency (Financial Safety) -> <span class="test-pass">PASSED</span></div>
+      <div>[Test 6] Out-of-Order Webhook Delivery (Monotonic State Machine) -> <span class="test-pass">PASSED</span></div>
+      <div>[Test 7] Historical Order Price Immutability (Menu Catalog Edit) -> <span class="test-pass">PASSED</span></div>
+      <div style="margin-top:10px; color:#34D399; font-weight:700;">
+        🎉 ALL INVARIANTS VERIFIED & BUILD PASSED WITH 0 TYPESCRIPT ERRORS!
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      smol café · Rishikesh · Designed & Engineered with Warmth & Precision
+    </div>
+
+  </div>
+</body>
+</html>
