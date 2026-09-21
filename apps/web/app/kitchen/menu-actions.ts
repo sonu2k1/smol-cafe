@@ -46,10 +46,7 @@ declare global {
 
 function getStockStore() {
   if (!globalThis.__SMOL_KITCHEN_MENU_STOCK__) {
-    globalThis.__SMOL_KITCHEN_MENU_STOCK__ = {
-      // Default initial 1 item for immediate realistic visibility
-      item_croissant_butter: { stockStatus: "LOW_STOCK", lowStockCount: 3, chefNotes: "Batch fresh at 4 PM" },
-    };
+    globalThis.__SMOL_KITCHEN_MENU_STOCK__ = {};
   }
   return globalThis.__SMOL_KITCHEN_MENU_STOCK__;
 }
@@ -135,7 +132,6 @@ export async function fetchKitchenMenuCatalogAction(): Promise<{
 
     const ingredients: KitchenIngredientItem[] = Object.entries(ingredientStore).map(
       ([name, inStock], idx) => {
-        // Approximate count of items that use this ingredient
         const lower = name.toLowerCase().split(" ")[0];
         const affected = items.filter((item) =>
           (item.coreIngredients || "").toLowerCase().includes(lower) ||
@@ -176,7 +172,7 @@ export async function updateMenuItemStockAction(
   itemId: string,
   stockStatus: ItemStockStatus,
   lowStockCount?: number
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; itemId: string; stockStatus: ItemStockStatus }> {
   try {
     const stockStore = getStockStore();
     const existing = stockStore[itemId] || { stockStatus: "IN_STOCK" };
@@ -193,7 +189,7 @@ export async function updateMenuItemStockAction(
       await supabase
         .from("menu_items")
         .update({
-          status: stockStatus === "SOLD_OUT" ? "INACTIVE" : "ACTIVE",
+          status: stockStatus === "SOLD_OUT" ? "SOLD_OUT" : "ACTIVE",
           metadata: {
             availability: stockStatus,
             low_stock_portions: stockStatus === "LOW_STOCK" ? (lowStockCount ?? 3) : null,
@@ -208,6 +204,7 @@ export async function updateMenuItemStockAction(
     revalidatePath("/smol-menu");
     revalidatePath("/menu");
     revalidatePath("/admin");
+    revalidatePath("/orders");
 
     const statusLabel =
       stockStatus === "SOLD_OUT" ? "86'd / SOLD OUT" : stockStatus === "LOW_STOCK" ? "LOW STOCK" : "IN STOCK";
@@ -215,9 +212,73 @@ export async function updateMenuItemStockAction(
     return {
       success: true,
       message: `Item status updated to ${statusLabel}`,
+      itemId,
+      stockStatus,
     };
   } catch (err: any) {
-    return { success: false, message: err?.message || "Failed to update item stock." };
+    return { success: false, message: err?.message || "Failed to update item stock.", itemId, stockStatus };
+  }
+}
+
+/**
+ * Bulk toggle all items in a station or category (e.g. 86 all Shakes or all Bakery items)
+ */
+export async function bulkSetCategoryStockAction(
+  categoryOrStation: string,
+  stockStatus: ItemStockStatus
+): Promise<{ success: boolean; message: string; updatedCount: number; updatedItemIds: string[] }> {
+  try {
+    const catalog = await getMenuCatalog();
+    const stockStore = getStockStore();
+    let count = 0;
+    const targetItems: string[] = [];
+
+    catalog.forEach((cat) => {
+      cat.items.forEach((it) => {
+        const station = inferStation(cat.name, it.name);
+        if (
+          categoryOrStation === "ALL" ||
+          cat.name.toLowerCase() === categoryOrStation.toLowerCase() ||
+          station.toLowerCase() === categoryOrStation.toLowerCase()
+        ) {
+          targetItems.push(it.id);
+          stockStore[it.id] = {
+            stockStatus,
+            lowStockCount: stockStatus === "LOW_STOCK" ? 3 : undefined,
+          };
+          count++;
+        }
+      });
+    });
+
+    try {
+      const supabase = createAdminClient();
+      if (targetItems.length > 0) {
+        await supabase
+          .from("menu_items")
+          .update({
+            status: stockStatus === "SOLD_OUT" ? "SOLD_OUT" : "ACTIVE",
+            metadata: { availability: stockStatus },
+          })
+          .in("id", targetItems);
+      }
+    } catch {
+      // ignore
+    }
+
+    revalidatePath("/kitchen");
+    revalidatePath("/smol-menu");
+    revalidatePath("/menu");
+    revalidatePath("/admin");
+
+    return {
+      success: true,
+      message: `${count} items marked as ${stockStatus.replace("_", " ")}`,
+      updatedCount: count,
+      updatedItemIds: targetItems,
+    };
+  } catch (err: any) {
+    return { success: false, message: err?.message || "Failed bulk update.", updatedCount: 0, updatedItemIds: [] };
   }
 }
 

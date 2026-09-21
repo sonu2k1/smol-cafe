@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { createAdminClient, isMockDatabase } from "@/lib/supabase/admin";
 import { broadcastSyncEvent } from "@/lib/sync-events";
 import type { OrderStatus } from "@smol-cafe/db";
@@ -322,6 +323,11 @@ export async function transitionOrderStatusAction(
       durationMs,
       data: { fromStatus, toStatus },
     });
+
+    revalidatePath("/kitchen");
+    revalidatePath("/orders");
+    revalidatePath("/cashier");
+    revalidatePath("/admin");
 
     return {
       success: true,

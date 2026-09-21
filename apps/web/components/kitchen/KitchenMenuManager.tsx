@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   ChefHat,
   Search,
@@ -16,6 +16,8 @@ import {
   Check,
   Package,
   RefreshCw,
+  Ban,
+  CheckCheck,
 } from "lucide-react";
 import {
   type KitchenMenuItem,
@@ -25,8 +27,9 @@ import {
   updateMenuItemStockAction,
   updateChefItemNotesAction,
   updateIngredientStockAction,
+  bulkSetCategoryStockAction,
 } from "@/app/kitchen/menu-actions";
-import { broadcastSyncEvent } from "@/lib/sync-events";
+import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 
 interface KitchenMenuManagerProps {
   onClose?: () => void;
@@ -50,7 +53,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
   const [isSavingNote, setIsSavingNote] = useState<boolean>(false);
 
   // Load menu items on mount
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await fetchKitchenMenuCatalogAction();
@@ -64,11 +67,21 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
+
+  // Subscribe to real-time events across tabs/stations
+  useEffect(() => {
+    const unsub = subscribeToSyncEvents((event) => {
+      if (event.type === "ITEM_AVAILABILITY_CHANGED" || event.type === "INVENTORY_UPDATED") {
+        loadData();
+      }
+    });
+    return () => unsub();
+  }, [loadData]);
 
   // Compute stats
   const stats = useMemo(() => {
@@ -105,9 +118,10 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
       const res = await updateMenuItemStockAction(itemId, newStatus, count);
       if (res.success) {
         broadcastSyncEvent({
-          type: "STATUS_CHANGED",
-          orderId: itemId,
-          status: newStatus as any,
+          type: "ITEM_AVAILABILITY_CHANGED",
+          itemId: itemId,
+          availability: newStatus,
+          portionsLeft: newStatus === "LOW_STOCK" ? count : undefined,
           timestamp: Date.now(),
         });
         setFeedback({ type: "success", text: res.message });
@@ -115,6 +129,29 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
     } catch {
       setFeedback({ type: "error", text: "Failed to update item availability." });
       loadData();
+    }
+  };
+
+  // Bulk Station Stock Change
+  const handleBulkStationStock = async (stockStatus: ItemStockStatus) => {
+    const target = selectedStation === "All Stations" ? "ALL" : selectedStation;
+    try {
+      const res = await bulkSetCategoryStockAction(target, stockStatus);
+      if (res.success) {
+        res.updatedItemIds.forEach((id) => {
+          broadcastSyncEvent({
+            type: "ITEM_AVAILABILITY_CHANGED",
+            itemId: id,
+            availability: stockStatus,
+            portionsLeft: stockStatus === "LOW_STOCK" ? 3 : undefined,
+            timestamp: Date.now(),
+          });
+        });
+        loadData();
+        setFeedback({ type: "success", text: res.message });
+      }
+    } catch {
+      setFeedback({ type: "error", text: "Bulk action failed." });
     }
   };
 
@@ -131,6 +168,13 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
 
     try {
       await updateMenuItemStockAction(itemId, "LOW_STOCK", newCount);
+      broadcastSyncEvent({
+        type: "ITEM_AVAILABILITY_CHANGED",
+        itemId,
+        availability: "LOW_STOCK",
+        portionsLeft: newCount,
+        timestamp: Date.now(),
+      });
     } catch {
       // ignore
     }
@@ -200,7 +244,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
             )}
             <span>{feedback.text}</span>
           </div>
-          <button onClick={() => setFeedback(null)} className="text-stone-400 hover:text-stone-700">
+          <button onClick={() => setFeedback(null)} className="text-stone-400 hover:text-stone-700 cursor-pointer">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -215,14 +259,14 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-serif text-lg sm:text-2xl font-bold text-[#241F1C] dark:text-white leading-tight">
-                Daily Kitchen Menu & 86 Editor
+                Daily Kitchen Menu &amp; 86 Editor
               </h1>
               <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 text-[10px] sm:text-[11px] font-mono font-bold shrink-0">
                 Chef Live
               </span>
             </div>
             <p className="font-mono text-[11px] sm:text-xs text-[#725039] dark:text-stone-400 mt-1">
-              Toggle dish availability (86), set low-stock portion alerts, and update daily chef specials.
+              Toggle dish availability (86), set low-stock portion alerts, and update daily chef specials in real time.
             </p>
           </div>
         </div>
@@ -230,7 +274,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
         <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
           <button
             onClick={loadData}
-            className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3.5 py-1.5 sm:py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs"
+            className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3.5 py-1.5 sm:py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs cursor-pointer"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
             <span>Sync Catalog</span>
@@ -254,7 +298,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
 
         <div className="rounded-2xl border border-amber-300/60 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20 p-3 shadow-xs">
           <span className="text-[10px] font-mono uppercase text-amber-800 dark:text-amber-300 block font-bold">
-            Low Stock (Portions)
+            Low Stock
           </span>
           <p className="mt-1 text-2xl font-serif font-bold text-amber-700 dark:text-amber-400">{stats.lowStock}</p>
         </div>
@@ -266,66 +310,26 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
           <p className="mt-1 text-2xl font-serif font-bold text-rose-700 dark:text-rose-400">{stats.soldOut}</p>
         </div>
 
-        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 shadow-xs col-span-2 sm:col-span-1">
-          <span className="text-[10px] font-mono uppercase text-[#754CFF] block font-bold">✦ Chef Specials</span>
-          <p className="mt-1 text-2xl font-serif font-bold text-[#754CFF]">{stats.specials}</p>
+        <div className="col-span-2 sm:col-span-1 rounded-2xl border border-purple-300/60 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20 p-3 shadow-xs">
+          <span className="text-[10px] font-mono uppercase text-purple-800 dark:text-purple-300 block font-bold">
+            Chef Specials
+          </span>
+          <p className="mt-1 text-2xl font-serif font-bold text-purple-700 dark:text-purple-400">{stats.specials}</p>
         </div>
       </div>
 
-      {/* Critical Ingredient Inventory Quick Bar */}
-      <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-xs">
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-[#B72E35] dark:text-[#F2C84B]" />
-            <span className="font-serif text-sm font-bold text-[#241F1C] dark:text-white">
-              Chef&apos;s Core Ingredients Stock Check
-            </span>
-          </div>
-          <span className="text-[11px] font-mono text-stone-500">Tap to toggle pantry status</span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2">
-          {ingredients.map((ing) => (
-            <button
-              key={ing.name}
-              onClick={() => handleToggleIngredient(ing.name, ing.inStock)}
-              className={`p-2 rounded-2xl border text-left transition flex flex-col justify-between ${
-                ing.inStock
-                  ? "bg-white dark:bg-stone-900 border-[#C9AE8B]/40 dark:border-stone-800 hover:border-emerald-500"
-                  : "bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-900 text-rose-800 dark:text-rose-300"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span
-                  className={`h-2 w-2 rounded-full ${ing.inStock ? "bg-emerald-500" : "bg-rose-500 animate-pulse"}`}
-                />
-                <span className="text-[9px] font-mono text-stone-400 uppercase font-bold">
-                  {ing.inStock ? "OK" : "DEPLETED"}
-                </span>
-              </div>
-              <span className="text-xs font-serif font-bold text-[#241F1C] dark:text-white block mt-1 line-clamp-1">
-                {ing.name}
-              </span>
-              <span className="text-[9.5px] font-mono text-stone-500 mt-0.5">
-                {ing.affectedItemsCount} dishes
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Station Tabs & Stock Filters */}
-      <div className="space-y-3 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-4">
-        {/* Stations */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+      {/* Station Filter & Bulk Action Bar */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-[#FAF4EB] dark:bg-[#1A1715] p-3 rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800">
+        {/* Station Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0">
           {stations.map((st) => (
             <button
               key={st}
               onClick={() => setSelectedStation(st)}
-              className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-mono font-bold transition ${
+              className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition whitespace-nowrap cursor-pointer ${
                 selectedStation === st
-                  ? "bg-[#241F1C] text-white dark:bg-white dark:text-[#241F1C] shadow-xs"
-                  : "bg-[#FAF4EB] text-[#725039] border border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800 hover:bg-[#F3E7D3]"
+                  ? "bg-[#B72E35] text-white shadow-xs"
+                  : "bg-white/80 dark:bg-stone-900 text-[#725039] dark:text-stone-300 border border-[#C9AE8B]/30 dark:border-stone-800 hover:bg-[#F3E7D3]"
               }`}
             >
               {st}
@@ -333,48 +337,69 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
           ))}
         </div>
 
-        {/* Stock Status Pills & Search */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
-            <span className="text-[10px] sm:text-[11px] font-mono text-stone-500 mr-1 shrink-0">Status:</span>
-            {(["ALL", "IN_STOCK", "LOW_STOCK", "SOLD_OUT"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStockFilter(s)}
-                className={`shrink-0 rounded-xl px-2.5 py-1 text-[10px] sm:text-[11px] font-mono font-bold transition border ${
-                  stockFilter === s
-                    ? s === "SOLD_OUT"
-                      ? "bg-rose-600 text-white border-rose-600"
-                      : s === "LOW_STOCK"
-                      ? "bg-amber-600 text-white border-amber-600"
-                      : "bg-[#B72E35] text-white border-[#B72E35]"
-                    : "bg-[#FAF4EB] text-stone-600 border-[#C9AE8B]/40 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-800"
-                }`}
-              >
-                {s === "ALL" ? "All Items" : s === "IN_STOCK" ? "In Stock" : s === "LOW_STOCK" ? "Low Stock" : "86 Sold Out"}
-              </button>
-            ))}
-          </div>
+        {/* Bulk Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => handleBulkStationStock("SOLD_OUT")}
+            className="flex-1 md:flex-none flex items-center justify-center gap-1 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 px-3 py-1.5 text-xs font-mono font-bold hover:bg-rose-200 transition cursor-pointer"
+            title={`86 all items in ${selectedStation}`}
+          >
+            <Ban className="h-3.5 w-3.5" />
+            <span>86 {selectedStation === "All Stations" ? "All" : selectedStation.split(" ")[0]}</span>
+          </button>
 
-          <div className="relative w-full sm:w-64 shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search dish or ingredient..."
-              className="w-full rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900 pl-9 pr-3 py-1.5 text-xs font-mono text-[#241F1C] dark:text-white placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-[#B72E35]"
-            />
-          </div>
+          <button
+            onClick={() => handleBulkStationStock("IN_STOCK")}
+            className="flex-1 md:flex-none flex items-center justify-center gap-1 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 px-3 py-1.5 text-xs font-mono font-bold hover:bg-emerald-200 transition cursor-pointer"
+            title={`Mark all items in ${selectedStation} In Stock`}
+          >
+            <CheckCheck className="h-3.5 w-3.5" />
+            <span>Restore All</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Search & Stock Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search dish, category or ingredient..."
+            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] text-xs font-mono text-[#241F1C] dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+          />
+        </div>
+
+        {/* Stock Filter Pills */}
+        <div className="flex items-center gap-1 rounded-2xl bg-[#EFE7DC] dark:bg-stone-900 p-1 border border-[#C9AE8B]/30 dark:border-stone-800 shrink-0">
+          {(["ALL", "IN_STOCK", "LOW_STOCK", "SOLD_OUT"] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setStockFilter(filter)}
+              className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition cursor-pointer ${
+                stockFilter === filter
+                  ? "bg-[#241F1C] dark:bg-white text-white dark:text-[#241F1C] shadow-xs"
+                  : "text-[#725039] dark:text-stone-400 hover:text-[#241F1C] dark:hover:text-white"
+              }`}
+            >
+              {filter === "ALL" ? "All" : filter.replace("_", " ")}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Menu Items Grid */}
-      {filteredItems.length === 0 ? (
-        <div className="text-center py-16 rounded-3xl border border-dashed border-[#C9AE8B]/50 dark:border-stone-800 bg-[#FAF4EB]/40 dark:bg-stone-900/40 p-6">
-          <ChefHat className="h-10 w-10 text-stone-400 mx-auto mb-2 opacity-50" />
-          <p className="font-serif text-base font-bold text-[#241F1C] dark:text-white">No Menu Items Found</p>
-          <p className="font-mono text-xs text-stone-500 mt-1">Try adjusting the station or stock filters above.</p>
+      {isLoading ? (
+        <div className="py-16 text-center text-stone-500 font-mono text-xs">
+          <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-[#B72E35]" />
+          Loading kitchen catalog...
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="py-16 text-center text-stone-500 font-mono text-xs">
+          No menu items found matching current filters.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -402,7 +427,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                           {item.station}
                         </span>
                         {item.isChefSpecial && (
-                          <span className="flex items-center gap-0.5 text-[9.5px] font-mono font-bold bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 px-1.5 py-0.2 rounded-md">
+                          <span className="flex items-center gap-0.5 text-[9.5px] font-mono font-bold bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 px-1.5 py-0.5 rounded-md">
                             <Sparkles className="h-2.5 w-2.5" /> Special
                           </span>
                         )}
@@ -418,7 +443,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                     {/* Quick Chef Note Edit Icon */}
                     <button
                       onClick={() => handleOpenNoteModal(item)}
-                      className="p-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition text-[#725039] dark:text-stone-300"
+                      className="p-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition text-[#725039] dark:text-stone-300 cursor-pointer"
                       title="Chef note / recommendation"
                     >
                       <Edit3 className="h-3.5 w-3.5" />
@@ -439,7 +464,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                     {/* State 1: IN STOCK */}
                     <button
                       onClick={() => handleSetStock(item.id, "IN_STOCK")}
-                      className={`py-1.5 px-2 rounded-xl font-mono text-[11px] font-bold transition flex items-center justify-center gap-1 ${
+                      className={`py-1.5 px-2 rounded-xl font-mono text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
                         item.stockStatus === "IN_STOCK"
                           ? "bg-emerald-600 text-white shadow-xs"
                           : "bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
@@ -452,7 +477,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                     {/* State 2: LOW STOCK */}
                     <button
                       onClick={() => handleSetStock(item.id, "LOW_STOCK", item.lowStockCount || 3)}
-                      className={`py-1.5 px-2 rounded-xl font-mono text-[11px] font-bold transition flex items-center justify-center gap-1 ${
+                      className={`py-1.5 px-2 rounded-xl font-mono text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
                         isLow
                           ? "bg-amber-500 text-white shadow-xs"
                           : "bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800 hover:bg-amber-50 dark:hover:bg-amber-950/40"
@@ -464,7 +489,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                     {/* State 3: 86 / SOLD OUT */}
                     <button
                       onClick={() => handleSetStock(item.id, "SOLD_OUT")}
-                      className={`py-1.5 px-2 rounded-xl font-mono text-[11px] font-bold transition flex items-center justify-center gap-1 ${
+                      className={`py-1.5 px-2 rounded-xl font-mono text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
                         is86
                           ? "bg-rose-600 text-white shadow-xs"
                           : "bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800 hover:bg-rose-50 dark:hover:bg-rose-950/40"
@@ -483,7 +508,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleAdjustCount(item.id, -1)}
-                          className="h-6 w-6 flex items-center justify-center rounded-lg bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200 border border-amber-300 dark:border-amber-800"
+                          className="h-6 w-6 flex items-center justify-center rounded-lg bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200 border border-amber-300 dark:border-amber-800 cursor-pointer"
                         >
                           <Minus className="h-3 w-3" />
                         </button>
@@ -492,7 +517,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                         </span>
                         <button
                           onClick={() => handleAdjustCount(item.id, 1)}
-                          className="h-6 w-6 flex items-center justify-center rounded-lg bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200 border border-amber-300 dark:border-amber-800"
+                          className="h-6 w-6 flex items-center justify-center rounded-lg bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200 border border-amber-300 dark:border-amber-800 cursor-pointer"
                         >
                           <Plus className="h-3 w-3" />
                         </button>
@@ -519,7 +544,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                 </h3>
                 <p className="text-[11px] font-mono text-stone-500">Live notes displayed to customers on menu</p>
               </div>
-              <button onClick={() => setNoteItem(null)} className="text-stone-400 hover:text-stone-600">
+              <button onClick={() => setNoteItem(null)} className="text-stone-400 hover:text-stone-600 cursor-pointer">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -562,14 +587,14 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                 <button
                   type="button"
                   onClick={() => setNoteItem(null)}
-                  className="rounded-xl px-4 py-2 text-xs font-mono text-stone-600 dark:text-stone-400 hover:bg-black/5"
+                  className="rounded-xl px-4 py-2 text-xs font-mono text-stone-600 dark:text-stone-400 hover:bg-black/5 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingNote}
-                  className="rounded-xl bg-[#B72E35] hover:bg-[#9B252B] px-5 py-2 text-xs font-mono font-bold text-white shadow-md transition disabled:opacity-50"
+                  className="rounded-xl bg-[#B72E35] hover:bg-[#9B252B] px-5 py-2 text-xs font-mono font-bold text-white shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
                   {isSavingNote ? "Saving..." : "Save Note"}
                 </button>

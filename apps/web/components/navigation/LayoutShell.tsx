@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import { RoleSwitcherBar } from "@/components/navigation/RoleSwitcherBar";
 import { InstallAppPrompt } from "@/components/common/InstallAppPrompt";
+import { OfflineSyncBanner } from "@/components/common/OfflineSyncBanner";
 
 interface LayoutShellProps {
   children: React.ReactNode;
@@ -36,6 +37,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
 
   const isStaffWorkspace =
     pathname?.startsWith("/kitchen") ||
+    pathname?.startsWith("/barista") ||
     pathname?.startsWith("/admin") ||
     pathname?.startsWith("/cashier");
 
@@ -77,6 +79,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
 
   return (
     <>
+      <OfflineSyncBanner />
       {showRoleSwitcher && <RoleSwitcherBar />}
       {children}
       <InstallAppPrompt />

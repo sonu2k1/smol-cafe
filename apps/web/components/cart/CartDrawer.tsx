@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { placeOrderAction, placePaidOrderAction, type ChangedItemDiff } from "@/app/menu/actions";
 import { useNetworkHealth } from "@/hooks/useNetworkHealth";
-import { broadcastSyncEvent } from "@/lib/sync-events";
+import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
 import {
   PostPaymentCelebrationModal,
@@ -17,6 +17,7 @@ import { getFoodImage } from "@/lib/food-images";
 import type { MenuItemWithDetails } from "@/lib/queries/menu";
 import { getLoyaltyAccountAction, redeemLoyaltyPointsAction, type LoyaltyAccountDetails } from "@/app/account/loyalty-actions";
 import { TableArchedCard } from "@/components/table/TableArchedCard";
+import { enqueueOfflineOrder } from "@/lib/offline-queue";
 import {
   CheckCircle2,
   CreditCard,
@@ -81,13 +82,27 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
     totalPaise: number;
   } | null>(null);
 
-  // Fetch customer loyalty pass details
+  // Fetch customer loyalty pass details & listen for realtime changes
   useEffect(() => {
+    const fetchLoyalty = () => {
+      getLoyaltyAccountAction()
+        .then((res) => {
+          setLoyaltyData(res);
+        })
+        .catch((err) => console.warn("Could not load loyalty account:", err));
+    };
+
     if (isCartOpen) {
-      getLoyaltyAccountAction().then((res) => {
-        setLoyaltyData(res);
-      }).catch((err) => console.warn("Could not load loyalty account:", err));
+      fetchLoyalty();
     }
+
+    const unsub = subscribeToSyncEvents((event) => {
+      if (event.type === "LOYALTY_UPDATED" || event.type === "REWARD_REDEEMED") {
+        fetchLoyalty();
+      }
+    });
+
+    return () => unsub();
   }, [isCartOpen]);
 
   const displayTable = (tableLabel || "07").replace(/^(table|t)[-\s_]*/i, "").trim().padStart(2, "0");
@@ -207,63 +222,124 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
       qty: cartItem.qty,
     }));
 
-    const result = await placePaidOrderAction(orderPayload, idempotencyKey, {
-      instructions: instructions || undefined,
-      paymentMethod,
-      tableLabel: displayTable,
-    });
-
-    if (result.success && result.orderId && result.orderNo) {
-      const finalOrderId = result.orderId;
-      const finalOrderNo = result.orderNo;
-      const finalTotalPaise = result.totalPaise || grandTotal * 100;
-      const finalTableLabel = result.tableLabel || displayTable;
-
-      // Broadcast single source of truth order placed + paid event across Cashier & Kitchen KDS
-      broadcastSyncEvent({
-        type: "ORDER_PLACED",
-        orderId: finalOrderId,
-        orderNo: finalOrderNo,
-        tableLabel: finalTableLabel,
-        status: "CONFIRMED",
-        timestamp: Date.now(),
-        metadata: {
-          paymentStatus: "PAID",
-          paymentMethod,
-          transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
-          amountPaise: finalTotalPaise,
-          itemsCount: items.length,
-        },
-      });
-
-      broadcastSyncEvent({
-        type: "PAYMENT_COMPLETED",
-        orderId: finalOrderId,
-        orderNo: finalOrderNo,
-        tableLabel: finalTableLabel,
-        status: "PAID",
-        timestamp: Date.now(),
-        metadata: {
-          transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
-          amountPaise: finalTotalPaise,
-          paymentMethod,
-        },
+    // If browser is offline, directly enqueue offline buffered order
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      const offlineOrder = enqueueOfflineOrder({
+        tableLabel: displayTable,
+        items: orderPayload.map((p) => ({
+          menu_item_id: p.menu_item_id,
+          expected_unit_price_paise: p.expected_unit_price_paise,
+          qty: p.qty,
+          name: items.find((it) => it.item.id === p.menu_item_id)?.item.name || "Artisanal Item",
+        })),
+        totalPaise: grandTotal * 100,
+        instructions: instructions || undefined,
+        paymentMethod,
+        transactionId: transactionId || `OFF-${Date.now().toString().slice(-6)}`,
       });
 
       return {
-        orderId: finalOrderId,
-        orderNo: finalOrderNo,
-        tableLabel: finalTableLabel,
-        totalPaise: finalTotalPaise,
-        verificationCode: result.verificationCode || "4821",
+        orderId: `offline-${offlineOrder.idempotencyKey}`,
+        orderNo: offlineOrder.tempOrderNo,
+        tableLabel: offlineOrder.tableLabel,
+        totalPaise: offlineOrder.totalPaise,
+        verificationCode: offlineOrder.verificationCode,
+        isOffline: true,
       };
-    } else if (result.error === "PRICE_CHANGED" && result.changedItems) {
-      setPriceConflicts(result.changedItems);
-      setErrorMessage("Some item prices changed. Please review your cart.");
-      return null;
-    } else {
-      setErrorMessage(result.message || "Failed to confirm order after payment.");
-      return null;
+    }
+
+    try {
+      const result = await placePaidOrderAction(orderPayload, idempotencyKey, {
+        instructions: instructions || undefined,
+        paymentMethod,
+        tableLabel: displayTable,
+      });
+
+      if (result.success && result.orderId && result.orderNo) {
+        const finalOrderId = result.orderId;
+        const finalOrderNo = result.orderNo;
+        const finalTotalPaise = result.totalPaise || grandTotal * 100;
+        const finalTableLabel = result.tableLabel || displayTable;
+
+        // Broadcast single source of truth order placed + paid event across Cashier & Kitchen KDS
+        broadcastSyncEvent({
+          type: "ORDER_PLACED",
+          orderId: finalOrderId,
+          orderNo: finalOrderNo,
+          tableLabel: finalTableLabel,
+          status: "CONFIRMED",
+          timestamp: Date.now(),
+          metadata: {
+            paymentStatus: "PAID",
+            paymentMethod,
+            transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
+            amountPaise: finalTotalPaise,
+            itemsCount: items.length,
+          },
+        });
+
+        broadcastSyncEvent({
+          type: "PAYMENT_COMPLETED",
+          orderId: finalOrderId,
+          orderNo: finalOrderNo,
+          tableLabel: finalTableLabel,
+          status: "PAID",
+          timestamp: Date.now(),
+          metadata: {
+            transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
+            amountPaise: finalTotalPaise,
+            paymentMethod,
+          },
+        });
+
+        // If customer redeemed points for bill discount, record deduction & sync
+        if (redeemPoints && pointsDiscountRupees > 0) {
+          redeemLoyaltyPointsAction(pointsDiscountRupees, `Applied on Order #${finalOrderNo}`).catch(console.warn);
+        }
+        broadcastSyncEvent({
+          type: "LOYALTY_UPDATED",
+          timestamp: Date.now(),
+        });
+
+        return {
+          orderId: finalOrderId,
+          orderNo: finalOrderNo,
+          tableLabel: finalTableLabel,
+          totalPaise: finalTotalPaise,
+          verificationCode: result.verificationCode || "4821",
+        };
+      } else if (result.error === "PRICE_CHANGED" && result.changedItems) {
+        setPriceConflicts(result.changedItems);
+        setErrorMessage("Some item prices changed. Please review your cart.");
+        return null;
+      } else {
+        setErrorMessage(result.message || "Failed to confirm order after payment.");
+        return null;
+      }
+    } catch (netErr) {
+      console.warn("Network error during order placement, fallback to offline queue:", netErr);
+      const offlineOrder = enqueueOfflineOrder({
+        tableLabel: displayTable,
+        items: orderPayload.map((p) => ({
+          menu_item_id: p.menu_item_id,
+          expected_unit_price_paise: p.expected_unit_price_paise,
+          qty: p.qty,
+          name: items.find((it) => it.item.id === p.menu_item_id)?.item.name || "Artisanal Item",
+        })),
+        totalPaise: grandTotal * 100,
+        instructions: instructions || undefined,
+        paymentMethod,
+        transactionId: transactionId || `OFF-${Date.now().toString().slice(-6)}`,
+      });
+
+      return {
+        orderId: `offline-${offlineOrder.idempotencyKey}`,
+        orderNo: offlineOrder.tempOrderNo,
+        tableLabel: offlineOrder.tableLabel,
+        totalPaise: offlineOrder.totalPaise,
+        verificationCode: offlineOrder.verificationCode,
+        isOffline: true,
+      };
     }
   };
 

@@ -18,8 +18,8 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
   const foodImageUrl = getFoodImage(item.name, item.imageUrl);
   const isSoldOut =
     item.status === "SOLD_OUT" ||
-    item.status === "INACTIVE" ||
-    (item.metadata as any)?.availability === "SOLD_OUT";
+    (item.metadata as any)?.availability === "SOLD_OUT" ||
+    (item.metadata as any)?.availability === "86";
   const isLowStock =
     item.status === "LOW_STOCK" || (item.metadata as any)?.availability === "LOW_STOCK";
   const lowStockCount = (item.metadata as any)?.low_stock_portions;
@@ -37,13 +37,13 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
           onOpenDetail(item);
         }
       }}
-      className={`group relative flex items-start justify-between gap-3.5 rounded-2xl border p-3.5 text-left shadow-xs transition duration-200 hover-lift hover:shadow-md cursor-pointer animate-fade-in-up ${
+      className={`group relative flex items-start justify-between gap-3.5 rounded-2xl border p-3.5 text-left shadow-xs transition duration-200 hover-lift hover:shadow-md cursor-pointer animate-fade-in-up overflow-hidden ${
         isSoldOut
-          ? "border-stone-300 dark:border-stone-800 bg-[#EFE7DC]/50 dark:bg-[#181412] opacity-75"
+          ? "border-stone-300 dark:border-stone-800 bg-[#FAF4EB]/80 dark:bg-[#1A1614] opacity-90"
           : "border-[#C9AE8B]/50 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] hover:border-[#B72E35]/60 dark:hover:border-[#FF5B52]/50 active:scale-[0.98]"
       }`}
     >
-      {/* Left: Arched Real Food Image */}
+      {/* Left: Arched Real Food Image (Full Grayscale B&W on Sold Out) */}
       <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-t-full rounded-b-xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#EFE7DC] dark:bg-[#171311] shadow-inner">
         {!imageError ? (
           <img
@@ -52,20 +52,12 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
             loading="lazy"
             onError={() => setImageError(true)}
             className={`h-full w-full object-cover transition-transform duration-300 group-hover:scale-110 ${
-              isSoldOut ? "grayscale opacity-50" : ""
+              isSoldOut ? "grayscale contrast-125 brightness-95" : ""
             }`}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[#725039] dark:text-[#C9AE8B]">
             <Coffee className="h-6 w-6" />
-          </div>
-        )}
-
-        {isSoldOut && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-xs">
-            <span className="font-mono text-[9.5px] font-black text-rose-300 tracking-wider uppercase px-1 text-center">
-              86 OUT
-            </span>
           </div>
         )}
       </div>
@@ -82,19 +74,18 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
             }`}
             title={isEgg ? "Egg" : "Veg"}
           />
-          <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-[#FAF4EB] group-hover:text-[#B72E35] dark:group-hover:text-[#FF5B52] transition-colors tracking-tight lowercase truncate">
+          <h3 className={`font-serif text-base font-bold transition-colors tracking-tight lowercase truncate ${
+            isSoldOut
+              ? "text-stone-700 dark:text-stone-300"
+              : "text-[#241F1C] dark:text-[#FAF4EB] group-hover:text-[#B72E35] dark:group-hover:text-[#FF5B52]"
+          }`}>
             {item.name}
           </h3>
         </div>
 
         {/* Live Status & Chef Badges */}
         <div className="flex flex-wrap items-center gap-1.5 mt-1">
-          {isSoldOut && (
-            <span className="rounded-md bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800 px-1.5 py-0.5 text-[9.5px] font-mono font-bold">
-              86 Sold Out
-            </span>
-          )}
-          {isLowStock && (
+          {isLowStock && !isSoldOut && (
             <span className="rounded-md bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 px-1.5 py-0.5 text-[9.5px] font-mono font-bold">
               Only {lowStockCount || 3} left
             </span>
@@ -138,12 +129,25 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
       <div className="shrink-0 text-right pt-0.5">
         <span
           className={`font-mono text-sm sm:text-base font-bold ${
-            isSoldOut ? "line-through text-stone-400" : "text-[#241F1C] dark:text-[#FAF4EB]"
+            isSoldOut ? "text-stone-400 dark:text-stone-500" : "text-[#241F1C] dark:text-[#FAF4EB]"
           }`}
         >
           ₹{priceRupees}
         </span>
       </div>
+
+      {/* Iconic Diagonal Red Stamped "SOLD OUT" Badge */}
+      {isSoldOut && (
+        <div className="absolute right-4 sm:right-10 top-1/2 -translate-y-1/2 z-20 pointer-events-none transform -rotate-12 select-none">
+          <div className="relative rounded-md border-[2.5px] border-[#C22828] bg-[#C22828] px-3.5 sm:px-5 py-1 sm:py-1.5 shadow-xl shadow-red-950/20">
+            {/* Inner dashed stamp border */}
+            <div className="absolute inset-[2px] rounded-[3px] border border-dashed border-white/60 pointer-events-none" />
+            <span className="relative z-10 font-mono text-xs sm:text-sm font-black tracking-widest text-white uppercase drop-shadow-md">
+              SOLD OUT
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

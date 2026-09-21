@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -8,13 +8,15 @@ import { fetchActiveOrdersAction, type CustomerOrderDetails } from "@/app/orders
 import { OrderCard } from "./OrderCard";
 import { ConversationDeckModal } from "./ConversationDeckModal";
 import { BottomNavBar } from "@/components/navigation/BottomNavBar";
-import { Bell, CreditCard, Tag } from "lucide-react";
+import { Bell, CreditCard, Tag, Receipt, Star, ExternalLink, MapPin } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { subscribeToSyncEvents } from "@/lib/sync-events";
 import { createTableJsonTag } from "@/lib/table-tag";
 import { JsonTagInspectorModal } from "@/components/table/JsonTagInspectorModal";
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { PastBillsModal } from "./PastBillsModal";
+import { soundManager } from "@/lib/sound";
 
 interface OrderStatusClientViewProps {
   initialOrders: CustomerOrderDetails[];
@@ -34,6 +36,13 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
   const router = useRouter();
   const [orders, setOrders] = useState<CustomerOrderDetails[]>(initialOrders);
   const [currentGuestName, setCurrentGuestName] = useState(guestName);
+  const [isDeckOpen, setIsDeckOpen] = useState(false);
+  const [isJsonInspectorOpen, setIsJsonInspectorOpen] = useState(false);
+  const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
+  const [isPastBillsOpen, setIsPastBillsOpen] = useState(false);
+
+  // Status tracker for audible chime on READY / COMPLETED transition
+  const prevStatusesRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -43,9 +52,6 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
       }
     }
   }, [currentGuestName]);
-  const [isDeckOpen, setIsDeckOpen] = useState(false);
-  const [isJsonInspectorOpen, setIsJsonInspectorOpen] = useState(false);
-  const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
 
   const displayTable = (tableLabel || "01").replace(/^(table|t)[-\s_]*/i, "").trim().padStart(2, "0");
   const tableJsonTag = createTableJsonTag(displayTable);
@@ -54,6 +60,15 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
     try {
       const res = await fetchActiveOrdersAction();
       if (res.success) {
+        // Detect if any order transitioned to READY or COMPLETED
+        res.orders.forEach((ord) => {
+          const prevStatus = prevStatusesRef.current[ord.id];
+          if (prevStatus && prevStatus !== ord.status && (ord.status === "READY" || ord.status === "COMPLETED" || ord.status === "SERVED")) {
+            soundManager.playOrderReadyChime();
+          }
+          prevStatusesRef.current[ord.id] = ord.status;
+        });
+
         setOrders(res.orders);
       }
     } catch (err) {
@@ -129,7 +144,6 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
       </div>
     );
   }
-
 
   const latestOrder = orders[0];
   const hasOrders = orders.length > 0;
@@ -209,8 +223,20 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-1 shrink-0">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#75AFA7]/25 dark:bg-[#75AFA7]/20 border border-[#75AFA7]/40 px-3 py-0.5 text-[10px] font-mono font-bold tracking-wider text-[#1C463F] dark:text-[#75C7BC] shadow-xs">
+          <div className="flex items-center gap-1.5 pt-1 shrink-0">
+            {orders.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsPastBillsOpen(true)}
+                className="inline-flex items-center gap-1 rounded-full bg-[#FAF4EB] dark:bg-white/10 border border-[#C9AE8B]/40 px-2.5 py-1 text-[10px] font-mono font-bold text-[#725039] dark:text-[#C9AE8B] hover:bg-[#EDE1D2] transition shadow-xs cursor-pointer"
+                title="View All Bills & Invoices"
+              >
+                <Receipt className="h-3 w-3 text-[#B72E35] dark:text-[#FF6B6B]" />
+                <span>Bills</span>
+              </button>
+            )}
+
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#75AFA7]/25 dark:bg-[#75AFA7]/20 border border-[#75AFA7]/40 px-2.5 py-1 text-[10px] font-mono font-bold tracking-wider text-[#1C463F] dark:text-[#75C7BC] shadow-xs">
               <span className="h-1.5 w-1.5 rounded-full bg-[#1C463F] dark:bg-[#75C7BC] animate-pulse" />
               LIVE
             </span>
@@ -298,7 +324,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             </div>
           </div>
 
-          {/* Table Zone Tag & UPI Payment CTA */}
+          {/* Table Zone Tag & Actions */}
           <div className="mt-4 pt-3 border-t border-[#C9AE8B]/30 dark:border-white/10 flex items-center justify-between gap-2">
             <button
               type="button"
@@ -392,24 +418,69 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
               if (typeof window !== "undefined" && "Notification" in window) {
                 Notification.requestPermission();
               }
+              soundManager.playOrderPlacedChime();
               alert("You will be notified as soon as your order is ready!");
             }}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 font-serif text-sm font-semibold text-[#F3E7D3] shadow-md transition hover:bg-[#91242C] active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 font-serif text-sm font-semibold text-[#F3E7D3] shadow-md transition hover:bg-[#91242C] active:scale-[0.98] cursor-pointer"
           >
             <Bell className="h-4 w-4 text-[#F3E7D3]" />
             <span>notify me when ready</span>
           </button>
         </div>
 
+        {/* Google Maps & Cafe Review Card */}
+        <div className="rounded-2xl border border-amber-300/80 dark:border-amber-900/50 bg-amber-50/90 dark:bg-amber-950/20 p-4 shadow-xs space-y-2">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white">
+                <Star className="h-4 w-4 fill-white" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-sm text-[#241F1C] dark:text-amber-100">
+                  Enjoying smol café?
+                </h4>
+                <p className="text-[11px] text-[#725039] dark:text-amber-300/80 font-sans">
+                  Tapovan, Rishikesh • Artisanal Coffee &amp; Slow Bakes
+                </p>
+              </div>
+            </div>
+
+            <a
+              href="https://maps.google.com/?q=smol+cafe+tapovan+rishikesh"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-xl bg-[#241F1C] dark:bg-amber-400 text-white dark:text-[#241F1C] px-3 py-1.5 text-xs font-serif font-bold shadow-xs hover:opacity-90 transition active:scale-95"
+            >
+              <span>Review on Google</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        </div>
+
         {/* Active Ticket Progression Cards */}
         {orders.length > 0 ? (
           <div className="pt-3 space-y-3">
-            <h4 className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#786F66] dark:text-[#C9AE8B]">
-              Detailed Round Timeline
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#786F66] dark:text-[#C9AE8B]">
+                Detailed Round Timeline ({orders.length} {orders.length === 1 ? "Round" : "Rounds"})
+              </h4>
+              <button
+                type="button"
+                onClick={() => setIsPastBillsOpen(true)}
+                className="text-xs font-serif font-bold text-[#B72E35] dark:text-[#FF6B6B] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Receipt className="h-3 w-3" />
+                <span>All Invoices</span>
+              </button>
+            </div>
             <div className="space-y-3">
               {orders.map((order) => (
-                <OrderCard key={order.id} order={order} />
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  tableLabel={tableLabel}
+                  guestName={currentGuestName}
+                />
               ))}
             </div>
           </div>
@@ -466,6 +537,16 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
         />
       )}
 
+      {/* Past Bills & Invoices Modal */}
+      {isPastBillsOpen && (
+        <PastBillsModal
+          orders={orders}
+          tableLabel={tableLabel}
+          guestName={currentGuestName}
+          onClose={() => setIsPastBillsOpen(false)}
+        />
+      )}
+
       {/* UPI Payment Gateway Drawer */}
       {isUpiDrawerOpen && latestOrder && (
         <UpiPaymentDrawer
@@ -493,4 +574,3 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
     </div>
   );
 };
-

@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <title>smol café — Complete Application Architecture & System Flow</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Mono:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap');
 
     @page {
       size: A4;
-      margin: 14mm 14mm 14mm 14mm;
+      margin: 12mm 12mm 12mm 12mm;
     }
 
     * {
@@ -17,113 +17,158 @@
       print-color-adjust: exact !important;
     }
 
+    /* Core Locked Brand Palette Variables */
+    :root {
+      --cafe-creme: #F3E7D3;
+      --smol-cherry: #B72E35;
+      --butter-taxi: #F2C84B;
+      --espresso-ink: #241F1C;
+      --biscuit: #C9AE8B;
+      --electric-violet: #754CFF;
+      --dusty-pool: #75AFA7;
+      --walnut: #725039;
+      --card-bg: #FAF4EB;
+      --card-border: #D9C5AB;
+    }
+
     body {
       margin: 0;
       padding: 0;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #F8F3EA;
-      color: #241F1C;
-      font-size: 11.5pt;
+      background-color: var(--cafe-creme);
+      color: var(--espresso-ink);
+      font-size: 11pt;
       line-height: 1.5;
     }
 
     .page {
       page-break-after: always;
-      padding: 4mm 0;
+      padding: 2mm 0 10mm 0;
       position: relative;
+      min-height: 275mm;
     }
 
     .page:last-child {
       page-break-after: auto;
     }
 
-    /* Header */
+    /* Brand Header */
     .brand-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 2px solid #C9AE8B;
+      border-bottom: 2px solid var(--biscuit);
       padding-bottom: 12px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
 
     .brand-title {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 26pt;
-      font-weight: 800;
-      color: #B72E35;
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 28pt;
+      font-weight: 700;
+      color: var(--smol-cherry);
       margin: 0;
       letter-spacing: -0.5px;
+      line-height: 1;
     }
 
     .brand-subtitle {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'Noto Sans Mono', monospace;
       font-size: 8.5pt;
-      color: #725039;
+      color: var(--walnut);
       text-transform: uppercase;
       letter-spacing: 1px;
-      margin-top: 4px;
+      margin-top: 6px;
     }
 
     .brand-badge {
-      background: #FAF4EB;
-      border: 1px solid #C9AE8B;
+      background: var(--card-bg);
+      border: 1px solid var(--biscuit);
       padding: 6px 14px;
       border-radius: 20px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 8.5pt;
+      font-family: 'Noto Sans Mono', monospace;
+      font-size: 8pt;
       font-weight: 600;
-      color: #B72E35;
+      color: var(--smol-cherry);
+      box-shadow: 0 1px 3px rgba(36, 31, 28, 0.04);
     }
 
-    /* Section Titles */
+    /* Section Headings */
     h2 {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 16pt;
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 17pt;
       font-weight: 700;
-      color: #241F1C;
-      margin: 20px 0 10px 0;
+      color: var(--espresso-ink);
+      margin: 18px 0 10px 0;
       display: flex;
       align-items: center;
       gap: 8px;
-      border-bottom: 1px dashed #C9AE8B;
-      padding-bottom: 6px;
+      border-bottom: 1px dashed var(--biscuit);
+      padding-bottom: 5px;
     }
 
     h3 {
-      font-family: 'Inter', sans-serif;
-      font-size: 12pt;
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 13.5pt;
       font-weight: 700;
-      color: #B72E35;
-      margin: 14px 0 6px 0;
+      color: var(--smol-cherry);
+      margin: 12px 0 5px 0;
     }
 
     p {
       margin: 0 0 10px 0;
-      color: #3D352F;
+      color: var(--espresso-ink);
+    }
+
+    .editorial-note {
+      font-family: 'EB Garamond', Georgia, serif;
+      font-style: italic;
+      color: var(--walnut);
+      font-size: 11pt;
     }
 
     /* Cards & Containers */
     .card {
-      background: #FAF4EB;
-      border: 1px solid #D9C5AB;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
       border-radius: 14px;
       padding: 14px 18px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       box-shadow: 0 2px 5px rgba(36, 31, 28, 0.04);
     }
 
     .card-highlight {
-      border-left: 4px solid #B72E35;
+      border-left: 4px solid var(--smol-cherry);
     }
 
     .card-dark {
-      background: #1C1917;
-      color: #FAF4EB;
-      border: 1px solid #332B25;
+      background: var(--espresso-ink);
+      color: var(--cafe-creme);
+      border: 1px solid #38312C;
+      border-radius: 16px;
     }
     .card-dark p {
       color: #D6C8B8;
+    }
+
+    /* Swatches Strip */
+    .palette-strip {
+      display: flex;
+      gap: 6px;
+      margin: 10px 0 14px 0;
+    }
+
+    .swatch {
+      flex: 1;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,0.1);
+      display: flex;
+      align-items: flex-end;
+      padding: 2px 4px;
+      font-family: 'Noto Sans Mono', monospace;
+      font-size: 6.5pt;
+      font-weight: 700;
     }
 
     /* Grid Layouts */
@@ -131,31 +176,40 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 12px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
     }
 
     .grid-4 {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr 1fr;
       gap: 10px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
 
     .role-pill {
       display: inline-block;
       padding: 3px 9px;
       border-radius: 6px;
-      font-size: 8pt;
-      font-family: 'JetBrains Mono', monospace;
+      font-size: 7.5pt;
+      font-family: 'Noto Sans Mono', monospace;
       font-weight: 700;
       margin-right: 6px;
       vertical-align: middle;
+      text-transform: uppercase;
     }
 
-    .role-customer { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
-    .role-cashier { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
-    .role-kitchen { background: #E0E7FF; color: #3730A3; border: 1px solid #A5B4FC; }
-    .role-admin { background: #D1FAE5; color: #065F46; border: 1px solid #6EE7B7; }
+    .role-customer { background: #FEF3C7; color: #92400E; border: 1px solid var(--butter-taxi); }
+    .role-cashier { background: #FEE2E2; color: var(--smol-cherry); border: 1px solid #FCA5A5; }
+    .role-kitchen { background: #E0E7FF; color: var(--electric-violet); border: 1px solid #C4B5FD; }
+    .role-barista { background: #E6F4F2; color: #1E6B60; border: 1px solid var(--dusty-pool); }
+    .role-admin { background: #FAF4EB; color: var(--walnut); border: 1px solid var(--biscuit); }
 
     /* Flow Step Item */
     .flow-step {
@@ -169,13 +223,13 @@
       width: 26px;
       height: 26px;
       border-radius: 50%;
-      background: #B72E35;
+      background: var(--smol-cherry);
       color: #FFF;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10pt;
+      font-family: 'Noto Sans Mono', monospace;
+      font-size: 9.5pt;
       font-weight: 700;
       flex-shrink: 0;
       margin-top: 2px;
@@ -187,34 +241,34 @@
 
     .step-title {
       font-weight: 700;
-      color: #241F1C;
+      color: var(--espresso-ink);
       font-size: 11pt;
       margin-bottom: 2px;
     }
 
     .step-desc {
-      font-size: 10pt;
-      color: #5C4533;
+      font-size: 9.5pt;
+      color: var(--walnut);
       margin: 0;
     }
 
     .code-tag {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 9pt;
-      background: #EFE6D7;
+      font-family: 'Noto Sans Mono', monospace;
+      font-size: 8.5pt;
+      background: #EAE0CE;
       padding: 2px 6px;
       border-radius: 4px;
-      color: #B72E35;
+      color: var(--smol-cherry);
       font-weight: 600;
     }
 
     /* Architecture Diagram Box */
     .arch-diagram {
-      background: #FAF4EB;
-      border: 2px solid #C9AE8B;
+      background: var(--card-bg);
+      border: 1.5px solid var(--biscuit);
       border-radius: 16px;
-      padding: 16px;
-      margin: 14px 0 20px 0;
+      padding: 14px;
+      margin: 12px 0 16px 0;
       text-align: center;
     }
 
@@ -227,34 +281,36 @@
 
     .diagram-box {
       background: #FFF;
-      border: 1.5px solid #C9AE8B;
+      border: 1.5px solid var(--biscuit);
       border-radius: 10px;
-      padding: 10px 14px;
-      width: 22%;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+      padding: 8px 10px;
+      width: 19%;
+      box-shadow: 0 2px 4px rgba(36, 31, 28, 0.04);
     }
 
-    .diagram-box.customer { border-color: #F59E0B; }
-    .diagram-box.cashier { border-color: #B72E35; }
-    .diagram-box.kitchen { border-color: #6366F1; }
-    .diagram-box.admin { border-color: #10B981; }
+    .diagram-box.customer { border-color: var(--butter-taxi); }
+    .diagram-box.cashier { border-color: var(--smol-cherry); }
+    .diagram-box.kitchen { border-color: var(--electric-violet); }
+    .diagram-box.barista { border-color: var(--dusty-pool); }
+    .diagram-box.admin { border-color: var(--walnut); }
 
     .diagram-box h4 {
-      margin: 0 0 4px 0;
-      font-size: 10pt;
+      margin: 0 0 3px 0;
+      font-size: 9pt;
+      font-family: 'EB Garamond', Georgia, serif;
       font-weight: 700;
     }
 
     .diagram-box p {
       margin: 0;
       font-size: 7.5pt;
-      color: #725039;
-      font-family: 'JetBrains Mono', monospace;
+      color: var(--walnut);
+      font-family: 'Noto Sans Mono', monospace;
     }
 
     .diagram-arrow {
-      font-size: 16pt;
-      color: #B72E35;
+      font-size: 14pt;
+      color: var(--smol-cherry);
       font-weight: bold;
     }
 
@@ -262,46 +318,46 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 10px 0;
-      font-size: 9.5pt;
+      margin: 8px 0 12px 0;
+      font-size: 9pt;
     }
 
     th {
-      background: #EFE6D7;
-      color: #725039;
+      background: #EAE0CE;
+      color: var(--walnut);
       text-align: left;
-      padding: 8px 10px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 8.5pt;
-      border-bottom: 2px solid #C9AE8B;
+      padding: 7px 9px;
+      font-family: 'Noto Sans Mono', monospace;
+      font-size: 8pt;
+      border-bottom: 2px solid var(--biscuit);
     }
 
     td {
-      padding: 8px 10px;
+      padding: 7px 9px;
       border-bottom: 1px solid #E5D5C1;
-      color: #241F1C;
+      color: var(--espresso-ink);
     }
 
     tr:nth-child(even) td {
-      background: #FAF4EB;
+      background: var(--card-bg);
     }
 
     .chalkboard-preview {
-      background: #171514;
-      border: 3px solid #8C6D53;
+      background: var(--espresso-ink);
+      border: 2px solid var(--biscuit);
       border-radius: 12px;
-      padding: 12px 16px;
-      color: #FDFBF7;
+      padding: 10px 14px;
+      color: var(--cafe-creme);
       font-family: 'Caveat', cursive;
-      font-size: 15pt;
+      font-size: 14pt;
       line-height: 1.3;
-      margin-top: 8px;
+      margin-top: 6px;
       text-shadow: 0 1px 2px rgba(0,0,0,0.4);
     }
 
     .chalkboard-preview .sub {
       font-size: 11pt;
-      color: #F2C84B;
+      color: var(--butter-taxi);
     }
 
     /* Footer */
@@ -312,11 +368,11 @@
       right: 0;
       display: flex;
       justify-content: space-between;
-      border-top: 1px solid #D9C5AB;
-      padding-top: 8px;
-      font-size: 8pt;
-      font-family: 'JetBrains Mono', monospace;
-      color: #8C6D53;
+      border-top: 1px solid var(--biscuit);
+      padding-top: 6px;
+      font-size: 7.5pt;
+      font-family: 'Noto Sans Mono', monospace;
+      color: var(--walnut);
     }
   </style>
 </head>
@@ -329,15 +385,27 @@
         <h1 class="brand-title">smol café</h1>
         <div class="brand-subtitle">Complete Application Architecture &amp; System Flow Guide</div>
       </div>
-      <div class="brand-badge">Full-Stack v0.1 • 2026 Edition</div>
+      <div class="brand-badge">Full-Stack v1.0 • Locked Brand Kit Edition</div>
+    </div>
+
+    <!-- Brand Palette Strip -->
+    <div class="palette-strip">
+      <div class="swatch" style="background:#F3E7D3; color:#241F1C;">#F3E7D3 crème</div>
+      <div class="swatch" style="background:#B72E35; color:#FFF;">#B72E35 cherry</div>
+      <div class="swatch" style="background:#F2C84B; color:#241F1C;">#F2C84B butter</div>
+      <div class="swatch" style="background:#241F1C; color:#F3E7D3;">#241F1C espresso</div>
+      <div class="swatch" style="background:#C9AE8B; color:#241F1C;">#C9AE8B biscuit</div>
+      <div class="swatch" style="background:#754CFF; color:#FFF;">#754CFF violet</div>
+      <div class="swatch" style="background:#75AFA7; color:#241F1C;">#75AFA7 pool</div>
+      <div class="swatch" style="background:#725039; color:#FFF;">#725039 walnut</div>
     </div>
 
     <h2>1. Executive Summary &amp; System Purpose</h2>
     <p>
-      <strong>smol café</strong> is a state-of-the-art, real-time café operating system and customer dining application. Built with Next.js 15 (App Router), React 19, TypeScript, and Tailwind CSS, it bridges customer self-ordering, front-desk cashier settlement, chef/barista kitchen ticket routing, and owner analytics into a unified real-time synchronization loop.
+      <strong>smol café</strong> is a state-of-the-art, real-time café operating system and customer dining application. Built with Next.js 15 (App Router), React 19, TypeScript, and Tailwind CSS, it bridges customer self-ordering, front-desk cashier settlement, dedicated barista espresso shots, kitchen KDS dispatch, and super-admin inventory radar into a unified zero-latency synchronization loop.
     </p>
 
-    <h2>2. System Architecture &amp; 4 Core Roles</h2>
+    <h2>2. System Architecture &amp; 5 Core Roles</h2>
     <div class="arch-diagram">
       <div class="diagram-flex">
         <div class="diagram-box customer">
@@ -352,21 +420,27 @@
           <p>PIN Verify &amp; Settle<br>/cashier</p>
         </div>
         <div class="diagram-arrow">➔</div>
+        <div class="diagram-box barista">
+          <span class="role-pill role-barista">ROLE 3</span>
+          <h4>Barista Bar</h4>
+          <p>Shot Timers &amp; Brews<br>/smol-backdoor/barista</p>
+        </div>
+        <div class="diagram-arrow">➔</div>
         <div class="diagram-box kitchen">
-          <span class="role-pill role-kitchen">ROLE 3</span>
+          <span class="role-pill role-kitchen">ROLE 4</span>
           <h4>Kitchen KDS</h4>
           <p>Kanban Dispatch<br>/kitchen</p>
         </div>
         <div class="diagram-arrow">➔</div>
         <div class="diagram-box admin">
-          <span class="role-pill role-admin">ROLE 4</span>
+          <span class="role-pill role-admin">ROLE 5</span>
           <h4>Admin Tower</h4>
-          <p>Live Ops &amp; Catalog<br>/admin</p>
+          <p>Live Ops &amp; Radar<br>/admin</p>
         </div>
       </div>
     </div>
 
-    <h2>3. The 4 Operational Roles Matrix</h2>
+    <h2>3. The 5 Operational Roles Matrix</h2>
     <table>
       <thead>
         <tr>
@@ -380,39 +454,45 @@
         <tr>
           <td><strong>Customer (Guest)</strong></td>
           <td><span class="code-tag">/t/table-XX</span>, <span class="code-tag">/menu</span></td>
-          <td>Browse menu, customize drinks, submit orders, track live status, pay via UPI QR.</td>
+          <td>Browse menu, customize drinks, submit orders, phone loyalty rewards, track live status, pay via UPI QR.</td>
           <td>Public (Bound by Table QR token)</td>
         </tr>
         <tr>
           <td><strong>Cashier / POS</strong></td>
           <td><span class="code-tag">/cashier</span></td>
-          <td>Verify 4-digit Table PIN, accept orders, manage 12 dining tables, calculate cash change.</td>
-          <td>Front-Desk Counter Staff</td>
+          <td>Verify 4-digit Table PIN, accept orders, manage 12 dining tables, calculate cash change &amp; print thermal slips.</td>
+          <td>Front-Desk Counter Staff (PIN: <span class="code-tag">8821</span>)</td>
         </tr>
         <tr>
-          <td><strong>Kitchen (Chef/Barista)</strong></td>
+          <td><strong>Barista (Specialty Bar)</strong></td>
+          <td><span class="code-tag">/smol-backdoor/barista</span></td>
+          <td>Espresso extraction timers (25-30s target), milk steaming station, filter coffee queue &amp; quick mark ready.</td>
+          <td>Dedicated Bar Display (PIN: <span class="code-tag">7744</span>)</td>
+        </tr>
+        <tr>
+          <td><strong>Kitchen (Chef KDS)</strong></td>
           <td><span class="code-tag">/kitchen</span></td>
-          <td>Large-screen KDS Kanban (New ➔ Prep ➔ Ready ➔ Served), acoustic chimes, order timers.</td>
-          <td>Kitchen Touchscreen Display</td>
+          <td>Large-screen KDS Kanban (New ➔ Prep ➔ Ready ➔ Served), acoustic 3-tone chimes, 86 availability toggle.</td>
+          <td>Kitchen Touchscreen (PIN: <span class="code-tag">5533</span>)</td>
         </tr>
         <tr>
           <td><strong>Super Admin (Owner)</strong></td>
-          <td><span class="code-tag">/admin</span></td>
-          <td>Live revenue analytics, hourly demand curves, menu in-stock toggling, loyalty perks.</td>
-          <td>Secured Gate (PIN: <span class="code-tag">8888</span>)</td>
+          <td><span class="code-tag">/admin</span>, <span class="code-tag">/admin/procurement</span></td>
+          <td>Live revenue analytics, low-stock radar, 1-tap GRN restock, menu in-stock toggling, phone loyalty rewards.</td>
+          <td>Secured Gate (PIN: <span class="code-tag">9900</span>)</td>
         </tr>
       </tbody>
     </table>
 
-    <div class="card card-highlight" style="margin-top: 14px;">
+    <div class="card card-highlight" style="margin-top: 10px;">
       <h3 style="margin-top:0;">⚡ Real-Time Synchronous Engine (lib/sync-events.ts)</h3>
-      <p style="margin-bottom:0; font-size:10pt;">
-        Unlike traditional multi-page apps that require frequent polling or refreshes, smol café utilizes an event-driven broadcast channel architecture. Whenever an order is submitted, verified, pushed to kitchen, or marked ready, events trigger instant UI transitions across all active tabs and devices in under <strong>50ms</strong>.
+      <p style="margin-bottom:0; font-size:9.5pt;">
+        Unlike traditional multi-page apps that require frequent polling or refreshes, <strong>smol café</strong> utilizes an event-driven broadcast channel &amp; Supabase Realtime mesh. Whenever an order is submitted, verified, pushed to barista/kitchen, restocked, or settled, events trigger instant UI transitions across all active tabs and devices in under <strong>50ms</strong>.
       </p>
     </div>
 
     <div class="page-footer">
-      <span>smol café • Complete System Flow Guide</span>
+      <span>smol café • Complete System Flow Guide • Brand Kit v1.0</span>
       <span>Page 1 of 3</span>
     </div>
   </div>
@@ -421,8 +501,8 @@
   <div class="page">
     <div class="brand-header">
       <div>
-        <h1 class="brand-title" style="font-size: 20pt;">smol café</h1>
-        <div class="brand-subtitle">Customer Dining Journey &amp; Cashier Desk Operations</div>
+        <h1 class="brand-title" style="font-size: 22pt;">smol café</h1>
+        <div class="brand-subtitle">Customer Dining Journey, Phone Loyalty &amp; Cashier Operations</div>
       </div>
       <div class="brand-badge">Flow Deep-Dive • Steps 1 to 5</div>
     </div>
@@ -466,9 +546,9 @@
     <div class="flow-step">
       <div class="step-num">4</div>
       <div class="step-content">
-        <div class="step-title">Order Submission &amp; 4-Digit Table Verification PIN (<span class="code-tag">/cart</span>)</div>
+        <div class="step-title">Phone-Number Loyalty &amp; Order Submission (<span class="code-tag">/cart</span>)</div>
         <p class="step-desc">
-          When the customer submits their cart, the system assigns a unique Order ID and displays a <strong>4-digit Table Verification PIN</strong>. This prevents prank orders from going to the kitchen until verified by the cashier.
+          Customers enter their 10-digit phone number to track visits (1st, 2nd, 3rd, 5th visit bonuses) and redeem Smol Club reward points for instant rupee discounts. When the cart is submitted, the system assigns a unique Order ID and displays a <strong>4-digit Table Verification PIN</strong>.
         </p>
       </div>
     </div>
@@ -478,7 +558,7 @@
       <div class="step-content">
         <div class="step-title">Live Status Bar &amp; Dynamic UPI Bill Payment (<span class="code-tag">/order/[id]</span>, <span class="code-tag">/bill</span>)</div>
         <p class="step-desc">
-          Customers follow the live progress bar: <em>Order Placed ➔ PIN Verified ➔ Brewing/Cooking ➔ Ready to Serve</em>. Upon finishing dining, guest requests digital bill, generates a dynamic UPI deep-link QR (<span class="code-tag">upi://pay?pa=...</span>), and receives an itemized digital chit with 5% GST calculated.
+          Customers follow the live progress bar: <em>Order Placed ➔ PIN Verified ➔ Brewing/Cooking ➔ Ready to Serve</em>. Upon finishing dining, guest requests digital bill, generates a dynamic UPI deep-link QR (<span class="code-tag">upi://pay?pa=...</span>), and receives an itemized thermal slip with 5% GST calculated.
         </p>
       </div>
     </div>
@@ -488,121 +568,136 @@
     <div class="grid-2">
       <div class="card">
         <h3 style="margin-top:0;">Tab 1: Verification Queue</h3>
-        <p style="font-size:9.5pt;">
-          Incoming orders appear with an amber halo. The cashier asks the patron for their 4-digit PIN, verifies it against the screen, and clicks <strong>"Confirm Order"</strong>. The chit is instantly broadcast to the kitchen.
+        <p style="font-size:9pt; color:var(--walnut);">
+          Incoming orders appear with an amber halo. The cashier asks the patron for their 4-digit PIN, verifies it against the screen, and clicks <strong>"Confirm Order"</strong>. The chit is instantly broadcast to barista and kitchen.
         </p>
       </div>
       <div class="card">
         <h3 style="margin-top:0;">Tab 2: Tables &amp; Settlement</h3>
-        <p style="font-size:9.5pt;">
+        <p style="font-size:9pt; color:var(--walnut);">
           A visual overview of all 12 tables. Cashier can open tables for walk-in guests, view accumulated round totals, launch UPI QR on the counter display, or record Cash payment with automatic change-due calculator.
         </p>
       </div>
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0;">Tab 3: Paid Orders &amp; Audit Ledger</h3>
-      <p style="font-size:9.5pt; margin-bottom:0;">
-        Maintains today's complete payment audit trail: Settlement ID, table number, tender method (PhonePe, Google Pay, Cash), exact timestamps, and a button to re-print or view digital guest chits.
+      <h3 style="margin-top:0;">Tab 3: Paid Orders &amp; Printable Invoices</h3>
+      <p style="font-size:9pt; color:var(--walnut); margin-bottom:0;">
+        Maintains today's complete payment audit trail: Settlement ID, table number, tender method (UPI, Google Pay, Cash), exact timestamps, and a button to re-print 58mm/80mm thermal guest chits.
       </p>
     </div>
 
     <div class="page-footer">
-      <span>smol café • Complete System Flow Guide</span>
+      <span>smol café • Complete System Flow Guide • Brand Kit v1.0</span>
       <span>Page 2 of 3</span>
     </div>
   </div>
 
-  <!-- PAGE 3: KITCHEN KDS, ADMIN TOWER, & DESIGN SYSTEM -->
+  <!-- PAGE 3: BARISTA STATION, KITCHEN KDS, & ADMIN RADAR -->
   <div class="page">
     <div class="brand-header">
       <div>
-        <h1 class="brand-title" style="font-size: 20pt;">smol café</h1>
-        <div class="brand-subtitle">Kitchen KDS, Admin Control Tower &amp; Design Architecture</div>
+        <h1 class="brand-title" style="font-size: 22pt;">smol café</h1>
+        <div class="brand-subtitle">Barista Station, Kitchen KDS, Admin Radar &amp; Design System</div>
       </div>
-      <div class="brand-badge">Kitchen • Admin • Theme Engine</div>
+      <div class="brand-badge">Barista • KDS • Radar • Design</div>
     </div>
 
-    <h2>6. Kitchen Display System - KDS (<span class="code-tag">/kitchen</span>)</h2>
+    <h2>6. Dedicated Barista Station (<span class="code-tag">/smol-backdoor/barista</span>)</h2>
     <p>
-      The KDS provides baristas and chefs with an ultra-responsive, touch-optimized Kanban board. Incoming verified chits play an acoustic café chime.
+      Optimized for coffee workflow: shot extraction timers (25-30s dial-in), grind adjustments, milk steaming queues, pour-overs, and cold brew dispatch.
     </p>
 
+    <div class="grid-3">
+      <div class="card" style="border-top: 3px solid var(--smol-cherry);">
+        <h4 style="margin:0; font-size:9.5pt; font-family:'EB Garamond'; font-weight:700; color:var(--smol-cherry);">☕ ESPRESSO &amp; HOT BREWS</h4>
+        <p style="font-size:8pt; margin:4px 0; color:var(--walnut);">Extraction timers, shot counter, temperature control.</p>
+        <div style="font-size:7pt; font-family:'Noto Sans Mono'; background:#FEE2E2; color:var(--smol-cherry); padding:2px 4px; border-radius:4px; text-align:center;">Target: 27s ± 2s</div>
+      </div>
+      <div class="card" style="border-top: 3px solid var(--dusty-pool);">
+        <h4 style="margin:0; font-size:9.5pt; font-family:'EB Garamond'; font-weight:700; color:#1E6B60;">🧊 ICED &amp; POUR-OVERS</h4>
+        <p style="font-size:8pt; margin:4px 0; color:var(--walnut);">Iced lattes, tonic cordials, single-origin V60.</p>
+        <div style="font-size:7pt; font-family:'Noto Sans Mono'; background:#E6F4F2; color:#1E6B60; padding:2px 4px; border-radius:4px; text-align:center;">Batch Brew Active</div>
+      </div>
+      <div class="card" style="border-top: 3px solid var(--butter-taxi);">
+        <h4 style="margin:0; font-size:9.5pt; font-family:'EB Garamond'; font-weight:700; color:#92400E;">⚡ 1-TAP DISPATCH</h4>
+        <p style="font-size:8pt; margin:4px 0; color:var(--walnut);">Realtime sync chime notifies waitstaff upon readiness.</p>
+        <div style="font-size:7pt; font-family:'Noto Sans Mono'; background:#FEF3C7; color:#92400E; padding:2px 4px; border-radius:4px; text-align:center;">Instant Chime Broadcast</div>
+      </div>
+    </div>
+
+    <h2>7. Kitchen Display System - KDS (<span class="code-tag">/kitchen</span>)</h2>
     <div class="grid-4">
       <div class="card" style="border-top: 3px solid #3B82F6;">
-        <h4 style="margin:0; font-size:10pt; color:#1D4ED8;">1. NEW ORDERS</h4>
-        <p style="font-size:8pt; margin:4px 0;">Confirmed by cashier. Waiting for prep.</p>
-        <div style="font-size:7.5pt; font-family:'JetBrains Mono'; background:#DBEAFE; color:#1E40AF; padding:2px 4px; border-radius:4px; text-align:center;">Action: Start Prep</div>
+        <h4 style="margin:0; font-size:9pt; color:#1D4ED8; font-family:'EB Garamond'; font-weight:700;">1. NEW ORDERS</h4>
+        <p style="font-size:7.5pt; margin:4px 0; color:var(--walnut);">Confirmed by cashier. Waiting for chef.</p>
+        <div style="font-size:7pt; font-family:'Noto Sans Mono'; background:#DBEAFE; color:#1E40AF; padding:2px 4px; border-radius:4px; text-align:center;">Start Prep</div>
       </div>
-      <div class="card" style="border-top: 3px solid #F59E0B;">
-        <h4 style="margin:0; font-size:10pt; color:#B45309;">2. PREPARING</h4>
-        <p style="font-size:8pt; margin:4px 0;">Brewing espresso, steaming milk, grilling melt.</p>
-        <div style="font-size:7.5pt; font-family:'JetBrains Mono'; background:#FEF3C7; color:#92400E; padding:2px 4px; border-radius:4px; text-align:center;">Action: Mark Ready</div>
+      <div class="card" style="border-top: 3px solid var(--butter-taxi);">
+        <h4 style="margin:0; font-size:9pt; color:#92400E; font-family:'EB Garamond'; font-weight:700;">2. PREPARING</h4>
+        <p style="font-size:7.5pt; margin:4px 0; color:var(--walnut);">Grilling sourdough melt, baking pastry.</p>
+        <div style="font-size:7pt; font-family:'Noto Sans Mono'; background:#FEF3C7; color:#92400E; padding:2px 4px; border-radius:4px; text-align:center;">Mark Ready</div>
       </div>
       <div class="card" style="border-top: 3px solid #10B981;">
-        <h4 style="margin:0; font-size:10pt; color:#047857;">3. READY</h4>
-        <p style="font-size:8pt; margin:4px 0;">Plated on counter. Waiter notified.</p>
-        <div style="font-size:7.5pt; font-family:'JetBrains Mono'; background:#D1FAE5; color:#065F46; padding:2px 4px; border-radius:4px; text-align:center;">Action: Serve Table</div>
+        <h4 style="margin:0; font-size:9pt; color:#047857; font-family:'EB Garamond'; font-weight:700;">3. READY</h4>
+        <p style="font-size:7.5pt; margin:4px 0; color:var(--walnut);">Plated on pass. Waiter notified.</p>
+        <div style="font-size:7pt; font-family:'Noto Sans Mono'; background:#D1FAE5; color:#065F46; padding:2px 4px; border-radius:4px; text-align:center;">Serve Table</div>
       </div>
-      <div class="card" style="border-top: 3px solid #6B7280;">
-        <h4 style="margin:0; font-size:10pt; color:#374151;">4. COMPLETED</h4>
-        <p style="font-size:8pt; margin:4px 0;">Successfully served to guest dining table.</p>
-        <div style="font-size:7.5pt; font-family:'JetBrains Mono'; background:#E5E7EB; color:#374151; padding:2px 4px; border-radius:4px; text-align:center;">Status: Archived</div>
+      <div class="card" style="border-top: 3px solid var(--walnut);">
+        <h4 style="margin:0; font-size:9pt; color:var(--walnut); font-family:'EB Garamond'; font-weight:700;">4. COMPLETED</h4>
+        <p style="font-size:7.5pt; margin:4px 0; color:var(--walnut);">Served to guest dining table.</p>
+        <div style="font-size:7pt; font-family:'Noto Sans Mono'; background:#EAE0CE; color:var(--walnut); padding:2px 4px; border-radius:4px; text-align:center;">Archived</div>
       </div>
     </div>
 
-    <h2>7. Admin Control Tower (<span class="code-tag">/admin</span>)</h2>
-    <p>
-      Protected by an encrypted passcode gate (Demo PIN: <span class="code-tag">8888</span>), the Admin Tower is the café manager's cockpit:
-    </p>
-
+    <h2>8. Super Admin Tower &amp; Low-Stock Radar (<span class="code-tag">/admin</span>)</h2>
     <div class="grid-2">
       <div class="card">
-        <h3 style="margin-top:0;">📊 Live Sales &amp; Demand Analytics</h3>
-        <p style="font-size:9pt; margin:0;">
-          Real-time daily gross revenue, orders count, table occupancy %, average ticket size (₹384.50), peak demand curve by hour (Peak 5PM: 26 orders/hr), and bestseller rankings.
+        <h3 style="margin-top:0;">📊 Live Sales &amp; Demand Velocity</h3>
+        <p style="font-size:8.5pt; margin:0; color:var(--walnut);">
+          Real-time gross revenue, table occupancy %, average ticket size, hourly demand curve, and bestseller rankings.
         </p>
       </div>
       <div class="card">
-        <h3 style="margin-top:0;">🪑 12 Tables Floor Map &amp; JSON Tags</h3>
-        <p style="font-size:9pt; margin:0;">
-          Interactive floor plan displaying table status (Free vs Busy). Generates encrypted Table JSON Tags and dynamic QR bill links for any dining table.
+        <h3 style="margin-top:0;">🚨 Grocery &amp; Low-Stock Radar (GRN)</h3>
+        <p style="font-size:8.5pt; margin:0; color:var(--walnut);">
+          Live gauge monitoring beans, dairy, and bakes with safety minimums and 1-tap instant Goods Receipt Note restocks.
         </p>
       </div>
     </div>
 
     <div class="grid-2">
       <div class="card">
-        <h3 style="margin-top:0;">📦 59-Item Menu Stock Toggle</h3>
-        <p style="font-size:9pt; margin:0;">
-          One-click toggling between <strong>IN STOCK</strong> and <strong>SOLD OUT</strong> for all coffees, sandwiches, and treats. Instantly disables sold-out items on active customer devices.
+        <h3 style="margin-top:0;">📦 59-Item Catalog &amp; 86 Toggle</h3>
+        <p style="font-size:8.5pt; margin:0; color:var(--walnut);">
+          Instant toggling between <strong>IN STOCK</strong> and <strong>86'D (SOLD OUT)</strong> with live multi-tab propagation.
         </p>
       </div>
       <div class="card">
-        <h3 style="margin-top:0;">🎖️ Smol Club Loyalty &amp; Merchant Setup</h3>
-        <p style="font-size:9pt; margin:0;">
-          Patron point ledger (₹10 spent = 1 pt). Tier perks: Seedling (0-100 pts), Regular (101-500 pts), Smol Insider (500+ pts). Configures merchant UPI VPA and 5% GST rate.
+        <h3 style="margin-top:0;">🎖️ Phone Loyalty &amp; Role PIN Control</h3>
+        <p style="font-size:8.5pt; margin:0; color:var(--walnut);">
+          Customer phone ledger (visit bonuses &amp; spend points) + RBAC PIN management for Admin, Cashier, Kitchen, and Barista.
         </p>
       </div>
     </div>
 
-    <h2>8. Universal Light / Dark Mode &amp; Design Palette</h2>
-    <div class="card card-dark">
+    <h2>9. Locked Brand Identity &amp; Day/Night System</h2>
+    <div class="card card-dark" style="margin-bottom:0;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <h3 style="color:#F2C84B; margin:0;">☀️ Daylight Crème vs 🌙 Midnight Espresso</h3>
-          <p style="font-size:9pt; margin:4px 0 0 0; color:#D6C8B8;">
-            Synchronized theme toggle with instant <span class="code-tag" style="background:#332B25; color:#F2C84B;">localStorage: smol_theme</span> persistence.
+          <h3 style="color:var(--butter-taxi); margin:0;">☀️ Daylight Crème vs 🌙 Midnight Espresso</h3>
+          <p style="font-size:8.5pt; margin:3px 0 0 0; color:#D6C8B8;">
+            Canvas: <span class="code-tag" style="background:#38312C; color:var(--butter-taxi);">#F3E7D3 (café crème)</span> • Hero: <span class="code-tag" style="background:#38312C; color:#FCA5A5;">#B72E35 (smol cherry)</span> • Night: <span class="code-tag" style="background:#38312C; color:#C4B5FD;">#754CFF (electric violet)</span>
           </p>
         </div>
-        <div style="font-family:'JetBrains Mono'; font-size:8pt; text-align:right; color:#A89F91;">
-          Light: #F3E7D3 • #FAF4EB<br>Dark: #141211 • #1C1917
+        <div style="font-family:'Noto Sans Mono', monospace; font-size:7.5pt; text-align:right; color:#A89F91;">
+          Type: EB Garamond + Inter + Noto Sans Mono<br>smol café • Tapovan, Rishikesh
         </div>
       </div>
     </div>
 
     <div class="page-footer">
-      <span>smol café • Complete System Flow Guide</span>
+      <span>smol café • Complete System Flow Guide • Brand Kit v1.0</span>
       <span>Page 3 of 3</span>
     </div>
   </div>

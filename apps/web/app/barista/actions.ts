@@ -1,0 +1,311 @@
+"use server";
+
+import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
+import { createAdminClient, isMockDatabase } from "@/lib/supabase/admin";
+import { broadcastSyncEvent } from "@/lib/sync-events";
+import type { OrderStatus } from "@smol-cafe/db";
+import { generateRequestId, logger } from "@/lib/observability/logger";
+import { captureAppException } from "@/lib/observability/sentry";
+
+const STAFF_SESSION_COOKIE = "smol_staff_session";
+
+export interface BaristaOrderItem {
+  id: string;
+  name: string;
+  qty: number;
+  itemStatus: string;
+  isBeverage: boolean;
+  notes?: string;
+  modifiers?: string[];
+}
+
+export interface BaristaTicket {
+  id: string;
+  orderNo: number;
+  tableLabel: string;
+  tableId: string;
+  guestName?: string | null;
+  guestPhone?: string | null;
+  status: OrderStatus;
+  submittedAt: string | null;
+  acceptedAt: string | null;
+  readyAt: string | null;
+  instructions?: string | null;
+  items: BaristaOrderItem[];
+}
+
+export interface FetchBaristaOrdersResult {
+  success: boolean;
+  orders: BaristaTicket[];
+  message?: string;
+}
+
+function isBeverageItem(name: string): boolean {
+  const n = (name || "").toLowerCase().trim();
+  return (
+    n.includes("coffee") ||
+    n.includes("espresso") ||
+    n.includes("americano") ||
+    n.includes("latte") ||
+    n.includes("cappuccino") ||
+    n.includes("mocha") ||
+    n.includes("cortado") ||
+    n.includes("macchiato") ||
+    n.includes("flat white") ||
+    n.includes("brew") ||
+    n.includes("pour over") ||
+    n.includes("aeropress") ||
+    n.includes("tonic") ||
+    n.includes("shake") ||
+    n.includes("frappe") ||
+    n.includes("tea") ||
+    n.includes("chai") ||
+    n.includes("matcha") ||
+    n.includes("smoothie") ||
+    n.includes("kombucha") ||
+    n.includes("beverage") ||
+    n.includes("hot chocolate")
+  );
+}
+
+/**
+ * Server Action: Fetches all active beverage and coffee orders for the Barista desk
+ */
+export async function fetchBaristaOrdersAction(): Promise<FetchBaristaOrdersResult> {
+  const supabase = createAdminClient();
+
+  try {
+    const activeStatuses = isMockDatabase()
+      ? ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED", "PREPARING", "READY", "SERVED", "COMPLETED"]
+      : ["SUBMITTED", "ACCEPTED", "PREPARING", "READY", "SERVED"];
+
+    // 1. Fetch active orders
+    const { data: orders, error: ordersError } = await supabase
+      .from("orders")
+      .select("*")
+      .in("status", activeStatuses)
+      .order("created_at", { ascending: true });
+
+    if (ordersError || !orders) {
+      console.error("fetchBaristaOrdersAction error:", ordersError);
+      return { success: false, orders: [], message: "Failed to fetch barista orders." };
+    }
+
+    if (orders.length === 0) {
+      return { success: true, orders: [] };
+    }
+
+    const orderIds = orders.map((o) => o.id);
+    const sessionIds = orders
+      .map((o) => o.table_session_id)
+      .filter((id): id is string => Boolean(id));
+
+    // 2. Fetch Dining Table Labels via Table Sessions
+    const tableLabelMap = new Map<string, { label: string; tableId: string }>();
+
+    if (sessionIds.length > 0) {
+      const { data: sessions } = await supabase
+        .from("table_sessions")
+        .select("id, table_id")
+        .in("id", sessionIds);
+
+      const tableIds = (sessions || [])
+        .map((s) => s.table_id)
+        .filter((id): id is string => Boolean(id));
+
+      if (tableIds.length > 0) {
+        const { data: tables } = await supabase
+          .from("dining_tables")
+          .select("id, label")
+          .in("id", tableIds);
+
+        const tableMap = new Map<string, string>();
+        for (const t of tables || []) {
+          tableMap.set(t.id, t.label);
+        }
+
+        for (const s of sessions || []) {
+          if (s.table_id && tableMap.has(s.table_id)) {
+            tableLabelMap.set(s.id, {
+              label: tableMap.get(s.table_id)!,
+              tableId: s.table_id,
+            });
+          }
+        }
+      }
+    }
+
+    // 3. Fetch order items for ticket breakdown
+    const { data: orderItems } = await supabase
+      .from("order_items")
+      .select("*")
+      .in("order_id", orderIds);
+
+    const itemsByOrder = new Map<string, BaristaOrderItem[]>();
+    for (const item of (orderItems as Array<{
+      id: string;
+      order_id: string;
+      name_snapshot: string;
+      qty: number;
+      item_status: string;
+    }>) || []) {
+      if (!itemsByOrder.has(item.order_id)) {
+        itemsByOrder.set(item.order_id, []);
+      }
+      itemsByOrder.get(item.order_id)!.push({
+        id: item.id,
+        name: item.name_snapshot,
+        qty: item.qty,
+        itemStatus: item.item_status || "PENDING",
+        isBeverage: isBeverageItem(item.name_snapshot),
+      });
+    }
+
+    // 4. Assemble barista tickets:
+    // Any order containing beverages is routed to Barista Desk
+    const tickets: BaristaTicket[] = [];
+
+    for (const o of orders) {
+      const allItems = itemsByOrder.get(o.id) || [];
+      const beverageItems = allItems.filter((i) => i.isBeverage);
+
+      // If the order has beverages, include it on the barista board
+      if (beverageItems.length > 0) {
+        const tableInfo = o.table_session_id ? tableLabelMap.get(o.table_session_id) : null;
+
+        tickets.push({
+          id: o.id,
+          orderNo: o.order_no,
+          tableLabel: tableInfo?.label || "01",
+          tableId: tableInfo?.tableId || "",
+          guestName: null,
+          guestPhone: null,
+          status: o.status as OrderStatus,
+          submittedAt: o.submitted_at || o.created_at,
+          acceptedAt: o.accepted_at,
+          readyAt: o.ready_at,
+          instructions: (o as { instructions?: string | null }).instructions || null,
+          items: beverageItems, // show beverages for barista
+        });
+      }
+    }
+
+    return { success: true, orders: tickets };
+  } catch (err: any) {
+    console.error("fetchBaristaOrdersAction error:", err);
+    return { success: false, orders: [], message: err?.message || "Failed to fetch barista orders." };
+  }
+}
+
+/**
+ * Server Action: Transition Order Status from Barista Desk
+ */
+export async function transitionBaristaOrderStatusAction(
+  orderId: string,
+  fromStatus: OrderStatus,
+  toStatus: OrderStatus
+): Promise<{ success: boolean; message?: string; currentStatus?: OrderStatus }> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+  const supabase = createAdminClient();
+
+  try {
+    const { data: currentOrder, error: checkError } = await supabase
+      .from("orders")
+      .select("id, status")
+      .eq("id", orderId)
+      .single();
+
+    if (checkError || !currentOrder) {
+      return { success: false, message: "Order not found." };
+    }
+
+    const nowIso = new Date().toISOString();
+    const updatePayload: Record<string, unknown> = {
+      status: toStatus,
+      updated_at: nowIso,
+    };
+
+    if (toStatus === "PREPARING") {
+      updatePayload.accepted_at = nowIso;
+    } else if (toStatus === "READY") {
+      updatePayload.ready_at = nowIso;
+    } else if (toStatus === "SERVED" || toStatus === "COMPLETED") {
+      updatePayload.served_at = nowIso;
+    }
+
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update(updatePayload)
+      .eq("id", orderId);
+
+    if (updateError) {
+      return { success: false, message: "Failed to update order status." };
+    }
+
+    // Broadcast sync events to all open panels
+    broadcastSyncEvent({
+      type: "BARISTA_TICKET_CHANGED",
+      orderId,
+      status: toStatus,
+      timestamp: Date.now(),
+    });
+
+    broadcastSyncEvent({
+      type: "STATUS_CHANGED",
+      orderId,
+      status: toStatus,
+      timestamp: Date.now(),
+    });
+
+    revalidatePath("/barista");
+    revalidatePath("/kitchen");
+    revalidatePath("/orders");
+    revalidatePath("/cashier");
+    revalidatePath("/admin");
+
+    return { success: true, currentStatus: toStatus, message: `Brew status updated to ${toStatus}` };
+  } catch (err: any) {
+    captureAppException(err, { requestId, orderId });
+    return { success: false, message: err?.message || "Internal server error." };
+  }
+}
+
+/**
+ * Server Action: Check if staff is logged in
+ */
+export async function checkStaffAuthAction(): Promise<boolean> {
+  const cookieStore = await cookies();
+  return Boolean(cookieStore.get(STAFF_SESSION_COOKIE)?.value);
+}
+
+/**
+ * Server Action: Staff login
+ */
+export async function staffLoginAction(
+  pinOrPassword: string
+): Promise<{ success: boolean; message?: string }> {
+  const validPins = ["1234", "smol2026", "chef", "barista", "coffee"];
+  if (validPins.includes(pinOrPassword.trim().toLowerCase())) {
+    const cookieStore = await cookies();
+    cookieStore.set(STAFF_SESSION_COOKIE, "authenticated", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
+    return { success: true };
+  }
+
+  return { success: false, message: "Invalid staff passcode. Try: 1234" };
+}
+
+/**
+ * Server Action: Staff logout
+ */
+export async function staffLogoutAction(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(STAFF_SESSION_COOKIE);
+}

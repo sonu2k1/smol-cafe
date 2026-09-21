@@ -12,6 +12,8 @@ import { CartDrawer } from "@/components/cart/CartDrawer";
 import { BottomNavBar } from "@/components/navigation/BottomNavBar";
 
 import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { subscribeToSyncEvents } from "@/lib/sync-events";
+import { cacheMenuCatalog, getCachedMenuCatalog } from "@/lib/offline-cache";
 
 interface MenuClientViewProps {
   categories: CategoryWithItems[];
@@ -21,7 +23,7 @@ interface MenuClientViewProps {
 }
 
 const MenuContentInner: React.FC<MenuClientViewProps> = ({
-  categories,
+  categories: initialCategories,
   tableLabel,
   locationName = "Smol Café",
   guestName = "",
@@ -29,7 +31,53 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
   const searchParams = useSearchParams();
   const categoryParam = searchParams ? searchParams.get("category") : null;
 
+  const [categories, setCategories] = useState<CategoryWithItems[]>(() => {
+    if (initialCategories && initialCategories.length > 0) return initialCategories;
+    const cached = getCachedMenuCatalog<CategoryWithItems[]>();
+    return cached && cached.length > 0 ? cached : initialCategories;
+  });
   const [currentGuestName, setCurrentGuestName] = useState(guestName);
+
+  useEffect(() => {
+    if (initialCategories && initialCategories.length > 0) {
+      setCategories(initialCategories);
+      cacheMenuCatalog(initialCategories);
+    } else {
+      const cached = getCachedMenuCatalog<CategoryWithItems[]>();
+      if (cached && cached.length > 0) {
+        setCategories(cached);
+      }
+    }
+  }, [initialCategories]);
+
+  // Listen for real-time 86'd / item stock availability sync across all tabs & devices
+  useEffect(() => {
+    const unsub = subscribeToSyncEvents((event) => {
+      if (event.type === "ITEM_AVAILABILITY_CHANGED" && event.itemId) {
+        setCategories((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            items: cat.items.map((item) => {
+              if (item.id === event.itemId) {
+                return {
+                  ...item,
+                  status: event.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : "ACTIVE",
+                  metadata: {
+                    ...item.metadata,
+                    availability: event.stockStatus,
+                    low_stock_portions: (event.metadata as any)?.lowStockCount,
+                  },
+                };
+              }
+              return item;
+            }),
+          }))
+        );
+      }
+    });
+
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {

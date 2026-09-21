@@ -15,7 +15,7 @@ export interface AuthCheckResult {
  * Sets the staff session cookie with explicit role permissions.
  */
 export async function setStaffSessionCookie(
-  role: "kitchen" | "cashier" | "admin" | "super_admin"
+  role: "kitchen" | "barista" | "cashier" | "admin" | "super_admin"
 ): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(STAFF_SESSION_COOKIE, role, {
@@ -40,7 +40,7 @@ export async function clearStaffSessionCookie(): Promise<void> {
  * Checks both the HTTP-only staff session cookie and Supabase JWT app_metadata role.
  */
 export async function requireStaffAuth(
-  allowedRoles: string[] = ["super_admin", "admin", "cashier", "kitchen", "chef"]
+  allowedRoles: string[] = ["super_admin", "admin", "cashier", "kitchen", "barista", "chef"]
 ): Promise<AuthCheckResult> {
   const cookieStore = await cookies();
   const staffCookie = cookieStore.get(STAFF_SESSION_COOKIE)?.value;

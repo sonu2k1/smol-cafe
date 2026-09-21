@@ -157,6 +157,11 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   if (!item) return null;
 
+  const isItemSoldOut =
+    item.status === "SOLD_OUT" ||
+    (item.metadata as any)?.availability === "SOLD_OUT" ||
+    (item.metadata as any)?.availability === "86";
+
   const basePriceRupees = Math.round(item.pricePaise / 100);
   const selectedOption = customOptions.find((o) => o.id === selectedOptionId);
   const optionDelta = selectedOption ? selectedOption.priceDelta : 0;
@@ -256,14 +261,16 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         <div className="flex-1 overflow-y-auto px-5 pt-2 pb-32">
           {/* Arched Window Food Image Hero */}
           <div className="flex justify-center pt-1 pb-3">
-            <div className="relative w-full max-w-[310px] aspect-[4/4.3] rounded-t-[7.5rem] p-1 border-[1.5px] border-[#725039]/40 dark:border-[#C9AE8B]/40 bg-[#FAF4EB] dark:bg-[#1E1916] shadow-sm">
+            <div className="relative w-full max-w-[310px] aspect-[4/4.3] rounded-t-[7.5rem] p-1 border-[1.5px] border-[#725039]/40 dark:border-[#C9AE8B]/40 bg-[#FAF4EB] dark:bg-[#1E1916] shadow-sm overflow-hidden">
               <div className="h-full w-full overflow-hidden rounded-t-[7.2rem] bg-[#EAE0D2] dark:bg-[#2A231E]">
                 {!imageError ? (
                   <img
                     src={foodImageUrl}
                     alt={item.name}
                     onError={() => setImageError(true)}
-                    className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                    className={`h-full w-full object-cover transition-transform duration-500 hover:scale-105 ${
+                      isItemSoldOut ? "grayscale contrast-125 brightness-95" : ""
+                    }`}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-[#725039]">
@@ -271,6 +278,18 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Iconic Diagonal Red Stamped "SOLD OUT" Badge on Modal Hero */}
+              {isItemSoldOut && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                  <div className="relative rounded-md border-[2.5px] border-[#C22828] bg-[#C22828] px-5 py-2 shadow-2xl transform -rotate-12">
+                    <div className="absolute inset-[2px] rounded-[3px] border border-dashed border-white/60 pointer-events-none" />
+                    <span className="relative z-10 font-mono text-base sm:text-lg font-black tracking-widest text-white uppercase drop-shadow-md">
+                      SOLD OUT
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -279,7 +298,9 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <h1 className="font-serif text-[28px] sm:text-[30px] font-normal leading-tight text-[#241F1C] dark:text-[#F3E7D3] capitalize">
               {item.name}
             </h1>
-            <span className="font-serif text-[26px] sm:text-[28px] font-normal text-[#241F1C] dark:text-[#F3E7D3] shrink-0">
+            <span className={`font-serif text-[26px] sm:text-[28px] font-normal shrink-0 ${
+              isItemSoldOut ? "text-stone-400 dark:text-stone-500 line-through" : "text-[#241F1C] dark:text-[#F3E7D3]"
+            }`}>
               ₹{basePriceRupees}
             </span>
           </div>
@@ -415,10 +436,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         {/* Floating / Sticky Bottom Action Button: Smol Cherry (#B72E35) with Crème (#F3E7D3) text */}
         <div className="absolute bottom-0 left-0 right-0 z-30 px-5 pt-3 pb-6 bg-gradient-to-t from-[#F3E7D3] via-[#F3E7D3]/95 to-transparent dark:from-[#241F1C] dark:via-[#241F1C]/95">
           {(() => {
-            const isSoldOut =
-              item.status === "SOLD_OUT" ||
-              item.status === "INACTIVE" ||
-              (item.metadata as any)?.availability === "SOLD_OUT";
+            const isSoldOut = isItemSoldOut;
 
             return (
               <button

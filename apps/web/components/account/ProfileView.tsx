@@ -6,11 +6,14 @@ import type { Profile } from "@smol-cafe/db";
 import type { CustomerHistoricalOrder } from "@/app/account/actions";
 import { claimCurrentSessionOrdersAction } from "@/app/account/actions";
 import {
+  getLoyaltyAccountAction,
+  recordCustomerPhoneLoginAction,
   redeemLoyaltyRewardAction,
   claimBonusQuestAction,
   type LoyaltyAccountDetails,
   type LoyaltyBonusRule,
 } from "@/app/account/loyalty-actions";
+import { subscribeToSyncEvents, broadcastSyncEvent } from "@/lib/sync-events";
 import { AuthModal } from "./AuthModal";
 import {
   Coffee,
@@ -26,6 +29,8 @@ import {
   ArrowRight,
   Flame,
   Clock,
+  Smartphone,
+  Edit3,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 
@@ -59,23 +64,103 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [localPhone, setLocalPhone] = useState(initialProfile?.phone || "");
   const [birthday, setBirthday] = useState<string>("1998-08-15");
   const [showBirthdayPicker, setShowBirthdayPicker] = useState<boolean>(false);
+  const [showPhoneModal, setShowPhoneModal] = useState<boolean>(false);
+  const [phoneInput, setPhoneInput] = useState<string>("");
+  const [nameInput, setNameInput] = useState<string>("");
+  const [phoneSubmitting, setPhoneSubmitting] = useState<boolean>(false);
+  const [phoneFeedback, setPhoneFeedback] = useState<string | null>(null);
+
   const [claimedQuests, setClaimedQuests] = useState<Set<string>>(
     new Set(initialLoyalty?.claimedQuests || ["first_order"])
   );
+
+  const cleanDisplayName = React.useMemo(() => {
+    let name = (profile?.display_name || localName || "Sonu").trim();
+    if (name.includes("Aditi") && name.includes("Sonu")) {
+      name = "Aditi Sharma";
+    }
+    return name;
+  }, [profile?.display_name, localName]);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       const savedName = localStorage.getItem("smol_guest_name");
       const savedPhone = localStorage.getItem("smol_guest_phone");
       const savedBday = localStorage.getItem("smol_guest_birthday");
-      if (savedName && !localName) setLocalName(savedName);
+      if (savedName && !localName) {
+        setLocalName(savedName);
+        setNameInput(savedName);
+      }
       if (savedPhone && !localPhone) {
         const clean = savedPhone.replace(/\D/g, "");
         setLocalPhone(`+91 ${clean.slice(0, 5)} ${clean.slice(5)}`);
+        setPhoneInput(clean.slice(-10));
       }
       if (savedBday) setBirthday(savedBday);
     }
   }, [localName, localPhone]);
+
+  const handleSaveCustomerPhone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phoneInput.trim()) return;
+    setPhoneSubmitting(true);
+    setPhoneFeedback(null);
+
+    try {
+      const res = await recordCustomerPhoneLoginAction(phoneInput, nameInput || cleanDisplayName);
+      if (res.success && res.details) {
+        if (res.phone) {
+          setLocalPhone(res.phone);
+          localStorage.setItem("smol_guest_phone", res.phone);
+        }
+        if (res.displayName) {
+          setLocalName(res.displayName);
+          localStorage.setItem("smol_guest_name", res.displayName);
+        }
+        setLoyalty(res.details);
+        if (res.details.account?.current_balance_cached !== undefined) {
+          setCurrentBalance(res.details.account.current_balance_cached);
+        }
+        setRedeemFeedback(res.message);
+        setShowPhoneModal(false);
+        broadcastSyncEvent({ type: "LOYALTY_UPDATED", timestamp: Date.now() });
+      } else {
+        setPhoneFeedback(res.message || "Failed to link phone number.");
+      }
+    } catch {
+      setPhoneFeedback("Network error linking phone number.");
+    } finally {
+      setPhoneSubmitting(false);
+    }
+  };
+
+  // Real-time synchronization for Loyalty Points across open customer tabs & cart
+  React.useEffect(() => {
+    const unsub = subscribeToSyncEvents((event) => {
+      if (
+        event.type === "LOYALTY_UPDATED" ||
+        event.type === "REWARD_REDEEMED" ||
+        event.type === "ORDER_PLACED" ||
+        event.type === "PAYMENT_COMPLETED" ||
+        event.type === "BILL_SETTLED"
+      ) {
+        getLoyaltyAccountAction()
+          .then((res) => {
+            if (res) {
+              setLoyalty(res);
+              if (res.account?.current_balance_cached !== undefined) {
+                setCurrentBalance(res.account.current_balance_cached);
+              }
+              if (res.claimedQuests) {
+                setClaimedQuests(new Set(res.claimedQuests));
+              }
+            }
+          })
+          .catch(console.warn);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const handleClaimOrders = async () => {
     setIsClaiming(true);
@@ -85,6 +170,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       const res = await claimCurrentSessionOrdersAction();
       if (res.success) {
         setClaimMessage(res.message || "Orders linked successfully!");
+        broadcastSyncEvent({ type: "LOYALTY_UPDATED", timestamp: Date.now() });
       } else {
         setClaimMessage(res.message || "Could not claim orders.");
       }
@@ -117,6 +203,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       if (res.success) {
         setCurrentBalance(res.newBalance || Math.max(0, currentBalance - cost));
         setRedeemFeedback(`🎉 Successfully unlocked: ${title}! It will be applied at checkout.`);
+        broadcastSyncEvent({ type: "REWARD_REDEEMED", timestamp: Date.now() });
       } else {
         setRedeemFeedback(res.message || "Failed to redeem reward.");
       }
@@ -133,6 +220,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         setClaimedQuests((prev) => new Set(prev).add(questId));
         setCurrentBalance((prev) => prev + pts);
         setRedeemFeedback(res.message || `+${pts} Smol Points credited!`);
+        broadcastSyncEvent({ type: "LOYALTY_UPDATED", timestamp: Date.now() });
       } else {
         setRedeemFeedback(res.message || "Could not claim quest.");
       }
@@ -209,11 +297,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </span>
               </div>
               <h2 className="font-serif text-2xl font-bold text-[#241F1C] dark:text-[#FAF4EB] mt-1">
-                {profile?.display_name || localName || "Sonu Singh"}
+                {cleanDisplayName}
               </h2>
-              <p className="font-mono text-[11px] text-[#725039] dark:text-[#C9AE8B]">
-                {profile?.phone || localPhone || "+91 98765 43210"} • <strong className="text-[#B72E35] dark:text-[#FF5B52]">{tierName}</strong>
-              </p>
+              <div className="flex flex-wrap items-center gap-1.5 mt-0.5 font-mono text-[11px] text-[#725039] dark:text-[#C9AE8B]">
+                <span>{localPhone || profile?.phone || "+91 98765 43210"}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoneInput((localPhone || profile?.phone || "").replace(/\D/g, "").slice(-10));
+                    setNameInput(cleanDisplayName);
+                    setShowPhoneModal(true);
+                  }}
+                  className="text-[10.5px] font-bold text-[#B72E35] dark:text-[#FF5B52] hover:underline flex items-center gap-0.5 cursor-pointer ml-0.5"
+                  title="Link or change mobile number"
+                >
+                  <Edit3 className="w-2.5 h-2.5" />
+                  <span>{localPhone || profile?.phone ? "Edit" : "Link Phone"}</span>
+                </button>
+                <span>•</span>
+                <span className="rounded-md bg-[#EFE7DC] dark:bg-white/10 px-1.5 py-0.2 font-mono text-[9.5px] font-bold text-[#725039] dark:text-[#C9AE8B]">
+                  {loyalty?.totalVisits ?? 1} Visits
+                </span>
+                <span>•</span>
+                <strong className="text-[#B72E35] dark:text-[#FF5B52]">{tierName}</strong>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-[#F2C84B]/80 dark:border-amber-500/30 bg-[#FDF6E2] dark:bg-amber-950/20 px-3.5 py-2 text-right">
@@ -379,6 +486,81 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </section>
 
+        {/* Phone Verification / Loyalty Linking Modal */}
+        {showPhoneModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
+            <div className="w-full max-w-sm rounded-3xl border border-[#C9AE8B] bg-[#FAF4EB] dark:bg-[#1E1A17] p-5 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-[#C9AE8B]/30 pb-2">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="h-5 w-5 text-[#B72E35]" />
+                  <h3 className="font-serif text-base font-bold">Link Mobile &amp; Loyalty</h3>
+                </div>
+                <button onClick={() => setShowPhoneModal(false)} className="text-stone-500 cursor-pointer">✕</button>
+              </div>
+
+              <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
+                Enter your mobile number to link your visits, points balance, and claim milestones across smol café!
+              </p>
+
+              {phoneFeedback && (
+                <div className="rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/40 p-2.5 text-xs text-rose-800 dark:text-rose-300 font-serif">
+                  {phoneFeedback}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveCustomerPhone} className="space-y-3">
+                <div>
+                  <label className="block font-mono text-[11px] font-bold uppercase text-[#725039] dark:text-[#C9AE8B] mb-1">
+                    Your Name
+                  </label>
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="e.g. Sonu"
+                    className="w-full p-2.5 rounded-xl border border-[#C9AE8B]/60 bg-white dark:bg-stone-900 font-serif text-sm focus:outline-none focus:border-[#B72E35]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-mono text-[11px] font-bold uppercase text-[#725039] dark:text-[#C9AE8B] mb-1">
+                    10-Digit Mobile Number
+                  </label>
+                  <div className="flex items-center rounded-xl border border-[#C9AE8B]/60 bg-white dark:bg-stone-900 px-3 py-2">
+                    <span className="font-mono text-xs text-stone-400 font-bold mr-1.5">+91</span>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
+                      placeholder="9876543210"
+                      className="w-full bg-transparent font-mono text-sm focus:outline-none tracking-wider"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={phoneSubmitting}
+                    className="flex-1 py-2.5 rounded-xl bg-[#B72E35] text-white font-serif font-bold text-xs shadow-sm hover:bg-[#9E242B] disabled:opacity-50 transition cursor-pointer"
+                  >
+                    {phoneSubmitting ? "Linking..." : "Save & Verify Visit"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPhoneModal(false)}
+                    className="px-4 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-xs font-serif cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Birthday Picker Modal */}
         {showBirthdayPicker && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
@@ -388,7 +570,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <Gift className="h-5 w-5 text-[#B72E35]" />
                   <h3 className="font-serif text-base font-bold">Add Birthday for +10 Pts</h3>
                 </div>
-                <button onClick={() => setShowBirthdayPicker(false)} className="text-stone-500">✕</button>
+                <button onClick={() => setShowBirthdayPicker(false)} className="text-stone-500 cursor-pointer">✕</button>
               </div>
               <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
                 We&apos;ll send you a complimentary artisanal brew on your birthday!
@@ -408,14 +590,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveBirthday}
-                  className="flex-1 py-2.5 rounded-xl bg-[#B72E35] text-white font-serif font-bold text-xs shadow-sm hover:bg-[#9E242B] transition"
+                  className="flex-1 py-2.5 rounded-xl bg-[#B72E35] text-white font-serif font-bold text-xs shadow-sm hover:bg-[#9E242B] transition cursor-pointer"
                 >
                   Save &amp; Claim +10 Pts
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowBirthdayPicker(false)}
-                  className="px-4 py-2.5 rounded-xl border border-stone-300 text-xs font-serif"
+                  className="px-4 py-2.5 rounded-xl border border-stone-300 text-xs font-serif cursor-pointer"
                 >
                   Cancel
                 </button>

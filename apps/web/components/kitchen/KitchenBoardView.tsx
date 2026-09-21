@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import type { KitchenTicket } from "@/app/kitchen/actions";
 import {
@@ -13,10 +13,24 @@ import { KitchenTicketCard } from "./KitchenTicketCard";
 import { EtaAccuracyReview } from "./EtaAccuracyReview";
 import { KitchenMenuManager } from "./KitchenMenuManager";
 import { KitchenCookbookView } from "./KitchenCookbookView";
-import { Bell, BellOff, AlertTriangle, RefreshCw, LogOut, Coffee, UtensilsCrossed, RotateCcw, Trash2, BookOpen } from "lucide-react";
+import {
+  Bell,
+  BellOff,
+  AlertTriangle,
+  RefreshCw,
+  LogOut,
+  Coffee,
+  UtensilsCrossed,
+  RotateCcw,
+  Trash2,
+  BookOpen,
+  Search,
+  Filter,
+} from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { soundManager } from "@/lib/sound";
 
 interface KitchenBoardViewProps {
   initialOrders: KitchenTicket[];
@@ -28,9 +42,11 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [showEtaAnalytics, setShowEtaAnalytics] = useState(false);
   const [currentView, setCurrentView] = useState<"TICKETS" | "MENU_STOCK" | "COOKBOOK">("TICKETS");
+  const [ticketStationFilter, setTicketStationFilter] = useState<"ALL" | "HOT_KITCHEN" | "BREW_BAR" | "BAKERY">("ALL");
+  const [ticketSearchQuery, setTicketSearchQuery] = useState("");
   const [mounted, setMounted] = useState(false);
   const prevOrderCountRef = useRef(initialOrders.length);
   // Track ongoing optimistic transitions to prevent polling flicker/snap-back
@@ -91,25 +107,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
   // Sound chime for incoming orders
   const playChime = useCallback(() => {
     if (!soundEnabled) return;
-    try {
-      const ctx = new (
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      )();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.4);
-    } catch {
-      // AudioContext unavailable
-    }
+    soundManager.playOrderPlacedChime();
   }, [soundEnabled]);
 
   const refreshOrders = useCallback(async () => {
@@ -139,7 +137,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
               optimisticLocksRef.current.delete(serverOrder.id);
               return serverOrder;
             }
-            // Server hasn't caught up yet, keep the optimistic status so it doesn't flicker/snap back!
+            // Server hasn't caught up yet, keep optimistic status so it doesn't flicker/snap back!
             return { ...serverOrder, status: activeLock.status };
           }
           return serverOrder;
@@ -222,16 +220,69 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
     }
   };
 
-  // Group tickets strictly into 4 columns per specification:
-  // Filter out any locally dismissed tickets (keeps data safe on DB and Admin Tower)
-  const visibleOrders = orders.filter((o) => !dismissedTicketIds.has(o.id));
+  // Filter visible orders by dismissed status, station, and search query
+  const filteredOrders = useMemo(() => {
+    let list = orders.filter((o) => !dismissedTicketIds.has(o.id));
 
-  const newOrders = visibleOrders.filter((o) =>
+    if (ticketSearchQuery.trim()) {
+      const q = ticketSearchQuery.toLowerCase().trim();
+      list = list.filter(
+        (o) =>
+          o.tableLabel.toLowerCase().includes(q) ||
+          o.orderNo.toString().includes(q) ||
+          o.items.some((i) => i.name.toLowerCase().includes(q))
+      );
+    }
+
+    if (ticketStationFilter !== "ALL") {
+      list = list.filter((o) => {
+        return o.items.some((item) => {
+          const name = item.name.toLowerCase();
+          if (ticketStationFilter === "BREW_BAR") {
+            return (
+              name.includes("coffee") ||
+              name.includes("espresso") ||
+              name.includes("latte") ||
+              name.includes("cappuccino") ||
+              name.includes("brew") ||
+              name.includes("tea") ||
+              name.includes("shake")
+            );
+          }
+          if (ticketStationFilter === "BAKERY") {
+            return (
+              name.includes("croissant") ||
+              name.includes("bun") ||
+              name.includes("bake") ||
+              name.includes("cake") ||
+              name.includes("cookie") ||
+              name.includes("sourdough")
+            );
+          }
+          if (ticketStationFilter === "HOT_KITCHEN") {
+            return (
+              name.includes("sandwich") ||
+              name.includes("toast") ||
+              name.includes("pasta") ||
+              name.includes("pizza") ||
+              name.includes("grill") ||
+              name.includes("paneer")
+            );
+          }
+          return true;
+        });
+      });
+    }
+
+    return list;
+  }, [orders, dismissedTicketIds, ticketStationFilter, ticketSearchQuery]);
+
+  const newOrders = filteredOrders.filter((o) =>
     ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED"].includes(o.status)
   );
-  const preparingOrders = visibleOrders.filter((o) => o.status === "PREPARING");
-  const readyOrders = visibleOrders.filter((o) => o.status === "READY");
-  const completedOrders = visibleOrders.filter((o) =>
+  const preparingOrders = filteredOrders.filter((o) => o.status === "PREPARING");
+  const readyOrders = filteredOrders.filter((o) => o.status === "READY");
+  const completedOrders = filteredOrders.filter((o) =>
     ["SERVED", "COMPLETED", "CLOSED"].includes(o.status)
   );
 
@@ -274,8 +325,8 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
             </div>
           </div>
 
-          {/* Central KDS View Switcher (Desktop XL Only: inline on wide screens) */}
-          <div className="hidden xl:flex items-center gap-1 rounded-2xl bg-[#EFE7DC] dark:bg-[#151110] p-1 border border-[#C9AE8B]/30 dark:border-stone-800 shrink-0">
+          {/* Central KDS View Switcher */}
+          <div className="hidden md:flex items-center gap-1 rounded-2xl bg-[#EFE7DC] dark:bg-[#151110] p-1 border border-[#C9AE8B]/30 dark:border-stone-800 shrink-0">
             <button
               onClick={() => setCurrentView("TICKETS")}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer whitespace-nowrap ${
@@ -285,7 +336,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
               }`}
             >
               <Coffee className="h-3.5 w-3.5 shrink-0" />
-              <span>Live Tickets ({visibleOrders.filter((o) => o.status !== "SERVED").length})</span>
+              <span>Live Tickets ({orders.filter((o) => o.status !== "SERVED" && o.status !== "COMPLETED").length})</span>
             </button>
             <button
               onClick={() => setCurrentView("MENU_STOCK")}
@@ -325,7 +376,7 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
               </button>
             )}
 
-            {/* Station Load & ETA Analytics Toggle (Desktop XL) */}
+            {/* Station Load & ETA Analytics Toggle */}
             <button
               onClick={() => setShowEtaAnalytics(!showEtaAnalytics)}
               className={`hidden xl:flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-mono transition cursor-pointer whitespace-nowrap ${
@@ -339,18 +390,26 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
 
             {/* Sound Toggle */}
             <button
-              onClick={() => setSoundEnabled((v) => !v)}
+              onClick={() => {
+                setSoundEnabled((v) => {
+                  const next = !v;
+                  if (next) {
+                    soundManager.playKitchenNewOrderAlert();
+                  }
+                  return next;
+                });
+              }}
               className={`flex items-center gap-1 rounded-full border px-2 sm:px-3 py-1 text-xs font-mono transition cursor-pointer whitespace-nowrap ${
                 soundEnabled
                   ? "border-[#F2C84B]/60 bg-[#F2C84B]/20 text-[#8C6207] dark:text-[#F2C84B]"
                   : "border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#F3E7D3]"
               }`}
-              title={soundEnabled ? "Mute audio alerts" : "Enable audio alerts"}
+              title={soundEnabled ? "Mute audio alerts" : "Enable audio alerts & test chime"}
             >
               {soundEnabled ? (
                 <>
                   <Bell className="h-3.5 w-3.5 text-[#8C6207] dark:text-[#F2C84B] shrink-0" />
-                  <span className="hidden sm:inline">chime on</span>
+                  <span className="hidden sm:inline">chime on 🔔</span>
                 </>
               ) : (
                 <>
@@ -401,8 +460,8 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
           </div>
         </div>
 
-        {/* Tablet & Mobile View Switcher Row (< xl screens, including iPads / tablets) */}
-        <div className="xl:hidden flex items-center justify-between gap-1.5 pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/60 mt-2 overflow-x-auto">
+        {/* Mobile View Switcher Row (< md screens) */}
+        <div className="md:hidden flex items-center justify-between gap-1.5 pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/60 mt-2 overflow-x-auto">
           <div className="flex flex-1 items-center gap-1 rounded-xl bg-[#EFE7DC] dark:bg-[#151110] p-1 border border-[#C9AE8B]/30 dark:border-stone-800">
             <button
               onClick={() => setCurrentView("TICKETS")}
@@ -438,18 +497,6 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
               <span>Cookbook</span>
             </button>
           </div>
-
-          <button
-            onClick={() => setShowEtaAnalytics(!showEtaAnalytics)}
-            className={`flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-[11px] font-mono transition cursor-pointer shrink-0 whitespace-nowrap ${
-              showEtaAnalytics
-                ? "border-[#B72E35] bg-[#B72E35]/15 text-[#B72E35] dark:text-[#F2C84B]"
-                : "border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 bg-[#FAF4EB] dark:bg-[#241F1C] text-[#725039] dark:text-[#C9AE8B]"
-            }`}
-            title="Toggle Station Load"
-          >
-            <span>⏱ ETA</span>
-          </button>
         </div>
 
         {/* Concurrency Conflict Toast */}
@@ -485,149 +532,190 @@ export const KitchenBoardView: React.FC<KitchenBoardViewProps> = ({ initialOrder
           <KitchenMenuManager />
         </main>
       ) : (
-        /* Kanban Board 4 Columns: NEW -> PREPARING -> READY -> COMPLETED */
-        <main className="grid flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-4 min-w-0">
-          {/* Column 1: NEW */}
-        <div className="flex flex-col rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-sm transition-colors duration-200">
-          <div className="mb-3 flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#B72E35]" />
-              <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#241F1C] dark:text-[#F3E7D3]">
-                new
-              </h2>
-            </div>
-            <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#B72E35] dark:text-[#F2C84B]">
-              {newOrders.length}
-            </span>
-          </div>
-
-          <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-            {newOrders.length === 0 ? (
-              <p className="py-14 text-center font-serif italic text-xs text-[#725039]/60 dark:text-stone-600">
-                no new tickets in queue
-              </p>
-            ) : (
-              newOrders.map((ticket) => (
-                <KitchenTicketCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  onTransition={handleTransition}
-                  onDismiss={handleDismissTicket}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Column 2: PREPARING */}
-        <div className="flex flex-col rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-sm transition-colors duration-200">
-          <div className="mb-3 flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#F2C84B] animate-pulse" />
-              <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#241F1C] dark:text-[#F3E7D3]">
-                preparing
-              </h2>
-            </div>
-            <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#8C6207] dark:text-[#F2C84B]">
-              {preparingOrders.length}
-            </span>
-          </div>
-
-          <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-            {preparingOrders.length === 0 ? (
-              <p className="py-14 text-center font-serif italic text-xs text-[#725039]/60 dark:text-stone-600">
-                nothing actively on the brew or grill
-              </p>
-            ) : (
-              preparingOrders.map((ticket) => (
-                <KitchenTicketCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  onTransition={handleTransition}
-                  onDismiss={handleDismissTicket}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Column 3: READY */}
-        <div className="flex flex-col rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-sm transition-colors duration-200">
-          <div className="mb-3 flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#75AFA7]" />
-              <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#241F1C] dark:text-[#F3E7D3]">
-                ready
-              </h2>
-            </div>
-            <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#245850] dark:text-[#75AFA7]">
-              {readyOrders.length}
-            </span>
-          </div>
-
-          <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-            {readyOrders.length === 0 ? (
-              <p className="py-14 text-center font-serif italic text-xs text-[#725039]/60 dark:text-stone-600">
-                no orders awaiting pickup
-              </p>
-            ) : (
-              readyOrders.map((ticket) => (
-                <KitchenTicketCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  onTransition={handleTransition}
-                  onDismiss={handleDismissTicket}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Column 4: COMPLETED */}
-        <div className="flex flex-col rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-sm transition-colors duration-200">
-          <div className="mb-3 flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-stone-400 dark:bg-stone-500" />
-              <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#725039] dark:text-[#C9AE8B]">
-                completed
-              </h2>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {completedOrders.length > 0 && (
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Station Filter & Search Row for Live Tickets */}
+          <div className="px-4 pt-3 pb-1 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 max-w-7xl">
+            {/* Station Filter Tabs */}
+            <div className="flex items-center gap-1 bg-[#FAF4EB] dark:bg-[#1D1815] p-1 rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 shrink-0 overflow-x-auto">
+              {(
+                [
+                  { key: "ALL", label: "All Tickets" },
+                  { key: "HOT_KITCHEN", label: "🍳 Hot Kitchen" },
+                  { key: "BREW_BAR", label: "☕ Brew Bar" },
+                  { key: "BAKERY", label: "🥐 Bakery" },
+                ] as const
+              ).map((tab) => (
                 <button
-                  type="button"
-                  onClick={handleClearAllCompleted}
-                  className="flex items-center gap-1 rounded-full border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#F3E7D3] dark:bg-[#241F1C] px-2 py-0.5 font-mono text-[10px] font-bold text-[#725039] dark:text-[#C9AE8B] hover:text-[#B72E35] dark:hover:text-[#F2C84B] hover:border-[#B72E35] transition active:scale-95 cursor-pointer shadow-2xs"
-                  title="Clear all completed tickets from view"
+                  key={tab.key}
+                  onClick={() => setTicketStationFilter(tab.key)}
+                  className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    ticketStationFilter === tab.key
+                      ? "bg-[#B72E35] text-white shadow-xs"
+                      : "text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3] dark:hover:bg-stone-800"
+                  }`}
                 >
-                  <Trash2 className="h-2.5 w-2.5" />
-                  <span>Clear All</span>
+                  {tab.label}
                 </button>
-              )}
-              <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#725039] dark:text-[#C9AE8B]">
-                {completedOrders.length}
-              </span>
+              ))}
+            </div>
+
+            {/* Quick Ticket Search */}
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400" />
+              <input
+                type="text"
+                value={ticketSearchQuery}
+                onChange={(e) => setTicketSearchQuery(e.target.value)}
+                placeholder="Search table # or item..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1D1815] text-xs font-mono text-[#241F1C] dark:text-white placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-[#B72E35]"
+              />
             </div>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-            {completedOrders.length === 0 ? (
-              <p className="py-14 text-center font-serif italic text-xs text-[#725039]/60 dark:text-stone-600">
-                served orders will appear here
-              </p>
-            ) : (
-              completedOrders.map((ticket) => (
-                <KitchenTicketCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  onTransition={handleTransition}
-                  onDismiss={handleDismissTicket}
-                />
-              ))
-            )}
-          </div>
+          {/* Kanban Board 4 Columns: NEW -> PREPARING -> READY -> COMPLETED */}
+          <main className="grid flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-4 min-w-0">
+            {/* Column 1: NEW */}
+            <div className="flex flex-col rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-sm transition-colors duration-200">
+              <div className="mb-3 flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#B72E35]" />
+                  <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#241F1C] dark:text-[#F3E7D3]">
+                    new
+                  </h2>
+                </div>
+                <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#B72E35] dark:text-[#F2C84B]">
+                  {newOrders.length}
+                </span>
+              </div>
+
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                {newOrders.length === 0 ? (
+                  <p className="py-14 text-center font-serif italic text-xs text-[#725039]/60 dark:text-stone-600">
+                    no new tickets in queue
+                  </p>
+                ) : (
+                  newOrders.map((ticket) => (
+                    <KitchenTicketCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      onTransition={handleTransition}
+                      onDismiss={handleDismissTicket}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Column 2: PREPARING */}
+            <div className="flex flex-col rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-sm transition-colors duration-200">
+              <div className="mb-3 flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#F2C84B] animate-pulse" />
+                  <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#241F1C] dark:text-[#F3E7D3]">
+                    preparing
+                  </h2>
+                </div>
+                <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#8C6207] dark:text-[#F2C84B]">
+                  {preparingOrders.length}
+                </span>
+              </div>
+
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                {preparingOrders.length === 0 ? (
+                  <p className="py-14 text-center font-serif italic text-xs text-[#725039]/60 dark:text-stone-600">
+                    nothing actively on the brew or grill
+                  </p>
+                ) : (
+                  preparingOrders.map((ticket) => (
+                    <KitchenTicketCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      onTransition={handleTransition}
+                      onDismiss={handleDismissTicket}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Column 3: READY */}
+            <div className="flex flex-col rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-sm transition-colors duration-200">
+              <div className="mb-3 flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#75AFA7]" />
+                  <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#241F1C] dark:text-[#F3E7D3]">
+                    ready
+                  </h2>
+                </div>
+                <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#245850] dark:text-[#75AFA7]">
+                  {readyOrders.length}
+                </span>
+              </div>
+
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                {readyOrders.length === 0 ? (
+                  <p className="py-14 text-center font-serif italic text-xs text-[#725039]/60 dark:text-stone-600">
+                    no orders awaiting pickup
+                  </p>
+                ) : (
+                  readyOrders.map((ticket) => (
+                    <KitchenTicketCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      onTransition={handleTransition}
+                      onDismiss={handleDismissTicket}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Column 4: COMPLETED */}
+            <div className="flex flex-col rounded-3xl border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/20 bg-[#FAF4EB] dark:bg-[#1A1715] p-4 shadow-sm transition-colors duration-200">
+              <div className="mb-3 flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-stone-400 dark:bg-stone-500" />
+                  <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#725039] dark:text-[#C9AE8B]">
+                    completed
+                  </h2>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {completedOrders.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAllCompleted}
+                      className="flex items-center gap-1 rounded-full border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#F3E7D3] dark:bg-[#241F1C] px-2 py-0.5 font-mono text-[10px] font-bold text-[#725039] dark:text-[#C9AE8B] hover:text-[#B72E35] dark:hover:text-[#F2C84B] hover:border-[#B72E35] transition active:scale-95 cursor-pointer shadow-2xs"
+                      title="Clear all completed tickets from view"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                      <span>Clear All</span>
+                    </button>
+                  )}
+                  <span className="rounded-full bg-[#F3E7D3] dark:bg-[#241F1C] border border-[#C9AE8B]/40 dark:border-[#C9AE8B]/30 px-2.5 py-0.5 font-mono text-xs font-bold text-[#725039] dark:text-[#C9AE8B]">
+                    {completedOrders.length}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                {completedOrders.length === 0 ? (
+                  <p className="py-14 text-center font-serif italic text-xs text-[#725039]/60 dark:text-stone-600">
+                    served orders will appear here
+                  </p>
+                ) : (
+                  completedOrders.map((ticket) => (
+                    <KitchenTicketCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      onTransition={handleTransition}
+                      onDismiss={handleDismissTicket}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </main>
         </div>
-      </main>
       )}
     </div>
   );

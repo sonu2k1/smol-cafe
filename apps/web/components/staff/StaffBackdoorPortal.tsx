@@ -13,13 +13,14 @@ import { ThemeToggle } from "@/components/common/ThemeToggle";
 
 export const StaffBackdoorPortal: React.FC = () => {
   const router = useRouter();
-  const [selectedRole, setSelectedRole] = useState<"kitchen" | "cashier" | "admin">("cashier");
+  const [selectedRole, setSelectedRole] = useState<"kitchen" | "barista" | "cashier" | "admin">("barista");
   const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [livePins, setLivePins] = useState<{ kitchen: string; cashier: string; admin: string }>({
+  const [livePins, setLivePins] = useState<{ kitchen: string; barista: string; cashier: string; admin: string }>({
     kitchen: "7711",
+    barista: "1234",
     cashier: "4422",
     admin: "9900",
   });
@@ -30,6 +31,7 @@ export const StaffBackdoorPortal: React.FC = () => {
         if (res.success && res.credentials) {
           setLivePins({
             kitchen: res.credentials.kitchen.pin,
+            barista: res.credentials.barista?.pin || "1234",
             cashier: res.credentials.cashier.pin,
             admin: res.credentials.admin.pin,
           });
@@ -49,6 +51,17 @@ export const StaffBackdoorPortal: React.FC = () => {
       accentColor: "text-amber-600 dark:text-[#F2C84B]",
       badgeBg: "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800",
       destination: "/smol-backdoor/kitchen",
+    },
+    {
+      id: "barista" as const,
+      name: "Barista Desk",
+      lightLogo: "/barista-logo.png",
+      darkLogo: "/barista-logo-dark.png",
+      tagline: "Single-origin espresso, pour overs & brew queue",
+      defaultPin: livePins.barista || "1234",
+      accentColor: "text-[#B72E35] dark:text-[#F2C84B]",
+      badgeBg: "bg-amber-50 text-amber-950 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700",
+      destination: "/smol-backdoor/barista",
     },
     {
       id: "cashier" as const,
@@ -74,7 +87,7 @@ export const StaffBackdoorPortal: React.FC = () => {
     },
   ];
 
-  const handleQuickLogin = async (role: "kitchen" | "cashier" | "admin", customPin?: string) => {
+  const handleQuickLogin = async (role: "kitchen" | "barista" | "cashier" | "admin", customPin?: string) => {
     // Require explicit PIN — no empty or default fallback allowed
     const activePin = customPin ?? pin;
 
@@ -150,8 +163,8 @@ export const StaffBackdoorPortal: React.FC = () => {
 
       {/* Main Role Selection & Keypad Card */}
       <main className="mx-auto my-auto w-full max-w-lg space-y-4 sm:space-y-5 py-4 sm:py-6">
-        {/* Role Selector 3-Column Tabs */}
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3]/60 dark:bg-[#1F1B18] p-1.5 sm:p-2 shadow-xs">
+        {/* Role Selector 4-Column Tabs */}
+        <div className="grid grid-cols-4 gap-1 sm:gap-2 rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3]/60 dark:bg-[#1F1B18] p-1.5 sm:p-2 shadow-xs">
           {roles.map((r) => {
             const isSelected = selectedRole === r.id;
 
@@ -164,17 +177,17 @@ export const StaffBackdoorPortal: React.FC = () => {
                   setPin("");
                   setErrorMessage(null);
                 }}
-                className={`flex flex-col items-center justify-center rounded-2xl py-2 sm:py-3 px-1 sm:px-2 text-center transition-all duration-300 cursor-pointer ${
+                className={`flex flex-col items-center justify-center rounded-2xl py-2 sm:py-2.5 px-0.5 sm:px-1.5 text-center transition-all duration-300 cursor-pointer ${
                   isSelected
                     ? "bg-white dark:bg-[#2B2521] shadow-md border-2 border-[#B72E35] dark:border-[#8B5CF6] scale-[1.02] sm:scale-[1.04]"
                     : "bg-transparent hover:bg-white/50 dark:hover:bg-white/5 opacity-60 hover:opacity-90"
                 }`}
               >
                 <div
-                  className={`relative flex items-center justify-center rounded-2xl mb-1 sm:mb-2 transition-all duration-300 p-1 sm:p-2 ${
+                  className={`relative flex items-center justify-center rounded-2xl mb-1 sm:mb-1.5 transition-all duration-300 p-1 ${
                     isSelected
-                      ? "h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24 bg-[#FAF4EB] dark:bg-stone-800 shadow-xs"
-                      : "h-11 w-11 sm:h-14 sm:w-14 bg-black/5 dark:bg-white/5"
+                      ? "h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 bg-[#FAF4EB] dark:bg-stone-800 shadow-xs"
+                      : "h-9 w-9 sm:h-12 sm:w-12 bg-black/5 dark:bg-white/5"
                   }`}
                 >
                   <Image
@@ -182,21 +195,21 @@ export const StaffBackdoorPortal: React.FC = () => {
                     alt={r.name}
                     width={80}
                     height={80}
-                    className={`object-contain w-auto dark:hidden transition-all duration-300 ${isSelected ? "h-11 sm:h-16 md:h-20" : "h-8 sm:h-11"}`}
+                    className={`object-contain w-auto dark:hidden transition-all duration-300 ${isSelected ? "h-9 sm:h-13 md:h-16" : "h-6 sm:h-9"}`}
                   />
                   <Image
                     src={r.darkLogo}
                     alt={r.name}
                     width={80}
                     height={80}
-                    className={`object-contain w-auto hidden dark:block transition-all duration-300 ${isSelected ? "h-11 sm:h-16 md:h-20" : "h-8 sm:h-11"}`}
+                    className={`object-contain w-auto hidden dark:block transition-all duration-300 ${isSelected ? "h-9 sm:h-13 md:h-16" : "h-6 sm:h-9"}`}
                   />
                 </div>
                 <span
                   className={`font-serif font-bold line-clamp-1 transition-all duration-300 ${
                     isSelected
-                      ? "text-[11px] sm:text-sm text-[#241F1C] dark:text-white"
-                      : "text-[10px] sm:text-xs text-[#725039] dark:text-stone-400"
+                      ? "text-[10px] sm:text-xs md:text-sm text-[#241F1C] dark:text-white"
+                      : "text-[9px] sm:text-[11px] text-[#725039] dark:text-stone-400"
                   }`}
                 >
                   {r.name}

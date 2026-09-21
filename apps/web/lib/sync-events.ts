@@ -11,8 +11,17 @@ export type SyncEventType =
   | "ORDER_CONFIRMED"
   | "ORDER_REJECTED"
   | "STATUS_CHANGED"
+  | "TICKET_STATUS_CHANGED"
+  | "ITEM_AVAILABILITY_CHANGED"
+  | "TABLE_RENAMED"
+  | "TABLE_CREATED"
+  | "TABLE_DELETED"
+  | "REWARD_REDEEMED"
+  | "LOYALTY_UPDATED"
+  | "INVENTORY_UPDATED"
+  | "BILL_SETTLED"
   | "PAYMENT_COMPLETED"
-  | "TABLE_SETTLED"
+  | "BARISTA_TICKET_CHANGED"
   | "SETTINGS_UPDATED";
 
 export interface SyncPayload {
@@ -20,8 +29,13 @@ export interface SyncPayload {
   orderId?: string;
   orderNo?: number;
   tableLabel?: string;
+  tableId?: string;
+  itemId?: string;
+  availability?: string;
+  portionsLeft?: number;
+  stockStatus?: string;
   status?: string;
-  timestamp: number;
+  timestamp?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -132,6 +146,11 @@ export function broadcastSyncEvent(event: SyncPayload): void {
     // Supabase broadcast error ignored
   }
 }
+
+/**
+  * Alias for broadcastSyncEvent for ergonomics across components and actions
+  */
+export const emitSyncEvent = broadcastSyncEvent;
 
 /**
  * Subscribes to real-time sync events across tabs, windows, ports, and devices.

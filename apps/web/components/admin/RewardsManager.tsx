@@ -8,6 +8,7 @@ import {
   toggleRewardActiveAction,
   type CreateRewardInput,
 } from "@/app/admin/rewards/actions";
+import { broadcastSyncEvent } from "@/lib/sync-events";
 
 interface RewardsManagerProps {
   initialRewards: Reward[];
@@ -66,6 +67,7 @@ export const RewardsManager: React.FC<RewardsManagerProps> = ({ initialRewards }
         setDiscountValue("50");
         setPointsCost("50");
         setFeedback({ type: "success", text: res.message || "Reward created!" });
+        broadcastSyncEvent({ type: "LOYALTY_UPDATED", timestamp: Date.now() });
       } else {
         setFeedback({ type: "error", text: res.message || "Failed to create reward." });
       }
@@ -81,6 +83,7 @@ export const RewardsManager: React.FC<RewardsManagerProps> = ({ initialRewards }
       const res = await toggleRewardActiveAction(reward.id, !reward.active);
       if (res.success && res.reward) {
         setRewards((prev) => prev.map((r) => (r.id === reward.id ? res.reward! : r)));
+        broadcastSyncEvent({ type: "LOYALTY_UPDATED", timestamp: Date.now() });
       }
     } catch {
       setFeedback({ type: "error", text: "Failed to toggle reward." });

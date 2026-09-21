@@ -37,7 +37,15 @@ import {
   Trash2,
   Sliders,
   CheckCircle2,
+  Flame,
+  Boxes,
+  PackagePlus,
 } from "lucide-react";
+import { ProcurementManager } from "@/components/admin/ProcurementManager";
+import {
+  fetchProcurementDataAction,
+  type ProcurementData,
+} from "@/app/admin/procurement/actions";
 import {
   getLoyaltyConfigAction,
   updateLoyaltyConfigAction,
@@ -88,6 +96,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
     | "orders"
     | "tables"
     | "menu"
+    | "inventory"
     | "customers"
     | "staff"
     | "payments"
@@ -109,6 +118,21 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
   const [overviewData, setOverviewData] = useState<AdminOverviewData | null>(initialOverviewData || null);
   const [orders, setOrders] = useState<AdminOrderRecord[]>(initialOverviewData?.orders || []);
   const [payments, setPayments] = useState<AdminPaymentRecord[]>(initialOverviewData?.payments || []);
+
+  // Procurement & Inventory State
+  const [procurementData, setProcurementData] = useState<ProcurementData>({
+    success: true,
+    vendors: [],
+    ingredients: [],
+    purchaseOrders: [],
+    goodsReceipts: [],
+  });
+
+  useEffect(() => {
+    fetchProcurementDataAction().then((res) => {
+      if (res.success) setProcurementData(res);
+    }).catch(console.error);
+  }, []);
 
   // Merchant Settings State
   const [merchantConfig, setMerchantConfig] = useState<MerchantConfig>(getUpiConfig());
@@ -135,10 +159,18 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
     },
     kitchen: {
       role: "kitchen",
-      roleName: "Kitchen Display (Chef/Barista)",
+      roleName: "Kitchen Display (Chef/Cooks)",
       portal: "/kitchen",
       pin: "7711",
-      permissions: "Order Queue, Prep Status Transition",
+      permissions: "Order Queue, Food Prep Status",
+      status: "Active",
+    },
+    barista: {
+      role: "barista",
+      roleName: "Barista Desk (Espresso & Brew)",
+      portal: "/smol-backdoor/barista",
+      pin: "1234",
+      permissions: "Beverage Queue, Shot Timer, Brew Status",
       status: "Active",
     },
   });
@@ -195,7 +227,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
     }
   };
 
-  const handleResetRolePin = async (role: "admin" | "cashier" | "kitchen") => {
+  const handleResetRolePin = async (role: "admin" | "cashier" | "kitchen" | "barista") => {
     setPinUpdating(true);
     try {
       const res = await resetRoleCredentialAction(role);
@@ -248,6 +280,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
       if (res.success) {
         setLoyaltyConfig(res.config);
         setLoyaltySaveNotice("Loyalty configuration & bonus rules saved successfully!");
+        broadcastSyncEvent({ type: "LOYALTY_UPDATED", timestamp: Date.now() });
         setTimeout(() => setLoyaltySaveNotice(null), 4000);
       }
     } catch {
@@ -280,8 +313,9 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
         )
       );
       setLoyaltySaveNotice(`Adjusted ${adjustPointsModal.pointsDelta > 0 ? "+" : ""}${adjustPointsModal.pointsDelta} points for ${adjustPointsModal.member.displayName}`);
-      setAdjustPointsModal(null);
+      broadcastSyncEvent({ type: "LOYALTY_UPDATED", timestamp: Date.now() });
       setTimeout(() => setLoyaltySaveNotice(null), 4000);
+      setAdjustPointsModal(null);
     } catch {
       alert("Failed to adjust points");
     } finally {
@@ -651,6 +685,12 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     await updateAdminOrderStatusAction(orderId, newStatus);
+    broadcastSyncEvent({
+      type: "STATUS_CHANGED",
+      orderId,
+      status: newStatus,
+      timestamp: Date.now(),
+    });
     await refreshData();
   };
 
@@ -664,6 +704,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
     { id: "orders", label: "Orders", icon: ShoppingBag, badge: `${orders.length}` },
     { id: "tables", label: "Tables", icon: Armchair, badge: "12" },
     { id: "menu", label: "Menu", icon: Coffee, badge: "59" },
+    { id: "inventory", label: "Grocery & Stock", icon: Flame, badge: procurementData?.radarData?.criticalCount ? `${procurementData.radarData.criticalCount} Low` : undefined },
     { id: "customers", label: "Customers", icon: Users },
     { id: "staff", label: "Staff", icon: Shield },
     { id: "payments", label: "Payments", icon: CreditCard },
@@ -920,6 +961,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                 {activeTab === "orders" && "Real-Time Order Pipeline"}
                 {activeTab === "tables" && "Table Floor Plan & JSON Tagging"}
                 {activeTab === "menu" && "Catalog & Stock Availability"}
+                {activeTab === "inventory" && "Grocery & Low-Stock Inventory Radar"}
                 {activeTab === "customers" && "Customer Directory & CRM"}
                 {activeTab === "staff" && "Role-Based Access Control (RBAC)"}
                 {activeTab === "payments" && "Financial Settlements & Reconciliation"}
@@ -1435,65 +1477,67 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
 
             {/* Orders Table */}
             <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
-                  <tr>
-                    <th className="p-3.5">Order No</th>
-                    <th className="p-3.5">Table &amp; Zone</th>
-                    <th className="p-3.5">Items Summary</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5">Total</th>
-                    <th className="p-3.5">Payment</th>
-                    <th className="p-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
-                  {orders
-                    .filter((o) => orderStatusFilter === "ALL" || o.status === orderStatusFilter)
-                    .filter(
-                      (o) =>
-                        searchQuery === "" ||
-                        o.orderNo.toString().includes(searchQuery) ||
-                        o.tableLabel.includes(searchQuery)
-                    )
-                    .map((o) => (
-                      <tr key={o.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
-                        <td className="p-3.5 font-bold text-[#241F1C] dark:text-white">#{o.orderNo}</td>
-                        <td className="p-3.5">
-                          <span className="text-[#8C6207] dark:text-[#F2C84B] font-bold">Table {o.tableLabel}</span>
-                          <span className="block text-[10px] text-[#8C6D53] dark:text-stone-500">{o.zone}</span>
-                        </td>
-                        <td className="p-3.5 max-w-xs truncate text-[#5C4533] dark:text-stone-300 font-sans">
-                          {o.items.join(", ")}
-                        </td>
-                        <td className="p-3.5">
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              o.status === "READY"
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
-                                : o.status === "PREPARING"
-                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
-                                  : "bg-[#F3E7D3] text-[#725039] dark:bg-stone-800 dark:text-stone-300 border border-[#C9AE8B]/30 dark:border-stone-700"
-                            }`}
-                          >
-                            {o.status}
-                          </span>
-                        </td>
-                        <td className="p-3.5 font-bold font-serif text-[#241F1C] dark:text-white">₹{o.totalRupees}</td>
-                        <td className="p-3.5 text-[11px] text-[#725039] dark:text-stone-400">{o.paymentStatus}</td>
-                        <td className="p-3.5 text-right">
-                          <button
-                            onClick={() => setInspectingOrder(o)}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-800 px-3 py-1.5 text-xs font-serif font-bold text-[#725039] dark:text-[#F3E7D3] hover:border-[#B72E35] dark:hover:border-[#F2C84B] hover:text-[#B72E35] dark:hover:text-[#F2C84B] transition shadow-xs cursor-pointer active:scale-95"
-                          >
-                            <Receipt className="h-3.5 w-3.5 text-[#B72E35] dark:text-[#F2C84B]" />
-                            <span>View Details</span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[650px] sm:min-w-0">
+                  <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
+                    <tr>
+                      <th className="p-3.5">Order No</th>
+                      <th className="p-3.5">Table &amp; Zone</th>
+                      <th className="p-3.5">Items Summary</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5">Total</th>
+                      <th className="p-3.5">Payment</th>
+                      <th className="p-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
+                    {orders
+                      .filter((o) => orderStatusFilter === "ALL" || o.status === orderStatusFilter)
+                      .filter(
+                        (o) =>
+                          searchQuery === "" ||
+                          o.orderNo.toString().includes(searchQuery) ||
+                          o.tableLabel.includes(searchQuery)
+                      )
+                      .map((o) => (
+                        <tr key={o.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
+                          <td className="p-3.5 font-bold text-[#241F1C] dark:text-white">#{o.orderNo}</td>
+                          <td className="p-3.5">
+                            <span className="text-[#8C6207] dark:text-[#F2C84B] font-bold">Table {o.tableLabel}</span>
+                            <span className="block text-[10px] text-[#8C6D53] dark:text-stone-500">{o.zone}</span>
+                          </td>
+                          <td className="p-3.5 max-w-xs truncate text-[#5C4533] dark:text-stone-300 font-sans">
+                            {o.items.join(", ")}
+                          </td>
+                          <td className="p-3.5">
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                o.status === "READY"
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                  : o.status === "PREPARING"
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                                    : "bg-[#F3E7D3] text-[#725039] dark:bg-stone-800 dark:text-stone-300 border border-[#C9AE8B]/30 dark:border-stone-700"
+                              }`}
+                            >
+                              {o.status}
+                            </span>
+                          </td>
+                          <td className="p-3.5 font-bold font-serif text-[#241F1C] dark:text-white">₹{o.totalRupees}</td>
+                          <td className="p-3.5 text-[11px] text-[#725039] dark:text-stone-400">{o.paymentStatus}</td>
+                          <td className="p-3.5 text-right">
+                            <button
+                              onClick={() => setInspectingOrder(o)}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-800 px-3 py-1.5 text-xs font-serif font-bold text-[#725039] dark:text-[#F3E7D3] hover:border-[#B72E35] dark:hover:border-[#F2C84B] hover:text-[#B72E35] dark:hover:text-[#F2C84B] transition shadow-xs cursor-pointer active:scale-95"
+                            >
+                              <Receipt className="h-3.5 w-3.5 text-[#B72E35] dark:text-[#F2C84B]" />
+                              <span>View Details</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1522,11 +1566,11 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
           const totalInStock = catalogItems.length - totalSoldOut;
 
           return (
-            <div className="p-6 space-y-4 max-w-7xl">
+            <div className="p-3 sm:p-6 pb-32 space-y-4 max-w-7xl animate-fade-in">
               {/* Header & Status Chips */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-bold font-serif text-[#241F1C] dark:text-white">
+                  <h2 className="text-lg sm:text-xl font-bold font-serif text-[#241F1C] dark:text-white">
                     Menu Items Catalog ({catalogItems.length} Artisanal Items)
                   </h2>
                   <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
@@ -1546,7 +1590,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
 
               {/* Search & Category Filter Toolbar */}
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   {/* Category Filter Pills */}
                   <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 max-w-full">
                     {categories.map((cat) => (
@@ -1565,7 +1609,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                   </div>
 
                   {/* Search Input */}
-                  <div className="relative min-w-[240px]">
+                  <div className="relative w-full sm:w-72">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#8C6D53] dark:text-stone-500" />
                     <input
                       type="text"
@@ -1586,86 +1630,163 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                 </div>
               </div>
 
-              {/* 59 Menu Items Table */}
-              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
-                    <tr>
-                      <th className="p-3.5">#</th>
-                      <th className="p-3.5">Item Name</th>
-                      <th className="p-3.5">Category</th>
-                      <th className="p-3.5">Target Price</th>
-                      <th className="p-3.5">Dietary</th>
-                      <th className="p-3.5 text-right">Availability Toggle</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800">
-                    {filteredMenuItems.length > 0 ? (
-                      filteredMenuItems.map((item, idx) => {
-                        const isSoldOut = soldOutItems[item.id] || false;
-                        const isVegan = item.dietary.toLowerCase().includes("vegan");
-                        const isEgg = item.dietary.toLowerCase().includes("egg");
+              {/* Mobile View: Clean Artisanal Cards (md:hidden) */}
+              <div className="block md:hidden space-y-2.5">
+                {filteredMenuItems.length > 0 ? (
+                  filteredMenuItems.map((item, idx) => {
+                    const isSoldOut = soldOutItems[item.id] || false;
+                    const isVegan = item.dietary.toLowerCase().includes("vegan");
+                    const isEgg = item.dietary.toLowerCase().includes("egg");
 
-                        return (
-                          <tr key={item.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
-                            <td className="p-3.5 font-mono text-[11px] text-stone-400">
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3.5 rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] space-y-2.5 shadow-xs transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2 min-w-0">
+                            <span className="font-mono text-[10px] font-bold text-[#8C6D53] dark:text-stone-400 bg-[#EFE7DC] dark:bg-stone-800 px-1.5 py-0.5 rounded-md shrink-0 mt-0.5">
                               {(idx + 1).toString().padStart(2, "0")}
-                            </td>
-                            <td className="p-3.5">
-                              <span className="font-bold text-[#241F1C] dark:text-white block">{item.name}</span>
-                              <span className="font-mono text-[10px] text-stone-500">{item.id}</span>
-                            </td>
-                            <td className="p-3.5 font-mono text-[#725039] dark:text-stone-400">
-                              <span className="rounded-md bg-[#EFE7DC] dark:bg-stone-800 px-2 py-0.5 text-[11px]">
-                                {item.category}
-                              </span>
-                            </td>
-                            <td className="p-3.5 font-serif font-bold text-[#B72E35] dark:text-[#F2C84B] text-sm">
-                              {item.price}
-                            </td>
-                            <td className="p-3.5">
-                              <span
-                                className={`rounded-full px-2.5 py-0.5 text-[10px] font-mono font-medium ${
-                                  isVegan
-                                    ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
-                                    : isEgg
-                                    ? "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
-                                    : "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-300 border border-green-300 dark:border-green-800"
-                                }`}
-                              >
-                                {item.dietary}
-                              </span>
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() => toggleItemStock(item.id)}
-                                className={`rounded-full px-3 py-1 font-mono text-xs font-bold transition cursor-pointer ${
-                                  isSoldOut
-                                    ? "bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800 shadow-xs"
-                                    : "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 shadow-xs"
-                                }`}
-                              >
-                                {isSoldOut ? "SOLD OUT" : "IN STOCK"}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
+                            </span>
+                            <div>
+                              <h3 className="font-bold text-[#241F1C] dark:text-white text-sm leading-snug">
+                                {item.name}
+                              </h3>
+                            </div>
+                          </div>
+                          <span className="font-serif font-bold text-[#B72E35] dark:text-[#F2C84B] text-base shrink-0">
+                            {item.price}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/80">
+                          <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                            <span className="rounded-md bg-[#EFE7DC] dark:bg-stone-800 text-[#725039] dark:text-stone-300 px-2 py-0.5 text-[10px] font-mono font-medium">
+                              {item.category}
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-mono font-medium ${
+                                isVegan
+                                  ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                  : isEgg
+                                  ? "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                                  : "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-300 border border-green-300 dark:border-green-800"
+                              }`}
+                            >
+                              {item.dietary}
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={() => toggleItemStock(item.id)}
+                            className={`shrink-0 rounded-full px-3 py-1 font-mono text-xs font-bold transition active:scale-95 cursor-pointer shadow-xs ${
+                              isSoldOut
+                                ? "bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800"
+                                : "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800"
+                            }`}
+                          >
+                            {isSoldOut ? "SOLD OUT" : "IN STOCK"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-8 text-center font-mono text-xs text-[#725039] dark:text-stone-400 rounded-2xl bg-[#FAF4EB] dark:bg-[#1A1715] border border-[#C9AE8B]/40 dark:border-stone-800">
+                    No menu items match &quot;{menuSearchQuery}&quot; in {selectedMenuCategory}
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop View: Wide Data Table (hidden md:block) */}
+              <div className="hidden md:block rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
                       <tr>
-                        <td colSpan={6} className="p-8 text-center font-mono text-xs text-[#725039] dark:text-stone-400">
-                          No menu items match &quot;{menuSearchQuery}&quot; in {selectedMenuCategory}
-                        </td>
+                        <th className="p-3.5">#</th>
+                        <th className="p-3.5">Item Name</th>
+                        <th className="p-3.5">Category</th>
+                        <th className="p-3.5">Target Price</th>
+                        <th className="p-3.5">Dietary</th>
+                        <th className="p-3.5 text-right">Availability Toggle</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800">
+                      {filteredMenuItems.length > 0 ? (
+                        filteredMenuItems.map((item, idx) => {
+                          const isSoldOut = soldOutItems[item.id] || false;
+                          const isVegan = item.dietary.toLowerCase().includes("vegan");
+                          const isEgg = item.dietary.toLowerCase().includes("egg");
+
+                          return (
+                            <tr key={item.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
+                              <td className="p-3.5 font-mono text-[11px] text-stone-400">
+                                {(idx + 1).toString().padStart(2, "0")}
+                              </td>
+                              <td className="p-3.5">
+                                <span className="font-bold text-[#241F1C] dark:text-white block">{item.name}</span>
+                                <span className="font-mono text-[10px] text-stone-500">{item.id}</span>
+                              </td>
+                              <td className="p-3.5 font-mono text-[#725039] dark:text-stone-400">
+                                <span className="rounded-md bg-[#EFE7DC] dark:bg-stone-800 px-2 py-0.5 text-[11px]">
+                                  {item.category}
+                                </span>
+                              </td>
+                              <td className="p-3.5 font-serif font-bold text-[#B72E35] dark:text-[#F2C84B] text-sm">
+                                {item.price}
+                              </td>
+                              <td className="p-3.5">
+                                <span
+                                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-mono font-medium ${
+                                    isVegan
+                                      ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                      : isEgg
+                                      ? "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                                      : "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-300 border border-green-300 dark:border-green-800"
+                                  }`}
+                                >
+                                  {item.dietary}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-right">
+                                <button
+                                  onClick={() => toggleItemStock(item.id)}
+                                  className={`rounded-full px-3 py-1 font-mono text-xs font-bold transition cursor-pointer ${
+                                    isSoldOut
+                                      ? "bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800 shadow-xs"
+                                      : "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 shadow-xs"
+                                  }`}
+                                >
+                                  {isSoldOut ? "SOLD OUT" : "IN STOCK"}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center font-mono text-xs text-[#725039] dark:text-stone-400">
+                            No menu items match &quot;{menuSearchQuery}&quot; in {selectedMenuCategory}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           );
         })()}
 
-        {/* Tab 5: CUSTOMERS & LOYALTY */}
+        {/* Tab 5: GROCERY & INVENTORY RADAR (GRN) */}
+        {activeTab === "inventory" && (
+          <div className="p-2 sm:p-6 max-w-7xl animate-fade-in">
+            <ProcurementManager initialData={procurementData} embedded={true} />
+          </div>
+        )}
+
+        {/* Tab 6: CUSTOMERS & LOYALTY */}
         {activeTab === "customers" && (
           <div className="p-6 space-y-6 max-w-7xl">
             <div className="flex items-center justify-between">
@@ -1775,6 +1896,10 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                         icon: ChefHat,
                       },
                       {
+                        ...roleCredentials.barista,
+                        icon: Coffee,
+                      },
+                      {
                         role: "guest" as const,
                         roleName: "Customer (Guest)",
                         portal: "/menu",
@@ -1782,11 +1907,11 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                         password: "",
                         permissions: "Menu Browse, Order Submit, UPI Pay",
                         status: "Public",
-                        icon: Coffee,
+                        icon: Sparkles,
                       },
                     ].map((s, idx) => {
                       const Icon = s.icon;
-                      const isStaff = s.role === "admin" || s.role === "cashier" || s.role === "kitchen";
+                      const isStaff = s.role === "admin" || s.role === "cashier" || s.role === "kitchen" || s.role === "barista";
 
                       return (
                         <tr key={idx} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
@@ -1965,52 +2090,109 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
 
         {/* Tab 8: PAYMENTS LEDGER */}
         {activeTab === "payments" && (
-          <div className="p-6 space-y-4 max-w-7xl">
-            <div className="flex items-center justify-between">
+          <div className="p-3 sm:p-6 pb-32 space-y-4 max-w-7xl animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div>
-                <h2 className="text-xl font-bold text-[#241F1C] dark:text-white">Payments Reconciliation &amp; Settlement Log</h2>
+                <h2 className="text-lg sm:text-xl font-bold font-serif text-[#241F1C] dark:text-white">
+                  Payments Reconciliation &amp; Settlement Log
+                </h2>
                 <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
                   Verified checkout transactions and daily gross revenue audits
                 </p>
               </div>
-              <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 px-3 py-1 text-xs font-mono font-bold">
-                Total: ₹{(overviewData?.kpis.grossRevenueRupees ?? 0).toLocaleString("en-IN")}
+              <span className="self-start sm:self-auto rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 px-3 py-1 text-xs font-mono font-bold shadow-xs">
+                Gross Revenue: ₹{(overviewData?.kpis.grossRevenueRupees ?? 0).toLocaleString("en-IN")}
               </span>
             </div>
 
-            <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
-                  <tr>
-                    <th className="p-3.5">Transaction ID</th>
-                    <th className="p-3.5">Payment Method</th>
-                    <th className="p-3.5">Amount</th>
-                    <th className="p-3.5">Order Ref</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5 text-right">Time</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
-                  {(payments.length > 0 ? payments : [
-                    { txn: "TXN/2026/89412984", mode: "UPI Direct QR", amt: "₹580", ord: "ORD-104", st: "VERIFIED", time: "10:15 AM" },
-                    { txn: "TXN/2026/71829104", mode: "Cash Tendered", amt: "₹420", ord: "ORD-103", st: "VERIFIED", time: "10:08 AM" },
-                    { txn: "TXN/2026/10294100", mode: "UPI Direct QR", amt: "₹280", ord: "ORD-101", st: "SETTLED", time: "09:45 AM" },
-                  ]).map((t, idx) => (
-                    <tr key={idx} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
-                      <td className="p-3.5 font-bold text-[#241F1C] dark:text-stone-200">{t.txn}</td>
-                      <td className="p-3.5 text-[#B72E35] dark:text-[#F2C84B] font-bold">{t.mode}</td>
-                      <td className="p-3.5 font-serif font-bold text-[#241F1C] dark:text-white">{t.amt}</td>
-                      <td className="p-3.5 text-[#725039] dark:text-stone-400">{t.ord}</td>
-                      <td className="p-3.5">
-                        <span className="rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-bold">
-                          {t.st}
+            {/* Mobile View: Clean Transaction Cards (md:hidden) */}
+            <div className="block md:hidden space-y-2.5">
+              {(payments.length > 0 ? payments : [
+                { txn: "TXN/2026/89412984", mode: "UPI Direct QR", amt: "₹580", ord: "ORD-104", st: "VERIFIED", time: "10:15 AM" },
+                { txn: "TXN/2026/71829104", mode: "Cash Tendered", amt: "₹420", ord: "ORD-103", st: "VERIFIED", time: "10:08 AM" },
+                { txn: "TXN/2026/10294100", mode: "UPI Direct QR", amt: "₹280", ord: "ORD-101", st: "SETTLED", time: "09:45 AM" },
+              ]).map((t, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] space-y-2.5 shadow-xs transition-colors"
+                >
+                  {/* Top Row: Txn ID & Amount */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-mono text-[10px] text-[#725039] dark:text-stone-400 block uppercase tracking-wider">
+                        Transaction ID
+                      </span>
+                      <span className="font-mono font-bold text-xs text-[#241F1C] dark:text-white break-all">
+                        {t.txn}
+                      </span>
+                    </div>
+                    <span className="font-serif font-bold text-[#B72E35] dark:text-[#F2C84B] text-base shrink-0">
+                      {t.amt}
+                    </span>
+                  </div>
+
+                  {/* Middle & Bottom Row: Mode, Order Ref, Status & Time */}
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/80">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                      <span className="rounded-md bg-[#EFE7DC] dark:bg-stone-800 text-[#725039] dark:text-[#F2C84B] px-2 py-0.5 text-[10px] font-mono font-bold truncate">
+                        {t.mode}
+                      </span>
+                      <span className="rounded-md bg-stone-100 dark:bg-stone-800/60 text-[#725039] dark:text-stone-300 px-2 py-0.5 text-[10px] font-mono">
+                        {t.ord}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-mono font-bold">
+                        {t.st}
+                      </span>
+                      {t.time && (
+                        <span className="text-[10px] font-mono text-[#725039] dark:text-stone-400">
+                          {t.time}
                         </span>
-                      </td>
-                      <td className="p-3.5 text-right text-[#725039] dark:text-stone-400 text-[11px]">{t.time}</td>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop View: Wide Data Table (hidden md:block) */}
+            <div className="hidden md:block rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[650px] sm:min-w-0">
+                  <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
+                    <tr>
+                      <th className="p-3.5">Transaction ID</th>
+                      <th className="p-3.5">Payment Method</th>
+                      <th className="p-3.5">Amount</th>
+                      <th className="p-3.5">Order Ref</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5 text-right">Time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#C9AE8B]/20 dark:divide-stone-800 font-mono">
+                    {(payments.length > 0 ? payments : [
+                      { txn: "TXN/2026/89412984", mode: "UPI Direct QR", amt: "₹580", ord: "ORD-104", st: "VERIFIED", time: "10:15 AM" },
+                      { txn: "TXN/2026/71829104", mode: "Cash Tendered", amt: "₹420", ord: "ORD-103", st: "VERIFIED", time: "10:08 AM" },
+                      { txn: "TXN/2026/10294100", mode: "UPI Direct QR", amt: "₹280", ord: "ORD-101", st: "SETTLED", time: "09:45 AM" },
+                    ]).map((t, idx) => (
+                      <tr key={idx} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
+                        <td className="p-3.5 font-bold text-[#241F1C] dark:text-stone-200">{t.txn}</td>
+                        <td className="p-3.5 text-[#B72E35] dark:text-[#F2C84B] font-bold">{t.mode}</td>
+                        <td className="p-3.5 font-serif font-bold text-[#241F1C] dark:text-white">{t.amt}</td>
+                        <td className="p-3.5 text-[#725039] dark:text-stone-400">{t.ord}</td>
+                        <td className="p-3.5">
+                          <span className="rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-bold">
+                            {t.st}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right text-[#725039] dark:text-stone-400 text-[11px]">{t.time}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -2335,7 +2517,8 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                 <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-white">Active Redeemable Perks &amp; Vouchers</h3>
                 <span className="font-mono text-xs text-[#B72E35] dark:text-[#F2C84B]">Synced to customer profile</span>
               </div>
-              <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[550px] sm:min-w-0">
                 <thead className="bg-[#F3E7D3]/60 dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
                   <tr>
                     <th className="p-3.5">Perk Name</th>
@@ -2366,6 +2549,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}

@@ -23,6 +23,8 @@ export interface MenuItemWithDetails {
     chai_ke_saathi?: boolean;
     subcategory?: string;
     availability?: string;
+    low_stock_portions?: number | null;
+    chef_special?: boolean;
     core_ingredients?: string;
     primary_equipment?: string;
     serving_ware?: string;
@@ -67,19 +69,32 @@ function getFallbackCatalog(): CategoryWithItems[] {
     }
   }
 
+  const stockStore = (globalThis as any).__SMOL_KITCHEN_MENU_STOCK__ || {};
+
   for (const item of MOCK_MENU_ITEMS) {
     const cat = categoryMap.get(item.category_id);
     if (!cat) continue;
 
     const ver = versionMap.get(item.id);
     const pricePaise = priceMap.get(item.id) || 18000;
-    const metadata = (ver?.metadata || item.metadata || {}) as MenuItemWithDetails["metadata"];
+    const baseMeta = (ver?.metadata || item.metadata || {}) as MenuItemWithDetails["metadata"];
+    const liveStock = stockStore[item.id];
+
+    const effectiveStatus = liveStock
+      ? (liveStock.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : item.status)
+      : item.status;
+
+    const metadata: MenuItemWithDetails["metadata"] = {
+      ...baseMeta,
+      availability: liveStock ? liveStock.stockStatus : baseMeta.availability,
+      low_stock_portions: liveStock?.lowStockCount ?? (baseMeta as any)?.low_stock_portions,
+    };
 
     cat.items.push({
       id: item.id,
       categoryId: item.category_id,
       name: item.name,
-      status: item.status,
+      status: effectiveStatus,
       description: ver?.description || "",
       pricePaise,
       imageUrl: ver?.image_url || null,
@@ -108,7 +123,7 @@ async function fetchMenuCatalogDirectly(): Promise<CategoryWithItems[]> {
       supabase
         .from("menu_items")
         .select("*")
-        .in("status", ["ACTIVE", "AVAILABLE", "SCHEDULED"]),
+        .order("created_at", { ascending: true }),
       supabase
         .from("menu_prices")
         .select("*")
@@ -145,6 +160,8 @@ async function fetchMenuCatalogDirectly(): Promise<CategoryWithItems[]> {
       }
     }
 
+    const stockStore = (globalThis as any).__SMOL_KITCHEN_MENU_STOCK__ || {};
+
     // Combine into CategoryWithItems
     const categoryMap = new Map<string, CategoryWithItems>();
 
@@ -163,13 +180,24 @@ async function fetchMenuCatalogDirectly(): Promise<CategoryWithItems[]> {
 
       const ver = versionMap.get(item.id);
       const pricePaise = priceMap.get(item.id) || 0;
-      const metadata = (ver?.metadata || item.metadata || {}) as MenuItemWithDetails["metadata"];
+      const baseMeta = (ver?.metadata || item.metadata || {}) as MenuItemWithDetails["metadata"];
+      const liveStock = stockStore[item.id];
+
+      const effectiveStatus = liveStock
+        ? (liveStock.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : item.status)
+        : item.status;
+
+      const metadata: MenuItemWithDetails["metadata"] = {
+        ...baseMeta,
+        availability: liveStock ? liveStock.stockStatus : baseMeta.availability,
+        low_stock_portions: liveStock?.lowStockCount ?? (baseMeta as any)?.low_stock_portions,
+      };
 
       cat.items.push({
         id: item.id,
         categoryId: item.category_id,
         name: item.name,
-        status: item.status,
+        status: effectiveStatus,
         description: ver?.description || "",
         pricePaise,
         imageUrl: ver?.image_url || null,

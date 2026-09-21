@@ -37,6 +37,174 @@ import {
 } from "@/app/admin/tables/actions";
 import { JsonTagInspectorModal } from "@/components/table/JsonTagInspectorModal";
 import { createTableJsonTag, type TableJsonTag } from "@/lib/table-tag";
+import { broadcastSyncEvent } from "@/lib/sync-events";
+function printHtmlContent(htmlContent: string, title: string) {
+  if (typeof window === "undefined") return;
+
+  const printFrame = document.createElement("iframe");
+  printFrame.style.position = "fixed";
+  printFrame.style.right = "0";
+  printFrame.style.bottom = "0";
+  printFrame.style.width = "0";
+  printFrame.style.height = "0";
+  printFrame.style.border = "0";
+  printFrame.style.visibility = "hidden";
+  document.body.appendChild(printFrame);
+
+  const doc = printFrame.contentWindow?.document;
+  if (!doc) {
+    window.print();
+    return;
+  }
+
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${title}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Inter:wght@400;500;600;700;900&family=Noto+Sans+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+        <style>
+          @page {
+            size: auto;
+            margin: 8mm;
+          }
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #ffffff !important;
+            color: #241F1C;
+            padding: 10px;
+          }
+          .font-serif {
+            font-family: 'EB Garamond', Georgia, serif;
+          }
+          .font-mono {
+            font-family: 'Noto Sans Mono', monospace;
+          }
+          .card-container {
+            width: 310px;
+            margin: 15px auto;
+            border: 2px solid #241F1C;
+            border-radius: 22px;
+            padding: 18px 16px;
+            text-align: center;
+            background: #ffffff;
+            box-shadow: none;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            width: 100%;
+          }
+          .batch-card {
+            border: 2px solid #241F1C;
+            border-radius: 18px;
+            padding: 14px 12px;
+            text-align: center;
+            background: #ffffff;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+          img {
+            max-width: 100%;
+            height: auto;
+          }
+          .logo {
+            height: 44px;
+            object-fit: contain;
+            margin: 0 auto 3px auto;
+            display: block;
+          }
+          .table-pill {
+            display: inline-block;
+            background: #241F1C;
+            color: #FAF4EB;
+            padding: 4px 16px;
+            border-radius: 12px;
+            margin: 6px 0 3px 0;
+          }
+          .qr-box {
+            width: 180px;
+            height: 180px;
+            margin: 8px auto;
+            padding: 6px;
+            border: 1px solid #d6d3d1;
+            border-radius: 14px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .qr-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          }
+          .tagline {
+            font-size: 12px;
+            font-weight: 700;
+            color: #241F1C;
+            margin-top: 4px;
+          }
+          .subtag {
+            font-size: 9px;
+            color: #78716c;
+            font-family: 'Noto Sans Mono', monospace;
+          }
+          .footer-info {
+            border-top: 1px solid #e7e5e4;
+            padding-top: 6px;
+            margin-top: 6px;
+            font-size: 8.5px;
+            font-family: 'Noto Sans Mono', monospace;
+            color: #78716c;
+          }
+          .footer-url {
+            color: #B72E35;
+            font-weight: 700;
+            margin-bottom: 2px;
+          }
+        </style>
+      </head>
+      <body>
+        ${htmlContent}
+      </body>
+    </html>
+  `);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+    } catch (e) {
+      console.error("Print error:", e);
+      window.print();
+    } finally {
+      setTimeout(() => {
+        if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+        }
+      }, 3000);
+    }
+  }, 350);
+}
 
 interface TableManagerProps {
   initialTables?: DiningTableRecord[];
@@ -99,6 +267,106 @@ export const TableManager: React.FC<TableManagerProps> = ({
   // Feedback banner
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const handlePrintSingleStand = (table: DiningTableRecord, qrUrl: string, url: string) => {
+    const content = `
+      <div class="card-container">
+        <div style="border-bottom: 1px solid #e7e5e4; padding-bottom: 8px; margin-bottom: 8px;">
+          <img src="/current_logo_transparent_on_cream.png" alt="smol café" class="logo" />
+          <span style="font-size: 8.5px; font-family: 'Noto Sans Mono', monospace; letter-spacing: 2px; color: #78716c; text-transform: uppercase; font-weight: bold; display: block;">
+            Tapovan, Rishikesh
+          </span>
+        </div>
+
+        <div style="margin: 6px 0;">
+          <div class="table-pill">
+            <span style="font-size: 9.5px; font-family: 'Noto Sans Mono', monospace; letter-spacing: 2px; text-transform: uppercase; display: block; font-weight: bold;">
+              SEATING TABLE
+            </span>
+            <span class="font-serif" style="font-size: 26px; font-weight: 900; line-height: 1; display: block;">
+              ${table.label}
+            </span>
+          </div>
+          <span style="display: block; font-size: 9.5px; font-family: 'Noto Sans Mono', monospace; color: #57534e; font-weight: bold; margin-top: 4px; text-transform: uppercase;">
+            ${table.section}
+          </span>
+        </div>
+
+        <div class="qr-box">
+          <img src="${qrUrl}" alt="Table ${table.label} QR" />
+        </div>
+
+        <div>
+          <p class="tagline font-serif">Scan to View Menu &amp; Order</p>
+          <p class="subtag">Point your phone camera • No app download required</p>
+        </div>
+
+        <div class="footer-info">
+          <div class="footer-url">${url.replace(/^https?:\/\//, "")}</div>
+          <div>Wi-Fi: <strong style="color: #292524;">smol-guest</strong> | Pass: <strong style="color: #292524;">coffee123</strong></div>
+        </div>
+      </div>
+    `;
+    printHtmlContent(content, `Smol Cafe — Table ${table.label} QR Stand`);
+  };
+
+  const handlePrintAllStands = (originUrl: string) => {
+    const cards = tables
+      .map((table) => {
+        const tableUrl = `${originUrl}/t/table-${table.label.toLowerCase()}`;
+        const qrUrl = allQrDataUrls[table.label] || "";
+        return `
+          <div class="batch-card">
+            <div style="border-bottom: 1px solid #e7e5e4; padding-bottom: 6px; margin-bottom: 6px;">
+              <img src="/current_logo_transparent_on_cream.png" alt="smol café" class="logo" style="height: 38px;" />
+              <span style="font-size: 7.5px; font-family: 'Noto Sans Mono', monospace; letter-spacing: 1.5px; color: #78716c; text-transform: uppercase; font-weight: bold; display: block;">
+                Tapovan, Rishikesh
+              </span>
+            </div>
+
+            <div style="margin: 4px 0;">
+              <div class="table-pill" style="padding: 3px 12px;">
+                <span style="font-size: 8.5px; font-family: 'Noto Sans Mono', monospace; letter-spacing: 1.5px; text-transform: uppercase; display: block; font-weight: bold;">
+                  TABLE
+                </span>
+                <span class="font-serif" style="font-size: 22px; font-weight: 900; line-height: 1; display: block;">
+                  ${table.label}
+                </span>
+              </div>
+              <span style="display: block; font-size: 8.5px; font-family: 'Noto Sans Mono', monospace; color: #57534e; font-weight: bold; margin-top: 3px; text-transform: uppercase;">
+                ${table.section} • ${table.seats} Seats
+              </span>
+            </div>
+
+            <div class="qr-box" style="width: 145px; height: 145px; margin: 6px auto;">
+              ${
+                qrUrl
+                  ? `<img src="${qrUrl}" alt="Table ${table.label} QR" />`
+                  : `<div style="font-size: 10px; font-family: monospace; color: #a8a29e;">QR Loading...</div>`
+              }
+            </div>
+
+            <div>
+              <p class="tagline font-serif" style="font-size: 11.5px;">Scan to View Menu &amp; Order</p>
+              <p class="subtag" style="font-size: 8px;">Point phone camera • Instant table menu</p>
+            </div>
+
+            <div class="footer-info">
+              <div class="footer-url">${tableUrl.replace(/^https?:\/\//, "")}</div>
+              <div>Wi-Fi: <strong style="color: #292524;">smol-guest</strong> | Pass: <strong style="color: #292524;">coffee123</strong></div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    const content = `
+      <div class="grid-container">
+        ${cards}
+      </div>
+    `;
+    printHtmlContent(content, `Smol Cafe — All ${tables.length} Table Stands`);
+  };
 
   // Real-time QR Generation for Add Table Modal preview
   useEffect(() => {
@@ -269,6 +537,12 @@ export const TableManager: React.FC<TableManagerProps> = ({
         if (!sections.includes(tableSection)) {
           setSections((prev) => [...prev, tableSection]);
         }
+        broadcastSyncEvent({
+          type: "TABLE_CREATED",
+          tableLabel: res.table.label,
+          tableId: res.table.id,
+          metadata: { section: res.table.section, seats: res.table.seats },
+        });
         setIsAddModalOpen(false);
         setIsAddSectionDropdownOpen(false);
         setFeedback({ type: "success", text: `Table T-${res.table.label} added! Scannable QR stand & tags generated.` });
@@ -308,6 +582,12 @@ export const TableManager: React.FC<TableManagerProps> = ({
         if (!sections.includes(tableSection)) {
           setSections((prev) => [...prev, tableSection]);
         }
+        broadcastSyncEvent({
+          type: "TABLE_RENAMED",
+          tableLabel: res.table.label,
+          tableId: res.table.id,
+          metadata: { section: res.table.section, seats: res.table.seats },
+        });
         setEditingTable(null);
         setFeedback({ type: "success", text: "Table updated successfully!" });
       } else {
@@ -329,6 +609,12 @@ export const TableManager: React.FC<TableManagerProps> = ({
         setTables((prev) =>
           prev.map((item) => (item.id === t.id ? { ...item, active: newStatus } : item))
         );
+        broadcastSyncEvent({
+          type: "TABLE_RENAMED",
+          tableLabel: t.label,
+          tableId: t.id,
+          metadata: { active: newStatus },
+        });
       }
     } catch {
       // ignore
@@ -343,6 +629,11 @@ export const TableManager: React.FC<TableManagerProps> = ({
       const res = await deleteTableAction(deletingTable.id);
       if (res.success) {
         setTables((prev) => prev.filter((t) => t.id !== deletingTable.id));
+        broadcastSyncEvent({
+          type: "TABLE_DELETED",
+          tableId: deletingTable.id,
+          tableLabel: deletingTable.label,
+        });
         setDeletingTable(null);
         setFeedback({ type: "success", text: `Table ${deletingTable.label} deleted successfully.` });
       } else {
@@ -1463,8 +1754,8 @@ export const TableManager: React.FC<TableManagerProps> = ({
                 </button>
 
                 <button
-                  onClick={() => window.print()}
-                  className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-[11px] font-mono font-bold text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3] transition"
+                  onClick={() => handlePrintSingleStand(viewingQrTable, qrDataUrl, tableUrl)}
+                  className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-[11px] font-mono font-bold text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3] transition shadow-xs hover:border-[#B72E35] cursor-pointer"
                 >
                   <Printer className="h-4 w-4 text-[#754CFF] dark:text-[#C4B5FD]" />
                   <span>Print Stand</span>
@@ -1475,7 +1766,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
               <div className="pt-1 print:hidden">
                 <button
                   onClick={() => setViewingQrTable(null)}
-                  className="w-full py-2.5 rounded-2xl bg-stone-200/80 hover:bg-stone-300 dark:bg-stone-800 dark:hover:bg-stone-700 text-[#241F1C] dark:text-white text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                  className="w-full py-2.5 rounded-2xl bg-stone-200/80 hover:bg-stone-300 dark:bg-stone-800 dark:hover:bg-stone-700 text-[#241F1C] dark:text-white text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                   <span>Close Preview</span>
@@ -1550,8 +1841,8 @@ export const TableManager: React.FC<TableManagerProps> = ({
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => window.print()}
-                    className="flex items-center gap-1.5 rounded-xl bg-[#B72E35] hover:bg-[#9B252B] text-white px-4 py-2 text-xs font-mono font-bold shadow-md transition"
+                    onClick={() => handlePrintAllStands(origin)}
+                    className="flex items-center gap-1.5 rounded-xl bg-[#B72E35] hover:bg-[#9B252B] text-white px-4 py-2 text-xs font-mono font-bold shadow-md transition cursor-pointer"
                   >
                     <Printer className="h-4 w-4" />
                     <span>Print All Stands</span>
@@ -1618,41 +1909,21 @@ export const TableManager: React.FC<TableManagerProps> = ({
                       </div>
 
                       <div className="space-y-0.5">
-                        <p className="text-[11px] font-serif font-bold text-[#241F1C]">
+                        <p className="text-xs font-serif font-bold text-[#241F1C]">
                           Scan to View Menu &amp; Order
                         </p>
-                        <p className="text-[8px] font-mono text-stone-500">
-                          {tableUrl.replace(/^https?:\/\//, "")}
+                        <p className="text-[8.5px] font-mono text-stone-500">
+                          Point phone camera • Instant table menu
                         </p>
                       </div>
 
-                      {/* Card Action Buttons (Hidden on Print) */}
-                      <div className="pt-2 border-t border-stone-200 flex items-center justify-center gap-2 print:hidden">
-                        <Link
-                          href={`/t/table-${table.label.toLowerCase()}`}
-                          target="_blank"
-                          className="flex items-center gap-1 rounded-lg bg-[#FAF4EB] hover:bg-[#F3E7D3] border border-stone-300 px-2.5 py-1 text-[10px] font-mono font-bold text-stone-800"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          <span>Test URL</span>
-                        </Link>
-
-                        <button
-                          onClick={() => {
-                            if (qrUrl) {
-                              const link = document.createElement("a");
-                              link.href = qrUrl;
-                              link.download = `smol-cafe-table-${table.label.toLowerCase()}-qr.png`;
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            }
-                          }}
-                          className="flex items-center gap-1 rounded-lg bg-stone-900 text-white px-2.5 py-1 text-[10px] font-mono font-bold"
-                        >
-                          <Download className="h-3 w-3" />
-                          <span>Save PNG</span>
-                        </button>
+                      <div className="border-t border-stone-200 pt-1 text-[8px] font-mono text-stone-500 space-y-0.5">
+                        <div className="font-bold text-[#B72E35]">
+                          {tableUrl.replace(/^https?:\/\//, "")}
+                        </div>
+                        <div className="text-stone-400">
+                          Wi-Fi: <span className="text-stone-700 font-bold">smol-guest</span> | Pass: <span className="text-stone-700 font-bold">coffee123</span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1712,11 +1983,9 @@ export const TableManager: React.FC<TableManagerProps> = ({
           .print\\:hidden,
           header, nav, aside, footer {
             display: none !important;
-            visibility: hidden !important;
           }
         }
       `}</style>
     </div>
   );
 };
-
