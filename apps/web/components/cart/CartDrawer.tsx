@@ -27,6 +27,7 @@ import {
   Plus,
   Check,
   Lock,
+  Receipt,
   Zap,
   Clock,
   Sparkles,
@@ -119,8 +120,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
   const maxDiscountRupees = Math.min(userBalance, Math.floor(itemsTotal * (maxDiscountPercent / 100)));
   const pointsDiscountRupees = redeemPoints ? maxDiscountRupees : 0;
   const effectiveItemsTotal = Math.max(0, itemsTotal - pointsDiscountRupees);
-  const taxesAndCharges = Math.round(effectiveItemsTotal * 0.06);
-  const grandTotal = effectiveItemsTotal + taxesAndCharges;
+  const taxesAndCharges = 0;
+  const grandTotal = effectiveItemsTotal;
   const totalRupees = effectiveItemsTotal;
 
   // Potential points earned on this order
@@ -372,7 +373,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
     setErrorMessage(null);
 
     try {
-      const transactionId = `TEST-BYPASS-${Date.now().toString().slice(-6)}`;
+      const transactionId = `CSH-${Date.now().toString().slice(-6)}`;
       const currentItemsSnapshot = items.map((i) => ({
         name: i.item.name,
         qty: i.qty,
@@ -381,7 +382,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
       }));
 
       // 1. Create paid & confirmed order in DB
-      const orderRes = await handleProcessPaidOrder("TEST_BYPASS", transactionId);
+      const orderRes = await handleProcessPaidOrder("CASHIER", transactionId);
       if (!orderRes) {
         setIsBypassing(false);
         return;
@@ -391,7 +392,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
       await bypassPaymentAction({
         tableLabel: displayTable,
         amountPaise: orderRes.totalPaise,
-      }).catch((err) => console.warn("Bypass bill settle notice:", err));
+      }).catch((err) => console.warn("Cashier bill settle notice:", err));
 
       // 3. Clear cart
       clearCart();
@@ -401,13 +402,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
         orderId: orderRes.orderId,
         orderNo: orderRes.orderNo,
         tableLabel: displayTable,
-        zone: (["07", "08", "09", "10"].includes(displayTable)) ? "Lounge" : "Café",
+        zone: (["07", "08", "09", "10"].includes(displayTable)) ? "smol-lounge" : (["11", "12", "13", "14"].includes(displayTable)) ? "smol-terrace" : "smol-cafe",
         totalRupees: Math.round(orderRes.totalPaise / 100),
         items: currentItemsSnapshot.length > 0 ? currentItemsSnapshot : [
           { name: "Artisanal Table Order", qty: 1, priceRupees: Math.round(orderRes.totalPaise / 100), subtotalRupees: Math.round(orderRes.totalPaise / 100) }
         ],
         transactionId,
-        appName: "Test Bypass Gateway (PAID)",
+        appName: "Cashier Desk (Pay at Counter)",
         onClose: () => {
           setCelebrationData(null);
           closeCart();
@@ -641,11 +642,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                         <span>-₹{pointsDiscountRupees}</span>
                       </div>
                     )}
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#725039] dark:text-[#C9AE8B]">Taxes &amp; Charges</span>
-                      <span>₹{taxesAndCharges}</span>
-                    </div>
                   </div>
 
                   {/* Points Earning Notice */}
@@ -724,7 +720,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
 
               {/* Payment Method Cards */}
               <div className="space-y-2.5 pt-1">
-                {/* UPI Option */}
+                {/* Payment Options (UPI, Card, Wallets) Commented Out
                 <button
                   type="button"
                   onClick={() => setIsUpiDrawerOpen(true)}
@@ -759,7 +755,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                   <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
                 </button>
 
-                {/* Card Option */}
                 <button
                   type="button"
                   onClick={() => {
@@ -790,7 +785,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                   <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
                 </button>
 
-                {/* Wallets Option */}
                 <button
                   type="button"
                   onClick={() => {
@@ -820,33 +814,34 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                   </div>
                   <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
                 </button>
+                */}
 
-                {/* Pre-Production Test Bypass Button */}
+                {/* Cashier Counter Option */}
                 <button
                   type="button"
                   onClick={handleTestBypassPayment}
                   disabled={isBypassing}
-                  className="w-full rounded-[1.25rem] border-2 border-dashed border-amber-600/70 dark:border-amber-400/60 bg-amber-500/10 dark:bg-amber-400/10 p-3.5 flex items-center justify-between hover:bg-amber-500/20 dark:hover:bg-amber-400/20 active:scale-[0.99] transition shadow-xs cursor-pointer text-left group"
+                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left group"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-amber-500/20 dark:bg-amber-400/20 border border-amber-500/30 text-amber-700 dark:text-amber-300">
-                      <Zap className="w-5 h-5 fill-amber-500/40 text-amber-600 dark:text-amber-400" />
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-[#B72E35]/15 dark:bg-[#B72E35]/25 border border-[#B72E35]/30">
+                      <Receipt className="w-5 h-5 text-[#B72E35] dark:text-[#F2C84B]" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
-                          Bypass Payment
+                          Pay at Cashier
                         </h3>
-                        <span className="rounded-full bg-amber-600 text-white dark:bg-amber-500 dark:text-black font-mono text-[9px] font-extrabold px-2 py-0.5 uppercase tracking-wide">
-                          Test Mode
+                        <span className="rounded-full bg-[#B72E35]/15 text-[#B72E35] dark:bg-[#B72E35]/30 dark:text-[#FF5B52] font-mono text-[9px] font-extrabold px-2 py-0.5 uppercase tracking-wide">
+                          Cash / Counter
                         </span>
                       </div>
                       <p className="font-sans text-[12px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
-                        {isBypassing ? "Settling test transaction..." : "Pre-production test • Bypass & mark paid"}
+                        {isBypassing ? "Sending order to Cashier Desk..." : "Send order to Cashier • Settle bill at counter"}
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-amber-600 dark:text-amber-400 group-hover:translate-x-0.5 transition" />
+                  <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B] group-hover:translate-x-0.5 transition" />
                 </button>
               </div>
 
@@ -1148,7 +1143,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                 orderId: created.orderId,
                 orderNo: created.orderNo,
                 tableLabel: displayTable,
-                zone: (["07", "08", "09", "10"].includes(displayTable)) ? "Lounge" : "Café",
+                zone: (["07", "08", "09", "10"].includes(displayTable)) ? "smol-lounge" : (["11", "12", "13", "14"].includes(displayTable)) ? "smol-terrace" : "smol-cafe",
                 totalRupees: Math.round(created.totalPaise / 100),
                 items: currentItemsSnapshot.length > 0 ? currentItemsSnapshot : [
                   { name: "Artisanal Table Order", qty: 1, priceRupees: Math.round(created.totalPaise / 100), subtotalRupees: Math.round(created.totalPaise / 100) }

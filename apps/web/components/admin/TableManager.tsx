@@ -219,7 +219,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
   const [sections, setSections] = useState<string[]>(
     initialSections.length > 0
       ? initialSections
-      : ["Café", "Lounge"]
+      : ["smol-cafe", "smol-lounge", "smol-terrace"]
   );
   const [selectedSection, setSelectedSection] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -482,16 +482,20 @@ export const TableManager: React.FC<TableManagerProps> = ({
   // Section color accents
   const getSectionBadgeClass = (sec: string) => {
     switch (sec) {
+      case "smol-cafe":
       case "Café":
       case "Cafe":
       case "Indoor Cozy":
         return "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800";
+      case "smol-lounge":
       case "Lounge":
         return "bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-800";
-      case "Courtyard Verandah":
-        return "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800";
+      case "smol-terrace":
+      case "Terrace":
       case "Garden Terrace":
         return "bg-teal-100 text-teal-900 border-teal-300 dark:bg-teal-950/70 dark:text-teal-300 dark:border-teal-800";
+      case "Courtyard Verandah":
+        return "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800";
       case "Brew Bar":
         return "bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800";
       default:
@@ -503,7 +507,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
   const handleOpenAdd = () => {
     const nextNum = (tables.length + 1).toString().padStart(2, "0");
     setTableLabel(nextNum);
-    setTableSection(sections[0] || "Café");
+    setTableSection(sections[0] || "smol-cafe");
     setTableSeats(4);
     setTableActive(true);
     setFeedback(null);
@@ -514,7 +518,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
   const handleOpenEdit = (t: DiningTableRecord) => {
     setEditingTable(t);
     setTableLabel(t.label);
-    setTableSection(t.section || sections[0] || "Café");
+    setTableSection(t.section || sections[0] || "smol-cafe");
     setTableSeats(t.seats || 2);
     setTableActive(t.active);
     setFeedback(null);
@@ -1517,7 +1521,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
               <span className="text-[10.5px] font-mono uppercase text-stone-500 block font-bold">Existing Zones</span>
               {sections.map((sec) => {
                 const count = sectionCounts[sec] || 0;
-                const isDefault = ["Café", "Lounge", "Indoor Cozy", "Courtyard Verandah", "Garden Terrace", "Brew Bar"].includes(sec);
+                const isDefault = ["smol-cafe", "smol-lounge", "smol-terrace", "Café", "Lounge", "Terrace", "Indoor Cozy", "Courtyard Verandah", "Garden Terrace", "Brew Bar"].includes(sec);
 
                 return (
                   <div

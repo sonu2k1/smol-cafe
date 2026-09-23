@@ -11,7 +11,7 @@ import {
   PostPaymentCelebrationModal,
   type PostPaymentCelebrationModalProps,
 } from "@/components/payment/PostPaymentCelebrationModal";
-import { ChevronRight, Lock, CheckCircle2, Zap } from "lucide-react";
+import { ChevronRight, Lock, CheckCircle2, Receipt } from "lucide-react";
 
 interface RunningBillViewProps {
   initialBill?: RunningBillDetails;
@@ -91,11 +91,8 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
 
   // Calculation: Use live session if available, otherwise default to exact reference values
   const itemsTotal = bill && bill.subtotalPaise > 0 ? Math.round(bill.subtotalPaise / 100) : 700;
-  const taxesAndCharges =
-    bill && bill.taxPaise > 0
-      ? Math.round(bill.taxPaise / 100)
-      : Math.round(itemsTotal * 0.06) || 42;
-  const grandTotal = itemsTotal + taxesAndCharges;
+  const taxesAndCharges = 0;
+  const grandTotal = itemsTotal;
 
   const [isBypassing, setIsBypassing] = useState(false);
   const [celebrationData, setCelebrationData] = useState<PostPaymentCelebrationModalProps | null>(null);
@@ -113,7 +110,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
         amountPaise,
       });
 
-      const transactionId = res.transactionId || `TEST-BYPASS-${Date.now().toString().slice(-6)}`;
+      const transactionId = res.transactionId || `CSH-${Date.now().toString().slice(-6)}`;
 
       broadcastSyncEvent({
         type: "PAYMENT_COMPLETED",
@@ -125,8 +122,8 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
         metadata: {
           transactionId,
           amountPaise,
-          paymentMethod: "TEST_BYPASS",
-          appName: "Pre-Prod Test Bypass",
+          paymentMethod: "CASHIER",
+          appName: "Cashier Desk",
         },
       });
 
@@ -154,20 +151,20 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
         orderId: res.orderId || bill?.sessionId || `ORD-${Date.now().toString().slice(-6)}`,
         orderNo: res.orderNo,
         tableLabel: bill?.tableLabel || "01",
-        zone: (bill?.tableLabel && ["07", "08", "09", "10"].includes(bill.tableLabel)) ? "Lounge" : "Café",
+        zone: (bill?.tableLabel && ["07", "08", "09", "10"].includes(bill.tableLabel)) ? "smol-lounge" : (bill?.tableLabel && ["11", "12", "13", "14"].includes(bill.tableLabel)) ? "smol-terrace" : "smol-cafe",
         totalRupees: grandTotal,
         items: itemsList,
         transactionId,
-        appName: "Test Bypass Gateway",
+        appName: "Cashier Desk (Counter Billing)",
         onClose: () => {
           setCelebrationData(null);
           refreshBill();
-          setRequestMessage("Test payment verified & settled! Bill closed.");
+          setRequestMessage("Order sent to Cashier Desk. Please settle at the counter.");
         },
       });
     } catch (err) {
-      console.error("Test bypass payment failed:", err);
-      setRequestMessage("Test payment bypass failed. Please retry.");
+      console.error("Cashier order submission failed:", err);
+      setRequestMessage("Could not send order to Cashier. Please retry or call staff.");
     } finally {
       setIsBypassing(false);
     }
@@ -283,10 +280,6 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
                   <span className="text-[#725039] dark:text-[#C9AE8B]">Items Total</span>
                   <span>₹{itemsTotal}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[#725039] dark:text-[#C9AE8B]">Taxes &amp; Charges</span>
-                  <span>₹{taxesAndCharges}</span>
-                </div>
               </div>
 
               {/* Solid Horizontal Line Divider in Biscuit */}
@@ -314,7 +307,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
 
           {/* Payment Method Cards */}
           <div className="space-y-2.5 pt-1">
-            {/* UPI Option */}
+            {/* Payment Options (UPI, Card, Wallets) Commented Out
             <button
               type="button"
               onClick={() => handlePaymentClick("UPI")}
@@ -350,7 +343,6 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
             </button>
 
-            {/* Card Option */}
             <button
               type="button"
               onClick={() => handlePaymentClick("Card")}
@@ -378,7 +370,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               </div>
               <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
             </button>
-            {/* Wallets Option */}
+
             <button
               type="button"
               onClick={() => handlePaymentClick("Wallets")}
@@ -406,33 +398,34 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
               </div>
               <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B]" />
             </button>
+            */}
 
-            {/* Pre-Production Test Bypass Button */}
+            {/* Cashier Counter Option */}
             <button
               type="button"
               onClick={handleTestBypassPayment}
               disabled={isBypassing}
-              className="w-full rounded-[1.25rem] border-2 border-dashed border-amber-600/70 dark:border-amber-400/60 bg-amber-500/10 dark:bg-amber-400/10 p-3.5 flex items-center justify-between hover:bg-amber-500/20 dark:hover:bg-amber-400/20 active:scale-[0.99] transition shadow-xs cursor-pointer text-left group"
+              className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left group"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-amber-500/20 dark:bg-amber-400/20 border border-amber-500/30 text-amber-700 dark:text-amber-300">
-                  <Zap className="w-5 h-5 fill-amber-500/40 text-amber-600 dark:text-amber-400" />
+                <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-[#B72E35]/15 dark:bg-[#B72E35]/25 border border-[#B72E35]/30">
+                  <Receipt className="w-5 h-5 text-[#B72E35] dark:text-[#F2C84B]" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
-                      Bypass Payment
+                      Pay at Cashier
                     </h3>
-                    <span className="rounded-full bg-amber-600 text-white dark:bg-amber-500 dark:text-black font-mono text-[9px] font-extrabold px-2 py-0.5 uppercase tracking-wide">
-                      Test Mode
+                    <span className="rounded-full bg-[#B72E35]/15 text-[#B72E35] dark:bg-[#B72E35]/30 dark:text-[#FF5B52] font-mono text-[9px] font-extrabold px-2 py-0.5 uppercase tracking-wide">
+                      Cash / Counter
                     </span>
                   </div>
                   <p className="font-sans text-[12px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
-                    {isBypassing ? "Settling test transaction..." : "Pre-production test • Bypass & mark paid"}
+                    {isBypassing ? "Sending bill to Cashier Desk..." : "Send order to Cashier • Settle bill at counter"}
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-amber-600 dark:text-amber-400 group-hover:translate-x-0.5 transition" />
+              <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B] group-hover:translate-x-0.5 transition" />
             </button>
           </div>
         </main>
