@@ -139,7 +139,7 @@ export async function placeOrderAction(
       data: { itemCount: items.length, rewardId, profileId },
     });
 
-    // 3. Call submit_order PostgreSQL function
+    // 3. Call submit_order PostgreSQL function with transient error retry
     let { data: rpcResult, error: rpcError } = await supabase.rpc("submit_order", {
       p_location_id: session.locationId,
       p_table_session_id: session.sessionId,
@@ -148,6 +148,23 @@ export async function placeOrderAction(
       p_reward_id: rewardId || null,
       p_profile_id: profileId,
     });
+
+    if (rpcError) {
+      // Retry once after brief 250ms backoff for transient lock / network hiccups under concurrency
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const retryCall = await supabase.rpc("submit_order", {
+        p_location_id: session.locationId,
+        p_table_session_id: session.sessionId,
+        p_idempotency_key: idempotencyKey,
+        p_items: items,
+        p_reward_id: rewardId || null,
+        p_profile_id: profileId,
+      });
+      if (!retryCall.error && retryCall.data) {
+        rpcResult = retryCall.data;
+        rpcError = null;
+      }
+    }
 
     let result = rpcResult as {
       success: boolean;

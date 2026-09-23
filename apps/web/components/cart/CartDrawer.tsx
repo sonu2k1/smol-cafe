@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { placeOrderAction, placePaidOrderAction, type ChangedItemDiff } from "@/app/menu/actions";
 import { useNetworkHealth } from "@/hooks/useNetworkHealth";
@@ -39,6 +40,7 @@ interface CartDrawerProps {
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guestName = "" }) => {
+  const router = useRouter();
   const [currentGuestName, setCurrentGuestName] = useState(guestName);
 
   useEffect(() => {
@@ -388,8 +390,21 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
         onClose: () => {
           setCelebrationData(null);
           closeCart();
+          router.push("/orders");
         },
       });
+
+      // Automated fallback redirect after celebration window
+      setTimeout(() => {
+        setCelebrationData((prev) => {
+          if (prev) {
+            closeCart();
+            router.push("/orders");
+            return null;
+          }
+          return prev;
+        });
+      }, 2000);
     } catch (err) {
       console.error("Test bypass payment failed:", err);
       setErrorMessage("Payment failed. Please try again.");
@@ -1122,6 +1137,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                 onClose: () => {
                   setCelebrationData(null);
                   closeCart();
+                  router.push("/orders");
                 },
               });
             } else {
