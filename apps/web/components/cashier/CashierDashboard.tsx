@@ -52,7 +52,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
   initialPendingOrders = [],
   initialPaidHistory = [],
 }) => {
-  const [activeTab, setActiveTab] = useState<"queue" | "tables" | "paid">("queue");
+  const [activeTab, setActiveTab] = useState<"queue" | "paid">("queue");
   const [tables, setTables] = useState<ActiveCashierTable[]>(initialTables);
   const [pendingOrders, setPendingOrders] = useState<PendingOrderVerification[]>(initialPendingOrders);
   const [paidHistory, setPaidHistory] = useState<PaidHistoryRecord[]>(initialPaidHistory);
@@ -133,7 +133,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
 
   // If pending orders arrive, gently surface tab if user was on queue
   useEffect(() => {
-    if (pendingOrders.length > 0 && activeTab !== "queue" && activeTab !== "tables") {
+    if (pendingOrders.length > 0 && activeTab !== "queue") {
       // Auto-focus queue if on initial state
     }
   }, [pendingOrders.length, activeTab]);
@@ -343,23 +343,6 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
             )}
           </button>
 
-          {/* TAB 2: ACTIVE TABLES */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("tables")}
-            className={`flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl px-3.5 sm:px-5 py-2 sm:py-2.5 text-xs font-bold transition-all cursor-pointer ${
-              activeTab === "tables"
-                ? "bg-[#F2C84B] text-[#241F1C] shadow-md font-extrabold"
-                : "bg-[#FAF4EB] dark:bg-stone-900 border border-[#C9AE8B]/40 dark:border-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#F3E7D3] dark:hover:bg-stone-800"
-            }`}
-          >
-            <Armchair className="h-4 w-4 shrink-0 text-[#8C6207] dark:text-amber-400" />
-            <span className="hidden sm:inline">Tables &amp; Settlement</span>
-            <span className="sm:hidden">Tables</span>
-            <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 px-1.5 sm:px-2 py-0.2 text-[10px] font-mono text-[#725039] dark:text-stone-300">
-              {tables.length}
-            </span>
-          </button>
 
           {/* TAB 3: PAID ORDERS */}
           <button
@@ -600,137 +583,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
           </div>
         )}
 
-        {/* TAB 2: ACTIVE TABLES & SETTLEMENT */}
-        {activeTab === "tables" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-extrabold tracking-tight">Active Dining Tables</h1>
-                <p className="text-xs text-stone-400">
-                  Select a table to record cash settlement &amp; close session
-                </p>
-              </div>
-              <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 px-3 py-1 font-mono text-xs font-bold text-[#725039] dark:text-stone-300">
-                {tables.length} {tables.length === 1 ? "Active Table" : "Active Tables"}
-              </span>
-            </div>
-
-            {tables.length === 0 ? (
-              <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] p-8 text-center text-[#725039] dark:text-stone-400 space-y-4 shadow-xs transition-colors">
-                <Armchair className="h-8 w-8 text-[#8C6D53] dark:text-stone-500 mx-auto" />
-                <p className="text-sm font-bold text-[#241F1C] dark:text-stone-200">No open table sessions</p>
-                <p className="text-xs text-[#8C6D53] dark:text-stone-500 max-w-sm mx-auto">
-                  All tables are currently settled. Open a table for walk-in guests:
-                </p>
-                <div className="flex flex-wrap justify-center gap-2 pt-2">
-                  {["01", "02", "03", "04", "05", "06"].map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => handleOpenTableForGuest(num)}
-                      className="rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-4 py-2 font-mono text-xs font-bold text-[#8C6207] dark:text-[#F6AD55] hover:bg-[#F3E7D3] dark:hover:bg-stone-800 active:scale-95 transition cursor-pointer"
-                    >
-                      + Open Table {num}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {tables.map((table) => {
-                  const isRequested = table.sessionStatus === "PAYMENT_PENDING";
-                  const totalRupees = Math.round(table.totalPaise / 100);
-
-                  return (
-                    <div
-                      key={table.sessionId}
-                      onClick={() => handleOpenSettlement(table)}
-                      role="button"
-                      tabIndex={0}
-                      className={`group relative flex flex-col justify-between rounded-3xl border-2 p-5 text-left transition-all hover:scale-[1.01] hover:shadow-xl active:scale-[0.99] cursor-pointer ${
-                        isRequested
-                          ? "border-[#F2C84B] bg-[#FDF8E7] dark:border-amber-500/80 dark:bg-amber-950/30"
-                          : "border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] hover:border-[#B72E35]/40 dark:hover:border-stone-700"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <h2 className="text-2xl font-black font-mono tracking-tight text-[#241F1C] dark:text-white group-hover:text-[#B72E35] dark:group-hover:text-[#F6AD55]">
-                            Table {table.tableLabel}
-                          </h2>
-                          {isRequested ? (
-                            <span className="flex items-center gap-1 rounded-full border border-amber-300 dark:border-amber-500/80 bg-amber-100 dark:bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-300 animate-pulse">
-                              <Receipt className="h-3.5 w-3.5" /> Bill Requested
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-[#F3E7D3] dark:bg-stone-800 border border-[#C9AE8B]/30 dark:border-transparent px-2.5 py-0.5 text-xs font-semibold text-[#725039] dark:text-stone-400">
-                              Dining Active
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="mt-2 text-xs text-[#725039] dark:text-stone-400">
-                          {table.orderCount} {table.orderCount === 1 ? "order round" : "order rounds"}
-                        </p>
-                      </div>
-
-                      <div className="mt-6 flex flex-col gap-2 border-t border-[#C9AE8B]/30 dark:border-stone-800/80 pt-4">
-                        <div className="flex items-baseline justify-between">
-                          <div>
-                            <span className="text-[10px] uppercase font-bold text-[#8C6D53] dark:text-stone-500">
-                              Bill Total
-                            </span>
-                            <p className="font-mono text-xl font-black text-[#B72E35] dark:text-[#F6AD55]">₹{totalRupees}</p>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setInspectingTag(createTableJsonTag(table.tableLabel));
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-2 py-1 text-[10px] font-mono text-[#725039] dark:text-stone-300 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 transition cursor-pointer"
-                            title="Inspect JSON Tag"
-                          >
-                            <Tag className="h-3 w-3 text-[#B72E35] dark:text-[#F2C84B]" />
-                            <span>JSON Tag</span>
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveUpiTable(table);
-                            }}
-                            className="flex items-center justify-center gap-1 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 py-2 text-xs font-bold text-[#8C6207] dark:text-[#F2C84B] hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition cursor-pointer"
-                          >
-                            <CreditCard className="h-3.5 w-3.5" />
-                            <span>UPI QR</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenSettlement(table);
-                            }}
-                            className="rounded-xl bg-[#B72E35] py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#9B242A] cursor-pointer"
-                          >
-                            Settle Cash →
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 3: PAID ORDERS & SETTLEMENT AUDIT */}
+        {/* TAB 2: PAID ORDERS & SETTLEMENT AUDIT */}
         {activeTab === "paid" && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
