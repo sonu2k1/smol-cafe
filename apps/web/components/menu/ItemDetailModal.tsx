@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import type { MenuItemWithDetails, CategoryWithItems } from "@/lib/queries/menu";
 import { useCart } from "@/context/CartContext";
-import { getFoodImage } from "@/lib/food-images";
+import { getFoodImage, SHOW_MENU_IMAGES } from "@/lib/food-images";
 import { ChevronLeft, Heart, Plus, Check, Coffee } from "lucide-react";
 
 interface ItemDetailModalProps {
@@ -38,6 +38,8 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [pairedAdded, setPairedAdded] = useState(false);
+  const foodImageUrl = item ? getFoodImage(item.name, item.imageUrl) : "";
+  const hasHeroImage = Boolean(SHOW_MENU_IMAGES && foodImageUrl && !imageError);
 
   // Determine beverage vs food for customization options
   const isBeverage = useMemo(() => {
@@ -182,8 +184,6 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     tagBadge = `${item.metadata.spice.toUpperCase()} SPICE`;
   }
 
-  const foodImageUrl = getFoodImage(item.name, item.imageUrl);
-
   const handleAddToCart = () => {
     // If an add-on was selected, bundle it with option details
     if (optionDelta > 0 && selectedOption) {
@@ -259,11 +259,11 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
         {/* Scrollable Content with generous bottom padding (pb-32) so all options scroll cleanly above the sticky button */}
         <div className="flex-1 overflow-y-auto px-5 pt-2 pb-32">
-          {/* Arched Window Food Image Hero */}
-          <div className="flex justify-center pt-1 pb-3">
-            <div className="relative w-full max-w-[310px] aspect-[4/4.3] rounded-t-[7.5rem] p-1 border-[1.5px] border-[#725039]/40 dark:border-[#C9AE8B]/40 bg-[#FAF4EB] dark:bg-[#1E1916] shadow-sm overflow-hidden">
-              <div className="h-full w-full overflow-hidden rounded-t-[7.2rem] bg-[#EAE0D2] dark:bg-[#2A231E]">
-                {!imageError ? (
+          {/* Optional: Arched Window Food Image Hero (Rendered only when SHOW_MENU_IMAGES is enabled) */}
+          {hasHeroImage && (
+            <div className="flex justify-center pt-1 pb-3">
+              <div className="relative w-full max-w-[310px] aspect-[4/4.3] rounded-t-[7.5rem] p-1 border-[1.5px] border-[#725039]/40 dark:border-[#C9AE8B]/40 bg-[#FAF4EB] dark:bg-[#1E1916] shadow-sm overflow-hidden">
+                <div className="h-full w-full overflow-hidden rounded-t-[7.2rem] bg-[#EAE0D2] dark:bg-[#2A231E]">
                   <img
                     src={foodImageUrl}
                     alt={item.name}
@@ -272,26 +272,22 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       isItemSoldOut ? "grayscale contrast-125 brightness-95" : ""
                     }`}
                   />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-[#725039]">
-                    <Coffee className="h-12 w-12 stroke-[1.5]" />
+                </div>
+
+                {/* Iconic Diagonal Red Stamped "SOLD OUT" Badge on Modal Hero */}
+                {isItemSoldOut && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                    <div className="relative rounded-md border-[2.5px] border-[#C22828] bg-[#C22828] px-5 py-2 shadow-2xl transform -rotate-12">
+                      <div className="absolute inset-[2px] rounded-[3px] border border-dashed border-white/60 pointer-events-none" />
+                      <span className="relative z-10 font-mono text-base sm:text-lg font-black tracking-widest text-white uppercase drop-shadow-md">
+                        SOLD OUT
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
-
-              {/* Iconic Diagonal Red Stamped "SOLD OUT" Badge on Modal Hero */}
-              {isItemSoldOut && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                  <div className="relative rounded-md border-[2.5px] border-[#C22828] bg-[#C22828] px-5 py-2 shadow-2xl transform -rotate-12">
-                    <div className="absolute inset-[2px] rounded-[3px] border border-dashed border-white/60 pointer-events-none" />
-                    <span className="relative z-10 font-mono text-base sm:text-lg font-black tracking-widest text-white uppercase drop-shadow-md">
-                      SOLD OUT
-                    </span>
-                  </div>
-                </div>
-              )}
             </div>
-          </div>
+          )}
 
           {/* Title and Price Header */}
           <div className="mt-2 flex items-baseline justify-between gap-3">
@@ -353,14 +349,16 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   Pairs beautifully with
                 </h3>
                 <div className="flex items-center justify-between gap-3">
-                  {/* Paired Item Thumbnail */}
-                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-[#C9AE8B]/50 bg-[#EAE0D2]">
-                    <img
-                      src={pairedItemInfo.imageUrl}
-                      alt={pairedItemInfo.name}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
+                  {/* Paired Item Thumbnail (Optional: rendered only when SHOW_MENU_IMAGES is enabled) */}
+                  {SHOW_MENU_IMAGES && pairedItemInfo.imageUrl && (
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-[#C9AE8B]/50 bg-[#EAE0D2]">
+                      <img
+                        src={pairedItemInfo.imageUrl}
+                        alt={pairedItemInfo.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
 
                   {/* Title & Subtitle */}
                   <div className="flex-1 min-w-0 pr-1">

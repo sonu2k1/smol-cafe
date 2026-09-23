@@ -4,6 +4,13 @@
  * Triple Decker Sandwiches, Khichdi, Aglio Olio, Margherita Pizza, Affogato, etc.
  */
 
+/**
+ * Global Feature Flag: Controls whether menu item photo thumbnails are rendered in the UI.
+ * - Set to `false` for a clean, minimalist artisanal bistro typographic layout.
+ * - Set to `true` whenever a developer wants to enable full menu photography.
+ */
+export const SHOW_MENU_IMAGES: boolean = false;
+
 export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   // Breakfast & Buns
   "bun makkhan, kanpur se":
@@ -155,10 +162,15 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
 
 /**
  * Returns a high-definition real food photograph for any menu item.
+ * If SHOW_MENU_IMAGES is false, returns empty string unless a custom image URL is provided.
  */
 export function getFoodImage(name: string, fallbackUrl?: string | null): string {
   if (fallbackUrl && fallbackUrl.startsWith("http")) {
     return fallbackUrl;
+  }
+
+  if (!SHOW_MENU_IMAGES) {
+    return "";
   }
 
   const cleanName = name.toLowerCase().trim();
