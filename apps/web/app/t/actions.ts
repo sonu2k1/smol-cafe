@@ -355,16 +355,20 @@ export interface ClientTableInfo {
  */
 export async function fetchActiveTablesAction(): Promise<ClientTableInfo[]> {
   const defaultZoneMap: Record<string, string> = {
-    "01": "Café",
-    "02": "Café",
-    "03": "Café",
-    "04": "Café",
-    "05": "Café",
-    "06": "Café",
-    "07": "Lounge",
-    "08": "Lounge",
-    "09": "Lounge",
-    "10": "Lounge",
+    "01": "smol-cafe",
+    "02": "smol-cafe",
+    "03": "smol-cafe",
+    "04": "smol-cafe",
+    "05": "smol-cafe",
+    "06": "smol-cafe",
+    "07": "smol-lounge",
+    "08": "smol-lounge",
+    "09": "smol-lounge",
+    "10": "smol-lounge",
+    "11": "smol-terrace",
+    "12": "smol-terrace",
+    "13": "smol-terrace",
+    "14": "smol-terrace",
   };
 
   try {
@@ -375,9 +379,9 @@ export async function fetchActiveTablesAction(): Promise<ClientTableInfo[]> {
       .order("label", { ascending: true });
 
     if (error || !tablesData || tablesData.length === 0) {
-      return Array.from({ length: 10 }, (_, i) => {
+      return Array.from({ length: 14 }, (_, i) => {
         const label = (i + 1).toString().padStart(2, "0");
-        const info = TABLE_ZONES_CONFIG[label] || { zone: "Café", capacity: 2 };
+        const info = TABLE_ZONES_CONFIG[label] || { zone: "smol-cafe", capacity: 2 };
         return { label, zone: info.zone, capacity: info.capacity, active: true };
       });
     }

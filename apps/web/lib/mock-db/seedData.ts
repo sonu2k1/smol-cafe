@@ -180,28 +180,32 @@ export const MOCK_LOCATION: MockLocation = {
 };
 
 const DEFAULT_ZONES: Record<string, string> = {
-  "01": "Café",
-  "02": "Café",
-  "03": "Café",
-  "04": "Café",
-  "05": "Café",
-  "06": "Café",
-  "07": "Lounge",
-  "08": "Lounge",
-  "09": "Lounge",
-  "10": "Lounge",
+  "01": "smol-cafe",
+  "02": "smol-cafe",
+  "03": "smol-cafe",
+  "04": "smol-cafe",
+  "05": "smol-cafe",
+  "06": "smol-cafe",
+  "07": "smol-lounge",
+  "08": "smol-lounge",
+  "09": "smol-lounge",
+  "10": "smol-lounge",
+  "11": "smol-terrace",
+  "12": "smol-terrace",
+  "13": "smol-terrace",
+  "14": "smol-terrace",
 };
 
-// 10 Dining Tables: 6 Café (01-06) + 4 Lounge (07-10)
-export const MOCK_TABLES: MockDiningTable[] = Array.from({ length: 10 }, (_, i) => {
+// 14 Dining Tables: 6 smol-cafe (01-06) + 4 smol-lounge (07-10) + 4 smol-terrace (11-14)
+export const MOCK_TABLES: MockDiningTable[] = Array.from({ length: 14 }, (_, i) => {
   const tableNum = (i + 1).toString().padStart(2, "0");
-  const isLounge = i >= 6; // 0..5 => Cafe, 6..9 => Lounge
-  const section = isLounge ? "Lounge" : "Café";
+  const section = i < 6 ? "smol-cafe" : i < 10 ? "smol-lounge" : "smol-terrace";
+  const seats = section === "smol-terrace" ? (i % 2 === 0 ? 4 : 2) : section === "smol-lounge" ? (i % 2 === 0 ? 6 : 4) : (i % 2 === 0 ? 4 : 2);
   return {
     id: `tbl_${tableNum}`,
     location_id: MOCK_LOCATION_ID,
     label: `${tableNum}`,
-    seats: isLounge ? (i % 2 === 0 ? 6 : 4) : (i % 2 === 0 ? 4 : 2),
+    seats,
     active: true,
     section,
     created_at: "2026-08-01T00:00:00.000Z",

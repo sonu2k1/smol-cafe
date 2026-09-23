@@ -316,15 +316,16 @@ export async function fetchAdminOverviewAction(): Promise<{
       orders: count,
     }));
 
-    // 7. Zone Utilization Calculation (6 Café, 4 Lounge)
+    // 7. Zone Utilization Calculation (6 smol-cafe, 4 smol-lounge, 4 smol-terrace)
     const zoneTableCounts: Record<string, { total: number; occupied: number }> = {
-      "Café": { total: 6, occupied: 0 },
-      "Lounge": { total: 4, occupied: 0 },
+      "smol-cafe": { total: 6, occupied: 0 },
+      "smol-lounge": { total: 4, occupied: 0 },
+      "smol-terrace": { total: 4, occupied: 0 },
     };
 
-    for (let i = 1; i <= 10; i++) {
+    for (let i = 1; i <= 14; i++) {
       const label = i.toString().padStart(2, "0");
-      const zName = TABLE_ZONES_CONFIG[label]?.zone || "Café";
+      const zName = TABLE_ZONES_CONFIG[label]?.zone || "smol-cafe";
       if (zoneTableCounts[zName]) {
         if (activeTableIds.has(label)) {
           zoneTableCounts[zName].occupied++;
@@ -334,14 +335,19 @@ export async function fetchAdminOverviewAction(): Promise<{
 
     const zoneUtilization: AdminZoneUtil[] = [
       {
-        zone: "Café",
-        occ: `${Math.round((zoneTableCounts["Café"].occupied / (zoneTableCounts["Café"].total || 1)) * 100)}%`,
+        zone: "smol-cafe",
+        occ: `${Math.round((zoneTableCounts["smol-cafe"].occupied / (zoneTableCounts["smol-cafe"].total || 1)) * 100)}%`,
         color: "#F2C84B",
       },
       {
-        zone: "Lounge",
-        occ: `${Math.round((zoneTableCounts["Lounge"].occupied / (zoneTableCounts["Lounge"].total || 1)) * 100)}%`,
+        zone: "smol-lounge",
+        occ: `${Math.round((zoneTableCounts["smol-lounge"].occupied / (zoneTableCounts["smol-lounge"].total || 1)) * 100)}%`,
         color: "#9F7AEA",
+      },
+      {
+        zone: "smol-terrace",
+        occ: `${Math.round((zoneTableCounts["smol-terrace"].occupied / (zoneTableCounts["smol-terrace"].total || 1)) * 100)}%`,
+        color: "#38B2AC",
       },
     ];
 
@@ -396,8 +402,8 @@ export async function fetchAdminOverviewAction(): Promise<{
         kpis: {
           todaysOrders: mappedOrders.length,
           grossRevenueRupees,
-          activeTablesCount: Math.min(diningTables?.length || 10, Math.max(activeTableIds.size, 1)),
-          totalTablesCount: diningTables && diningTables.length > 0 ? diningTables.length : 10,
+          activeTablesCount: Math.min(diningTables?.length || 14, Math.max(activeTableIds.size, 1)),
+          totalTablesCount: diningTables && diningTables.length > 0 ? diningTables.length : 14,
           pendingKdsCount: pendingKdsTickets,
           avgOrderRupees,
           topSellerName: topSeller.name,
