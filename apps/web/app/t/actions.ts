@@ -179,12 +179,25 @@ export async function resolveQrToken(
     const locationName = (location as { name: string } | null)?.name || "Smol Café";
 
     // 3. Find existing OPEN table session
-    const { data: existingSession } = await supabase
+    let { data: existingSession } = await supabase
       .from("table_sessions")
       .select("*")
       .eq("table_id", diningTable.id)
       .eq("status", "OPEN")
       .maybeSingle();
+
+    // Auto-close stale sessions (> 3 hours inactive)
+    if (existingSession) {
+      const MAX_INACTIVITY_MS = 3 * 60 * 60 * 1000;
+      const lastActive = new Date(existingSession.last_activity_at || existingSession.opened_at).getTime();
+      if (Date.now() - lastActive > MAX_INACTIVITY_MS) {
+        await supabase
+          .from("table_sessions")
+          .update({ status: "CLOSED", closed_at: new Date().toISOString() })
+          .eq("id", existingSession.id);
+        existingSession = null;
+      }
+    }
 
     let sessionId: string;
     let openedAt: string;
