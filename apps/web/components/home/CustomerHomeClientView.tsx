@@ -283,9 +283,6 @@ export const CustomerHomeClientView: React.FC<CustomerHomeClientProps> = ({
           </div>
         </div>
       )}
-
-      {/* Realistic 5-Tab Customer Bottom Navigation */}
-      <BottomNavBar />
     </div>
   );
 };

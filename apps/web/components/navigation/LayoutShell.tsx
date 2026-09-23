@@ -5,14 +5,15 @@ import { usePathname } from "next/navigation";
 import { RoleSwitcherBar } from "@/components/navigation/RoleSwitcherBar";
 import { InstallAppPrompt } from "@/components/common/InstallAppPrompt";
 import { OfflineSyncBanner } from "@/components/common/OfflineSyncBanner";
+import { BottomNavBar } from "@/components/navigation/BottomNavBar";
 
 interface LayoutShellProps {
   children: React.ReactNode;
 }
 
 /**
- * Wraps children and conditionally renders the RoleSwitcherBar.
- * Hidden on the landing/role-selection page ("/") to keep the gateway clean.
+ * Wraps children and conditionally renders the RoleSwitcherBar and BottomNavBar.
+ * Persistent across client navigations so BottomNavBar never flickers or disappears.
  */
 export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
   const pathname = usePathname();
@@ -33,7 +34,11 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
     pathname?.startsWith("/cart") ||
     pathname === "/table" ||
     pathname?.startsWith("/table") ||
-    pathname?.startsWith("/profile");
+    pathname?.startsWith("/profile") ||
+    pathname?.startsWith("/account") ||
+    pathname?.startsWith("/events") ||
+    pathname?.startsWith("/music") ||
+    pathname?.startsWith("/drinks");
 
   const isStaffWorkspace =
     pathname?.startsWith("/kitchen") ||
@@ -42,6 +47,21 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
     pathname?.startsWith("/cashier");
 
   const showRoleSwitcher = !isCustomerFacingRoute && isStaffWorkspace;
+
+  const showBottomNavBar =
+    pathname === "/home" ||
+    pathname?.startsWith("/home") ||
+    pathname?.startsWith("/smol-menu") ||
+    pathname?.startsWith("/menu") ||
+    pathname?.startsWith("/drinks") ||
+    pathname?.startsWith("/orders") ||
+    pathname?.startsWith("/order-status") ||
+    pathname?.startsWith("/profile") ||
+    pathname?.startsWith("/account") ||
+    pathname?.startsWith("/events") ||
+    pathname?.startsWith("/music") ||
+    pathname?.startsWith("/table") ||
+    pathname?.startsWith("/t/");
 
   // Real-time synchronization of mobile status bar color (<meta name="theme-color">)
   React.useEffect(() => {
@@ -82,6 +102,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
       <OfflineSyncBanner />
       {showRoleSwitcher && <RoleSwitcherBar />}
       {children}
+      {showBottomNavBar && <BottomNavBar />}
       <InstallAppPrompt />
     </>
   );

@@ -328,9 +328,6 @@ export const JukeboxClientView: React.FC<JukeboxClientViewProps> = ({ initialDat
           </div>
         </div>
       )}
-
-      {/* Bottom Sticky Navigation */}
-      <BottomNavBar />
     </div>
   );
 };
