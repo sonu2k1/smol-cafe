@@ -21,9 +21,9 @@ export const FloatingCartBar: React.FC = () => {
   return (
     <aside
       aria-label="Cart summary"
-      className="fixed bottom-[calc(5.65rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 px-3 pointer-events-none select-none animate-fade-in-up"
+      className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(6.25rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 px-3 pointer-events-none select-none animate-fade-in-up"
     >
-      <div className="pointer-events-auto mx-auto flex max-w-[355px] items-center justify-between rounded-2xl border border-red-900/30 dark:border-white/15 bg-[#B72E35] px-4 py-2.5 text-white shadow-xl shadow-red-950/30 transition-all">
+      <div className="pointer-events-auto mx-auto flex max-w-[335px] sm:max-w-[355px] items-center justify-between rounded-2xl border border-red-900/30 dark:border-white/15 bg-[#B72E35] px-3.5 py-2 sm:px-4 sm:py-2.5 text-white shadow-xl shadow-red-950/30 transition-all">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-bold text-[#B72E35] shadow-xs shrink-0">
             {totalCount}

@@ -193,10 +193,17 @@ const DEFAULT_ZONES: Record<string, string> = {
   "11": "Garden Terrace",
   "12": "Courtyard Verandah",
   "13": "Indoor Cozy",
+  "14": "Courtyard Verandah",
+  "15": "Garden Terrace",
+  "16": "Indoor Cozy",
+  "17": "Garden Terrace",
+  "18": "Brew Bar",
+  "19": "Indoor Cozy",
+  "20": "Courtyard Verandah",
 };
 
-// 12 Dining Tables
-export const MOCK_TABLES: MockDiningTable[] = Array.from({ length: 12 }, (_, i) => {
+// 20 Dining Tables
+export const MOCK_TABLES: MockDiningTable[] = Array.from({ length: 20 }, (_, i) => {
   const tableNum = (i + 1).toString().padStart(2, "0");
   return {
     id: `tbl_${tableNum}`,
@@ -210,7 +217,7 @@ export const MOCK_TABLES: MockDiningTable[] = Array.from({ length: 12 }, (_, i) 
   };
 });
 
-// SHA-256 tokens for tables 01-12
+// SHA-256 tokens for tables 01-20
 export const MOCK_QR_TOKENS: MockTableQrToken[] = MOCK_TABLES.map((t) => {
   const tokenStr = `table-${t.label.toLowerCase()}`;
   return {
