@@ -1404,10 +1404,8 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                   <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-white">Zone Utilization</h3>
                   <div className="space-y-2.5 text-xs">
                     {(overviewData?.zoneUtilization || [
-                      { zone: "Indoor Cozy", occ: "75%", color: "#F2C84B" },
-                      { zone: "Courtyard Verandah", occ: "60%", color: "#B72E35" },
-                      { zone: "Garden Terrace", occ: "40%", color: "#48BB78" },
-                      { zone: "Brew Bar", occ: "100%", color: "#4299E1" },
+                      { zone: "Café", occ: "67%", color: "#F2C84B" },
+                      { zone: "Lounge", occ: "50%", color: "#9F7AEA" },
                     ]).map((z, idx) => (
                       <div key={idx} className="flex items-center justify-between">
                         <span className="text-[#5C4533] dark:text-stone-300">{z.zone}</span>

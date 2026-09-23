@@ -125,7 +125,7 @@ export async function resolveQrToken(
     // Fallback 2: Auto-provision standard cafe table if missing
     if (!diningTable && standardTableLabel) {
       const tableConfig = TABLE_ZONES_CONFIG[standardTableLabel] || {
-        zone: "Indoor Cozy",
+        zone: "Café",
         capacity: 4,
       };
       const now = new Date().toISOString();
@@ -355,26 +355,16 @@ export interface ClientTableInfo {
  */
 export async function fetchActiveTablesAction(): Promise<ClientTableInfo[]> {
   const defaultZoneMap: Record<string, string> = {
-    "01": "Indoor Cozy",
-    "02": "Indoor Cozy",
-    "03": "Courtyard Verandah",
-    "04": "Courtyard Verandah",
-    "05": "Brew Bar",
-    "06": "Brew Bar",
-    "07": "Garden Terrace",
-    "08": "Garden Terrace",
-    "09": "Indoor Cozy",
-    "10": "Indoor Cozy",
-    "11": "Garden Terrace",
-    "12": "Courtyard Verandah",
-    "13": "Indoor Cozy",
-    "14": "Courtyard Verandah",
-    "15": "Garden Terrace",
-    "16": "Indoor Cozy",
-    "17": "Garden Terrace",
-    "18": "Brew Bar",
-    "19": "Indoor Cozy",
-    "20": "Courtyard Verandah",
+    "01": "Café",
+    "02": "Café",
+    "03": "Café",
+    "04": "Café",
+    "05": "Café",
+    "06": "Café",
+    "07": "Lounge",
+    "08": "Lounge",
+    "09": "Lounge",
+    "10": "Lounge",
   };
 
   try {
@@ -385,9 +375,9 @@ export async function fetchActiveTablesAction(): Promise<ClientTableInfo[]> {
       .order("label", { ascending: true });
 
     if (error || !tablesData || tablesData.length === 0) {
-      return Array.from({ length: 20 }, (_, i) => {
+      return Array.from({ length: 10 }, (_, i) => {
         const label = (i + 1).toString().padStart(2, "0");
-        const info = TABLE_ZONES_CONFIG[label] || { zone: "Indoor Cozy", capacity: 2 };
+        const info = TABLE_ZONES_CONFIG[label] || { zone: "Café", capacity: 2 };
         return { label, zone: info.zone, capacity: info.capacity, active: true };
       });
     }
@@ -403,7 +393,7 @@ export async function fetchActiveTablesAction(): Promise<ClientTableInfo[]> {
           sectionMap[t.label] ||
           sectionMap[cleanNum] ||
           TABLE_ZONES_CONFIG[cleanNum]?.zone ||
-          "Indoor Cozy";
+          "Café";
         const capacity = t.seats || TABLE_ZONES_CONFIG[cleanNum]?.capacity || 2;
         return {
           label: cleanNum,
@@ -424,9 +414,9 @@ export async function fetchActiveTablesAction(): Promise<ClientTableInfo[]> {
     });
   } catch (err) {
     console.error("fetchActiveTablesAction error:", err);
-    return Array.from({ length: 12 }, (_, i) => {
+    return Array.from({ length: 10 }, (_, i) => {
       const label = (i + 1).toString().padStart(2, "0");
-      const info = TABLE_ZONES_CONFIG[label] || { zone: "Indoor Cozy", capacity: 2 };
+      const info = TABLE_ZONES_CONFIG[label] || { zone: "Café", capacity: 2 };
       return { label, zone: info.zone, capacity: info.capacity, active: true };
     });
   }

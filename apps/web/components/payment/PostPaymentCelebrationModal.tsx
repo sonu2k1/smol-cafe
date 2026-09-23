@@ -69,7 +69,7 @@ export const PostPaymentCelebrationModal: React.FC<PostPaymentCelebrationModalPr
   orderId = `ORD-${Date.now().toString().slice(-6)}`,
   orderNo,
   tableLabel,
-  zone = "Indoor Cozy",
+  zone = "Café",
   totalRupees,
   items = [],
   transactionId = `UPI/2026/${Math.floor(100000000 + Math.random() * 900000000)}`,

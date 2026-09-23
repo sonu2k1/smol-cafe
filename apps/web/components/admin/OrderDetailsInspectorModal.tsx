@@ -39,7 +39,7 @@ export const OrderDetailsInspectorModal: React.FC<OrderDetailsInspectorModalProp
 
   // Resolved values
   const tableNumber = order?.tableLabel || tag?.table_number || "01";
-  const zoneName = order?.zone || tag?.zone || "Indoor Cozy";
+  const zoneName = order?.zone || tag?.zone || "Café";
   const resolvedTag = tag || createTableJsonTag(tableNumber);
   const jsonString = JSON.stringify(
     order
