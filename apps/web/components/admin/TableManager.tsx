@@ -219,7 +219,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
   const [sections, setSections] = useState<string[]>(
     initialSections.length > 0
       ? initialSections
-      : ["Indoor Cozy", "Courtyard Verandah", "Garden Terrace", "Brew Bar"]
+      : ["Café", "Lounge"]
   );
   const [selectedSection, setSelectedSection] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -259,7 +259,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
 
   // Form states
   const [tableLabel, setTableLabel] = useState<string>("");
-  const [tableSection, setTableSection] = useState<string>(sections[0] || "Indoor Cozy");
+  const [tableSection, setTableSection] = useState<string>(sections[0] || "Café");
   const [tableSeats, setTableSeats] = useState<number>(4);
   const [tableActive, setTableActive] = useState<boolean>(true);
   const [newSectionName, setNewSectionName] = useState<string>("");
@@ -482,8 +482,12 @@ export const TableManager: React.FC<TableManagerProps> = ({
   // Section color accents
   const getSectionBadgeClass = (sec: string) => {
     switch (sec) {
+      case "Café":
+      case "Cafe":
       case "Indoor Cozy":
         return "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800";
+      case "Lounge":
+        return "bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-800";
       case "Courtyard Verandah":
         return "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800";
       case "Garden Terrace":
@@ -491,7 +495,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
       case "Brew Bar":
         return "bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800";
       default:
-        return "bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-800";
+        return "bg-stone-100 text-stone-900 border-stone-300 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700";
     }
   };
 
@@ -499,7 +503,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
   const handleOpenAdd = () => {
     const nextNum = (tables.length + 1).toString().padStart(2, "0");
     setTableLabel(nextNum);
-    setTableSection(sections[0] || "Indoor Cozy");
+    setTableSection(sections[0] || "Café");
     setTableSeats(4);
     setTableActive(true);
     setFeedback(null);
@@ -510,7 +514,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
   const handleOpenEdit = (t: DiningTableRecord) => {
     setEditingTable(t);
     setTableLabel(t.label);
-    setTableSection(t.section || sections[0] || "Indoor Cozy");
+    setTableSection(t.section || sections[0] || "Café");
     setTableSeats(t.seats || 2);
     setTableActive(t.active);
     setFeedback(null);
@@ -1513,7 +1517,7 @@ export const TableManager: React.FC<TableManagerProps> = ({
               <span className="text-[10.5px] font-mono uppercase text-stone-500 block font-bold">Existing Zones</span>
               {sections.map((sec) => {
                 const count = sectionCounts[sec] || 0;
-                const isDefault = ["Indoor Cozy", "Courtyard Verandah", "Garden Terrace", "Brew Bar"].includes(sec);
+                const isDefault = ["Café", "Lounge", "Indoor Cozy", "Courtyard Verandah", "Garden Terrace", "Brew Bar"].includes(sec);
 
                 return (
                   <div

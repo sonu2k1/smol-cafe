@@ -28,7 +28,7 @@ export const UpiPaymentDrawer: React.FC<UpiPaymentDrawerProps> = ({
   orderId = `ORD-${Date.now().toString().slice(-6)}`,
   orderNo,
   tableLabel,
-  zone = "Indoor Cozy",
+  zone = "Café",
   amountPaise,
   items = [],
   onClose,

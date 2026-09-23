@@ -30,37 +30,49 @@ export interface UpdateTableInput {
 }
 
 const DEFAULT_SECTIONS = [
+  "Café",
+  "Lounge",
+];
+
+const LEGACY_SECTIONS = new Set([
   "Indoor Cozy",
   "Courtyard Verandah",
   "Garden Terrace",
   "Brew Bar",
-];
+]);
 
 declare global {
   var __SMOL_CUSTOM_SECTIONS__: string[] | undefined;
   var __SMOL_TABLE_SECTIONS_MAP__: Record<string, string> | undefined;
 }
 
-if (!globalThis.__SMOL_TABLE_SECTIONS_MAP__) {
-  globalThis.__SMOL_TABLE_SECTIONS_MAP__ = {
-    "01": "Indoor Cozy",
-    "02": "Indoor Cozy",
-    "03": "Courtyard Verandah",
-    "04": "Courtyard Verandah",
-    "05": "Brew Bar",
-    "06": "Brew Bar",
-    "07": "Garden Terrace",
-    "08": "Garden Terrace",
-    "09": "Indoor Cozy",
-    "10": "Indoor Cozy",
-    "11": "Garden Terrace",
-    "12": "Courtyard Verandah",
-  };
+// Enforce standard table mapping for 10 tables
+globalThis.__SMOL_TABLE_SECTIONS_MAP__ = {
+  ...(globalThis.__SMOL_TABLE_SECTIONS_MAP__ || {}),
+  "01": "Café",
+  "02": "Café",
+  "03": "Café",
+  "04": "Café",
+  "05": "Café",
+  "06": "Café",
+  "07": "Lounge",
+  "08": "Lounge",
+  "09": "Lounge",
+  "10": "Lounge",
+};
+
+// Clean legacy custom sections
+if (globalThis.__SMOL_CUSTOM_SECTIONS__) {
+  globalThis.__SMOL_CUSTOM_SECTIONS__ = globalThis.__SMOL_CUSTOM_SECTIONS__.filter(
+    (s) => !LEGACY_SECTIONS.has(s)
+  );
 }
 
 function getSectionsList(tables: DiningTableRecord[]): string[] {
-  const custom = globalThis.__SMOL_CUSTOM_SECTIONS__ || [];
-  const fromTables = tables.map((t) => t.section).filter(Boolean);
+  const custom = (globalThis.__SMOL_CUSTOM_SECTIONS__ || []).filter((s) => !LEGACY_SECTIONS.has(s));
+  const fromTables = tables
+    .map((t) => t.section)
+    .filter((s) => Boolean(s) && !LEGACY_SECTIONS.has(s));
   const combined = Array.from(new Set([...DEFAULT_SECTIONS, ...custom, ...fromTables]));
   return combined;
 }
@@ -97,33 +109,34 @@ export async function fetchTablesAndSectionsAction(): Promise<{
     const occupiedTableIds = new Set((sessionsData || []).map((s: { table_id: string }) => s.table_id));
 
     const defaultZoneMap: Record<string, string> = {
-      "01": "Indoor Cozy",
-      "02": "Indoor Cozy",
-      "03": "Courtyard Verandah",
-      "04": "Courtyard Verandah",
-      "05": "Brew Bar",
-      "06": "Brew Bar",
-      "07": "Garden Terrace",
-      "08": "Garden Terrace",
-      "09": "Indoor Cozy",
-      "10": "Indoor Cozy",
-      "11": "Garden Terrace",
-      "12": "Courtyard Verandah",
+      "01": "Café",
+      "02": "Café",
+      "03": "Café",
+      "04": "Café",
+      "05": "Café",
+      "06": "Café",
+      "07": "Lounge",
+      "08": "Lounge",
+      "09": "Lounge",
+      "10": "Lounge",
     };
 
     const sectionMap = globalThis.__SMOL_TABLE_SECTIONS_MAP__ || defaultZoneMap;
 
     const tables: DiningTableRecord[] = (tablesData || []).map((t: any) => {
       const cleanNum = t.label?.toString().padStart(2, "0");
-      const section = sectionMap[t.id] || sectionMap[t.label] || sectionMap[cleanNum] || t.section || defaultZoneMap[cleanNum] || "Indoor Cozy";
+      let section = t.section || sectionMap[t.id] || sectionMap[t.label] || sectionMap[cleanNum] || defaultZoneMap[cleanNum] || "Café";
+      if (LEGACY_SECTIONS.has(section)) {
+        section = defaultZoneMap[cleanNum] || (parseInt(cleanNum, 10) > 6 ? "Lounge" : "Café");
+      }
       return {
         id: t.id,
         location_id: t.location_id,
         label: t.label,
-        seats: t.seats || 2,
+        seats: t.seats || (["07", "08", "09", "10"].includes(cleanNum) ? 4 : 2),
         active: t.active !== undefined ? t.active : true,
         section,
-        isOccupied: occupiedTableIds.has(t.id) || ["01", "02", "04", "07"].includes(cleanNum),
+        isOccupied: occupiedTableIds.has(t.id),
         created_at: t.created_at,
         updated_at: t.updated_at,
       };
@@ -166,7 +179,7 @@ export async function createTableAction(input: CreateTableInput): Promise<{
     }
 
     const cleanNum = label.padStart(2, "0");
-    const section = input.section?.trim() || "Indoor Cozy";
+    const section = input.section?.trim() || "Café";
     const seats = Number(input.seats) || 2;
     const active = input.active !== undefined ? input.active : true;
 
@@ -323,7 +336,7 @@ export async function updateTableAction(
       (input.section ? input.section.trim() : undefined) ||
       globalThis.__SMOL_TABLE_SECTIONS_MAP__?.[tableId] ||
       globalThis.__SMOL_TABLE_SECTIONS_MAP__?.[cleanNum] ||
-      "Indoor Cozy";
+      "Café";
 
     revalidatePath("/admin");
     revalidatePath("/admin/tables");
@@ -357,21 +370,24 @@ export async function deleteTableAction(tableId: string): Promise<{
   try {
     const supabase = createAdminClient();
 
-    // Check if table has an active session with guests
-    const { data: activeSession } = await supabase
-      .from("table_sessions")
-      .select("id, status")
-      .eq("table_id", tableId)
-      .eq("status", "OPEN")
-      .maybeSingle();
-
-    if (activeSession) {
-      return {
-        success: false,
-        message: "Cannot delete table: It currently has an active guest session. Please settle and close the table first.",
-      };
+    // 1. Close or delete any existing table sessions for this table
+    try {
+      await supabase
+        .from("table_sessions")
+        .delete()
+        .eq("table_id", tableId);
+    } catch {
+      // Fallback: try closing if delete is restricted
+      await supabase
+        .from("table_sessions")
+        .update({ status: "CLOSED", closed_at: new Date().toISOString() })
+        .eq("table_id", tableId);
     }
 
+    // 2. Remove associated QR tokens
+    await supabase.from("table_qr_tokens").delete().eq("table_id", tableId);
+
+    // 3. Delete the table itself
     const { error: deleteError } = await supabase
       .from("dining_tables")
       .delete()
@@ -381,11 +397,14 @@ export async function deleteTableAction(tableId: string): Promise<{
       return { success: false, message: deleteError.message };
     }
 
-    // Also remove qr token
-    await supabase.from("table_qr_tokens").delete().eq("table_id", tableId);
+    // 4. Clean up runtime memory map
+    if (globalThis.__SMOL_TABLE_SECTIONS_MAP__) {
+      delete globalThis.__SMOL_TABLE_SECTIONS_MAP__[tableId];
+    }
 
     revalidatePath("/admin");
     revalidatePath("/admin/tables");
+    revalidatePath("/smol-backdoor/admin");
     revalidatePath("/");
     revalidatePath("/home");
 
