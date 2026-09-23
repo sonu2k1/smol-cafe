@@ -568,9 +568,6 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
           }}
         />
       )}
-
-      {/* Bottom Sticky Navigation */}
-      <BottomNavBar />
     </div>
   );
 };

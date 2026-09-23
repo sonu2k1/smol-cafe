@@ -750,9 +750,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           });
         }}
       />
-
-      {/* Bottom Sticky Navigation */}
-      <BottomNavBar />
     </div>
   );
 };
