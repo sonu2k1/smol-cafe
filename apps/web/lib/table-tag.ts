@@ -4,7 +4,7 @@
  * and session tagging for cross-interface synchronization.
  */
 
-export type TableZone = "Café" | "Lounge" | "Indoor Cozy" | "Courtyard Verandah" | "Garden Terrace" | "Brew Bar" | (string & {});
+export type TableZone = "smol-cafe" | "smol-lounge" | "smol-terrace" | "Café" | "Lounge" | "Terrace" | (string & {});
 
 export interface TableJsonTag {
   table_id: string;
@@ -22,18 +22,24 @@ export interface TableJsonTag {
 
 export const TABLE_ZONES_CONFIG: Record<string, { zone: TableZone; capacity: number }> = {
   // 6 Café Tables
-  "01": { zone: "Café", capacity: 2 },
-  "02": { zone: "Café", capacity: 2 },
-  "03": { zone: "Café", capacity: 4 },
-  "04": { zone: "Café", capacity: 4 },
-  "05": { zone: "Café", capacity: 2 },
-  "06": { zone: "Café", capacity: 4 },
+  "01": { zone: "smol-cafe", capacity: 2 },
+  "02": { zone: "smol-cafe", capacity: 2 },
+  "03": { zone: "smol-cafe", capacity: 4 },
+  "04": { zone: "smol-cafe", capacity: 4 },
+  "05": { zone: "smol-cafe", capacity: 2 },
+  "06": { zone: "smol-cafe", capacity: 4 },
 
   // 4 Lounge Tables
-  "07": { zone: "Lounge", capacity: 4 },
-  "08": { zone: "Lounge", capacity: 4 },
-  "09": { zone: "Lounge", capacity: 6 },
-  "10": { zone: "Lounge", capacity: 6 },
+  "07": { zone: "smol-lounge", capacity: 4 },
+  "08": { zone: "smol-lounge", capacity: 4 },
+  "09": { zone: "smol-lounge", capacity: 6 },
+  "10": { zone: "smol-lounge", capacity: 6 },
+
+  // 4 Terrace Tables
+  "11": { zone: "smol-terrace", capacity: 2 },
+  "12": { zone: "smol-terrace", capacity: 2 },
+  "13": { zone: "smol-terrace", capacity: 4 },
+  "14": { zone: "smol-terrace", capacity: 4 },
 };
 
 /**
@@ -46,7 +52,7 @@ export function createTableJsonTag(
 ): TableJsonTag {
   const cleanLabel = tableLabel.padStart(2, "0");
   const config = TABLE_ZONES_CONFIG[cleanLabel] || {
-    zone: "Café" as TableZone,
+    zone: "smol-cafe" as TableZone,
     capacity: 2,
   };
 
