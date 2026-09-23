@@ -59,9 +59,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ children }) => {
     pathname?.startsWith("/profile") ||
     pathname?.startsWith("/account") ||
     pathname?.startsWith("/events") ||
-    pathname?.startsWith("/music") ||
-    pathname?.startsWith("/table") ||
-    pathname?.startsWith("/t/");
+    pathname?.startsWith("/music");
 
   // Real-time synchronization of mobile status bar color (<meta name="theme-color">)
   React.useEffect(() => {
