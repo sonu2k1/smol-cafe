@@ -66,11 +66,24 @@ export async function resolveQrToken(
     const finalGuestName = guestName || existingCookie?.guestName;
     const finalGuestPhone = guestPhone || existingCookie?.guestPhone;
 
-    // 1. Query table_qr_tokens by hash or plain token
+    // 1. Query table_qr_tokens by hash, plain token, or standardized table-XX format
+    const matchDigits = plainToken.match(/(\d+)/);
+    const standardTableLabel = matchDigits ? matchDigits[1].padStart(2, "0") : "";
+    const rawNumberLabel = matchDigits ? parseInt(matchDigits[1], 10).toString() : "";
+    const standardTokenHash = standardTableLabel ? `table-${standardTableLabel}` : "";
+
+    const queryFilters = [
+      `token_hash.eq.${tokenHash}`,
+      `token_hash.eq.${plainToken}`,
+    ];
+    if (standardTokenHash && standardTokenHash !== plainToken) {
+      queryFilters.push(`token_hash.eq.${standardTokenHash}`);
+    }
+
     const { data: qrTokens, error: qrError } = await supabase
       .from("table_qr_tokens")
       .select("*")
-      .or(`token_hash.eq.${tokenHash},token_hash.eq.${plainToken}`)
+      .or(queryFilters.join(","))
       .limit(1);
 
     let diningTable: DiningTable | null = null;
@@ -100,15 +113,14 @@ export async function resolveQrToken(
       }
     }
 
-    // Fallback: match table number directly or resolve table by label
-    if (!diningTable) {
-      const match = plainToken.match(/(\d+)/);
-      const tableLabel = match ? match[1].padStart(2, "0") : plainToken;
-
+    // Fallback: match table number directly or resolve table by label (padded and unpadded)
+    if (!diningTable && (standardTableLabel || plainToken)) {
+      const targetLabel = standardTableLabel || plainToken;
       const { data: tableByLabel } = await supabase
         .from("dining_tables")
         .select("*")
-        .eq("label", tableLabel)
+        .or(`label.eq.${targetLabel},label.eq.${rawNumberLabel || targetLabel}`)
+        .limit(1)
         .maybeSingle();
 
       if (tableByLabel) {
@@ -124,12 +136,19 @@ export async function resolveQrToken(
       };
     }
 
+    // If diningTable is found, ensure active status
     if (!diningTable.active) {
-      return {
-        success: false,
-        error: "TABLE_INACTIVE",
-        message: "This table is currently not in service. Please check with staff.",
-      };
+      // Auto-activate known standard cafe tables if temporarily inactive
+      if (standardTableLabel && TABLE_ZONES_CONFIG[standardTableLabel]) {
+        await supabase.from("dining_tables").update({ active: true }).eq("id", diningTable.id);
+        diningTable.active = true;
+      } else {
+        return {
+          success: false,
+          error: "TABLE_INACTIVE",
+          message: "This table is currently not in service. Please check with staff.",
+        };
+      }
     }
 
     // Fetch location name
