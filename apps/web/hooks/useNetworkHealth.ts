@@ -14,19 +14,11 @@ export interface NetworkHealthState {
  * Hook to detect client offline status and backend outage for graceful degradation
  */
 export function useNetworkHealth(): NetworkHealthState {
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
+  const [isOnline, setIsOnline] = useState(true);
   const [isBackendReachable, setIsBackendReachable] = useState(true);
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
 
   const checkHealth = useCallback(async () => {
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      setIsOnline(false);
-      setIsBackendReachable(false);
-      return;
-    }
-
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -38,10 +30,18 @@ export function useNetworkHealth(): NetworkHealthState {
       });
       clearTimeout(timeoutId);
 
-      setIsOnline(true);
-      setIsBackendReachable(res.ok);
+      if (res.ok) {
+        setIsOnline(true);
+        setIsBackendReachable(true);
+      } else {
+        const navOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+        setIsOnline(navOnline);
+        setIsBackendReachable(false);
+      }
       setLastCheckedAt(new Date());
     } catch {
+      const navOnline = typeof navigator !== "undefined" ? navigator.onLine : false;
+      setIsOnline(navOnline);
       setIsBackendReachable(false);
       setLastCheckedAt(new Date());
     }
@@ -60,6 +60,7 @@ export function useNetworkHealth(): NetworkHealthState {
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("focus", checkHealth);
 
     // Initial check and periodic 15s health probe
     checkHealth();
@@ -68,6 +69,7 @@ export function useNetworkHealth(): NetworkHealthState {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("focus", checkHealth);
       clearInterval(interval);
     };
   }, [checkHealth]);
