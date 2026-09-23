@@ -427,32 +427,17 @@ export async function confirmCashierOrderAction(
       console.warn("status history insert notice:", histErr);
     }
 
-    // 4. Broadcast instant real-time events to wake up Kitchen KDS, Barista Desk, and Customer Tracker
+    // 4. Single broadcast instant real-time event to wake up Kitchen KDS, Barista Desk, and Customer Tracker
     broadcastSyncEvent({
       type: "ORDER_CONFIRMED",
       orderId,
       orderNo: currentOrder?.order_no,
+      status: "ACCEPTED",
       timestamp: Date.now(),
       metadata: {
         stationTarget,
         staffName,
       },
-    });
-
-    broadcastSyncEvent({
-      type: "TICKET_STATUS_CHANGED",
-      orderId,
-      orderNo: currentOrder?.order_no,
-      status: "ACCEPTED",
-      timestamp: Date.now(),
-    });
-
-    broadcastSyncEvent({
-      type: "ORDER_PLACED",
-      orderId,
-      orderNo: currentOrder?.order_no,
-      status: "ACCEPTED",
-      timestamp: Date.now(),
     });
 
     const destinationLabel =

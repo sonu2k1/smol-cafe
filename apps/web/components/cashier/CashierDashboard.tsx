@@ -64,6 +64,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
   const [editingOrder, setEditingOrder] = useState<PendingOrderVerification | null>(null);
   const [amountTendered, setAmountTendered] = useState("");
   const [staffName, setStaffName] = useState("Cashier");
+  const [submittingOrderIds, setSubmittingOrderIds] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{
     type: "success" | "error";
@@ -97,10 +98,18 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
     }
   }, []);
 
+  // Debounced refresh for realtime updates to prevent request flooding
+  const debouncedRefresh = useCallback(() => {
+    const timer = setTimeout(() => {
+      refreshData();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [refreshData]);
+
   // Supabase Real-time subscriptions for cross-device live updates
-  useSupabaseRealtime({ table: "orders", onData: () => refreshData() });
-  useSupabaseRealtime({ table: "table_sessions", onData: () => refreshData() });
-  useSupabaseRealtime({ table: "bills", onData: () => refreshData() });
+  useSupabaseRealtime({ table: "orders", onData: () => debouncedRefresh() });
+  useSupabaseRealtime({ table: "table_sessions", onData: () => debouncedRefresh() });
+  useSupabaseRealtime({ table: "bills", onData: () => debouncedRefresh() });
 
   const handleOpenTableForGuest = async (label: string) => {
     await openTableSessionAction(label);
@@ -118,10 +127,10 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
       if (document.visibilityState === "visible") {
         refreshData();
       }
-    }, 5000);
+    }, 8000);
 
     const unsubscribe = subscribeToSyncEvents(() => {
-      refreshData();
+      debouncedRefresh();
     });
 
     return () => {
@@ -129,55 +138,92 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
       window.removeEventListener("focus", handleFocus);
       unsubscribe();
     };
-  }, [refreshData]);
-
-  // If pending orders arrive, gently surface tab if user was on queue
-  useEffect(() => {
-    if (pendingOrders.length > 0 && activeTab !== "queue") {
-      // Auto-focus queue if on initial state
-    }
-  }, [pendingOrders.length, activeTab]);
+  }, [refreshData, debouncedRefresh]);
 
   const handleConfirmOrder = async (
     orderId: string,
     stationTarget: "KITCHEN" | "BARISTA" | "ALL" = "ALL"
   ) => {
-    setIsSubmitting(true);
-    setActionFeedback(null);
+    if (submittingOrderIds.has(orderId)) return;
+
+    // 1. Instant Optimistic UI Update (0ms instant feedback)
+    const targetOrder = pendingOrders.find((o) => o.id === orderId);
+    setSubmittingOrderIds((prev) => new Set(prev).add(orderId));
+    setPendingOrders((prev) => prev.filter((o) => o.id !== orderId));
+
+    if (targetOrder) {
+      const optimisticPaidRecord: PaidHistoryRecord = {
+        id: `ORD-${targetOrder.orderNo || targetOrder.id.slice(-4)}`,
+        tableLabel: targetOrder.tableLabel,
+        totalRupees: Math.round(targetOrder.totalPaise / 100),
+        paymentMethod: "CASH",
+        paidAt: new Date().toISOString(),
+        itemsCount: targetOrder.items.reduce((acc, i) => acc + i.qty, 0) || 1,
+        items: targetOrder.items.map((i) => ({
+          name: i.name,
+          qty: i.qty,
+          priceRupees: Math.round(i.unitPricePaise / 100),
+          subtotalRupees: Math.round(i.lineSubtotal / 100),
+        })),
+      };
+      setPaidHistory((prev) => [optimisticPaidRecord, ...prev.filter((p) => p.id !== optimisticPaidRecord.id)]);
+    }
+
+    const stationLabel =
+      stationTarget === "KITCHEN"
+        ? "Kitchen (Food)"
+        : stationTarget === "BARISTA"
+        ? "Barista (Drinks)"
+        : "Kitchen & Barista";
+
+    setActionFeedback({
+      type: "success",
+      text: `Order #${targetOrder?.orderNo || ""} confirmed and dispatched to ${stationLabel}!`,
+    });
+
     try {
       const res = await confirmCashierOrderAction(orderId, stationTarget, staffName);
-      if (res.success) {
-        setActionFeedback({ type: "success", text: res.message || "Order confirmed & dispatched!" });
-        await refreshData();
-        setActiveTab("paid");
-      } else {
+      if (!res.success) {
         setActionFeedback({ type: "error", text: res.message || "Failed to confirm order." });
+        refreshData();
       }
     } catch {
       setActionFeedback({ type: "error", text: "Network error confirming order." });
+      refreshData();
     } finally {
-      setIsSubmitting(false);
+      setSubmittingOrderIds((prev) => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
     }
   };
 
   const handleRejectOrder = async (orderId: string) => {
+    if (submittingOrderIds.has(orderId)) return;
     const reason = prompt("Enter reason for order rejection/cancellation:", "Customer requested cancellation");
     if (!reason) return;
 
-    setIsSubmitting(true);
-    setActionFeedback(null);
+    // Instant Optimistic Removal
+    setSubmittingOrderIds((prev) => new Set(prev).add(orderId));
+    setPendingOrders((prev) => prev.filter((o) => o.id !== orderId));
+    setActionFeedback({ type: "success", text: "Order cancelled." });
+
     try {
       const res = await rejectCashierOrderAction(orderId, reason, staffName);
-      if (res.success) {
-        setActionFeedback({ type: "success", text: res.message || "Order rejected." });
-        refreshData();
-      } else {
+      if (!res.success) {
         setActionFeedback({ type: "error", text: res.message || "Failed to reject order." });
+        refreshData();
       }
     } catch {
       setActionFeedback({ type: "error", text: "Network error rejecting order." });
+      refreshData();
     } finally {
-      setIsSubmitting(false);
+      setSubmittingOrderIds((prev) => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
     }
   };
 
@@ -503,7 +549,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                             <div className="grid grid-cols-2 gap-2">
                               <button
                                 type="button"
-                                disabled={isSubmitting}
+                                disabled={submittingOrderIds.has(order.id)}
                                 onClick={() => handleConfirmOrder(order.id, "KITCHEN")}
                                 className="flex items-center justify-center gap-1 rounded-xl bg-orange-600 hover:bg-orange-500 text-white px-2.5 py-2 text-[11px] font-bold shadow-xs active:scale-95 transition cursor-pointer"
                                 title="Send only Food items to Kitchen KDS"
@@ -514,7 +560,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
 
                               <button
                                 type="button"
-                                disabled={isSubmitting}
+                                disabled={submittingOrderIds.has(order.id)}
                                 onClick={() => handleConfirmOrder(order.id, "BARISTA")}
                                 className="flex items-center justify-center gap-1 rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-2 text-[11px] font-bold shadow-xs active:scale-95 transition cursor-pointer"
                                 title="Send only Beverage items to Barista Desk"
@@ -525,7 +571,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
 
                               <button
                                 type="button"
-                                disabled={isSubmitting}
+                                disabled={submittingOrderIds.has(order.id)}
                                 onClick={() => handleConfirmOrder(order.id, "ALL")}
                                 className="col-span-2 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2 text-xs font-bold shadow-md active:scale-95 transition cursor-pointer"
                               >
@@ -536,7 +582,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                           ) : order.hasFoodItems ? (
                             <button
                               type="button"
-                              disabled={isSubmitting}
+                              disabled={submittingOrderIds.has(order.id)}
                               onClick={() => handleConfirmOrder(order.id, "KITCHEN")}
                               className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 text-xs font-bold shadow-md active:scale-95 transition cursor-pointer"
                             >
@@ -546,7 +592,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                           ) : order.hasBeverageItems ? (
                             <button
                               type="button"
-                              disabled={isSubmitting}
+                              disabled={submittingOrderIds.has(order.id)}
                               onClick={() => handleConfirmOrder(order.id, "BARISTA")}
                               className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 text-xs font-bold shadow-md active:scale-95 transition cursor-pointer"
                             >
@@ -556,7 +602,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                           ) : (
                             <button
                               type="button"
-                              disabled={isSubmitting}
+                              disabled={submittingOrderIds.has(order.id)}
                               onClick={() => handleConfirmOrder(order.id, "ALL")}
                               className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 text-xs font-bold shadow-md active:scale-95 transition cursor-pointer"
                             >
@@ -568,7 +614,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                           {/* Reject Option */}
                           <button
                             type="button"
-                            disabled={isSubmitting}
+                            disabled={submittingOrderIds.has(order.id)}
                             onClick={() => handleRejectOrder(order.id)}
                             className="w-full text-center text-[11px] font-semibold text-rose-700 dark:text-rose-400 hover:underline py-1"
                           >
