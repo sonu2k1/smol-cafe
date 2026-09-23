@@ -17,7 +17,21 @@ import {
   type PendingOrderVerification,
   type PaidHistoryRecord,
 } from "@/app/cashier/actions";
-import { Bell, Armchair, Sparkles, Check, Receipt, CreditCard, Tag, Printer, RefreshCw } from "lucide-react";
+import {
+  Bell,
+  Armchair,
+  Sparkles,
+  Check,
+  Receipt,
+  CreditCard,
+  Tag,
+  Printer,
+  RefreshCw,
+  Edit3,
+  Coffee,
+  UtensilsCrossed,
+  Layers,
+} from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
 import { createTableJsonTag, type TableJsonTag } from "@/lib/table-tag";
@@ -25,6 +39,7 @@ import { JsonTagInspectorModal } from "@/components/table/JsonTagInspectorModal"
 import { UpiPaymentDrawer } from "@/components/payment/UpiPaymentDrawer";
 import { DigitalReceiptModal, type ReceiptData } from "@/components/payment/DigitalReceiptModal";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { CashierOrderEditorModal } from "./CashierOrderEditorModal";
 
 interface CashierDashboardProps {
   initialTables: ActiveCashierTable[];
@@ -37,7 +52,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
   initialPendingOrders = [],
   initialPaidHistory = [],
 }) => {
-  const [activeTab, setActiveTab] = useState<"queue" | "tables" | "paid">("paid");
+  const [activeTab, setActiveTab] = useState<"queue" | "tables" | "paid">("queue");
   const [tables, setTables] = useState<ActiveCashierTable[]>(initialTables);
   const [pendingOrders, setPendingOrders] = useState<PendingOrderVerification[]>(initialPendingOrders);
   const [paidHistory, setPaidHistory] = useState<PaidHistoryRecord[]>(initialPaidHistory);
@@ -46,6 +61,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
   const [inspectingTag, setInspectingTag] = useState<TableJsonTag | null>(null);
   const [activeUpiTable, setActiveUpiTable] = useState<ActiveCashierTable | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<ReceiptData | null>(null);
+  const [editingOrder, setEditingOrder] = useState<PendingOrderVerification | null>(null);
   const [amountTendered, setAmountTendered] = useState("");
   const [staffName, setStaffName] = useState("Cashier");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,19 +107,18 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
     refreshData();
   };
 
-  // Poll pending orders and tables every 3 seconds + real-time event listener + window focus revalidation
+  // Poll pending orders and tables + real-time event listener + window focus revalidation
   useEffect(() => {
     refreshData();
 
     const handleFocus = () => refreshData();
     window.addEventListener("focus", handleFocus);
 
-    // Smart fallback polling: 7s when tab is active (Realtime sync events handle instant push)
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshData();
       }
-    }, 7000);
+    }, 5000);
 
     const unsubscribe = subscribeToSyncEvents(() => {
       refreshData();
@@ -116,18 +131,23 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
     };
   }, [refreshData]);
 
-  const handleConfirmOrder = async (orderId: string) => {
+  // If pending orders arrive, gently surface tab if user was on queue
+  useEffect(() => {
+    if (pendingOrders.length > 0 && activeTab !== "queue" && activeTab !== "tables") {
+      // Auto-focus queue if on initial state
+    }
+  }, [pendingOrders.length, activeTab]);
+
+  const handleConfirmOrder = async (
+    orderId: string,
+    stationTarget: "KITCHEN" | "BARISTA" | "ALL" = "ALL"
+  ) => {
     setIsSubmitting(true);
     setActionFeedback(null);
     try {
-      const res = await confirmCashierOrderAction(orderId, staffName);
+      const res = await confirmCashierOrderAction(orderId, stationTarget, staffName);
       if (res.success) {
-        broadcastSyncEvent({
-          type: "ORDER_CONFIRMED",
-          orderId,
-          timestamp: Date.now(),
-        });
-        setActionFeedback({ type: "success", text: res.message || "Order confirmed & sent to kitchen!" });
+        setActionFeedback({ type: "success", text: res.message || "Order confirmed & dispatched!" });
         refreshData();
       } else {
         setActionFeedback({ type: "error", text: res.message || "Failed to confirm order." });
@@ -140,7 +160,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
   };
 
   const handleRejectOrder = async (orderId: string) => {
-    const reason = prompt("Enter reason for order cancellation/rejection:", "Customer requested cancellation");
+    const reason = prompt("Enter reason for order rejection/cancellation:", "Customer requested cancellation");
     if (!reason) return;
 
     setIsSubmitting(true);
@@ -216,7 +236,6 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
   return (
     <div className="min-h-screen bg-[#F3E7D3] dark:bg-[#141211] text-[#241F1C] dark:text-[#FDFBF7] transition-colors duration-200">
       {/* Header */}
-      {/* Header */}
       <header className="sticky top-0 z-30 border-b border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB]/95 dark:bg-[#1C1917]/95 px-3 sm:px-6 py-2.5 sm:py-3.5 backdrop-blur-md transition-colors duration-200">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-2">
           {/* Brand Left */}
@@ -250,11 +269,11 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                   smol café • Cashier Desk
                 </span>
                 <span className="hidden sm:inline rounded-md border border-[#C9AE8B]/30 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-2 py-0.5 font-mono text-[10px] text-[#725039] dark:text-stone-400 shrink-0">
-                  Front-Desk Queue &amp; POS
+                  Front-Desk Queue &amp; Gatekeeper
                 </span>
               </div>
               <p className="sm:hidden font-mono text-[10px] text-[#725039] dark:text-stone-400 truncate">
-                Front-Desk Queue &amp; POS
+                Front-Desk Queue &amp; Gatekeeper
               </p>
             </div>
           </div>
@@ -304,8 +323,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
 
         {/* Tab Switcher */}
         <div className="flex items-center gap-1.5 sm:gap-2 border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5 overflow-x-auto scrollbar-none">
-          {/* Order Confirmation Queue & Tables tabs temporarily commented out */}
-          {/*
+          {/* TAB 1: ORDER CONFIRMATION QUEUE */}
           <button
             type="button"
             onClick={() => setActiveTab("queue")}
@@ -325,6 +343,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
             )}
           </button>
 
+          {/* TAB 2: ACTIVE TABLES */}
           <button
             type="button"
             onClick={() => setActiveTab("tables")}
@@ -341,8 +360,8 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
               {tables.length}
             </span>
           </button>
-          */}
 
+          {/* TAB 3: PAID ORDERS */}
           <button
             type="button"
             onClick={() => setActiveTab("paid")}
@@ -361,21 +380,20 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
           </button>
         </div>
 
-        {/* TAB 1 & TAB 2 TEMPORARILY COMMENTED OUT */}
-        {/*
+        {/* TAB 1: ORDER CONFIRMATION QUEUE */}
         {activeTab === "queue" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-extrabold tracking-tight text-[#241F1C] dark:text-[#FDFBF7]">
-                  Incoming Order Confirmation Queue
+                  Incoming Cashier Approval Queue
                 </h1>
                 <p className="text-xs text-[#725039] dark:text-stone-400">
-                  Verify customer Table PIN &amp; confirm before pushing ticket to Kitchen KDS
+                  Review &amp; Edit orders placed via &quot;Pay at Cashier&quot; before dispatching to Kitchen / Barista KDS
                 </p>
               </div>
               <span className="rounded-full bg-[#B72E35]/10 dark:bg-[#B72E35]/20 border border-[#B72E35]/30 dark:border-[#B72E35]/50 px-3 py-1 font-mono text-xs font-bold text-[#B72E35] dark:text-[#F2C84B]">
-                {pendingOrders.length} Awaiting Verification
+                {pendingOrders.length} Awaiting Approval
               </span>
             </div>
 
@@ -384,107 +402,205 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                 <Sparkles className="h-8 w-8 text-amber-500 mx-auto" />
                 <p className="text-sm font-bold text-[#241F1C] dark:text-stone-200">No pending orders in queue</p>
                 <p className="text-xs text-[#8C6D53] dark:text-stone-500">
-                  All customer orders have been confirmed and sent to kitchen preparation.
+                  All customer orders have been reviewed, edited, and dispatched to stations.
                 </p>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
-                {pendingOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="relative flex flex-col justify-between rounded-3xl border-2 border-[#F2C84B] dark:border-amber-500/60 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-lg space-y-4 animate-scale-in transition-colors"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-[#B72E35] animate-pulse" />
-                          <span className="font-mono text-xs font-black uppercase tracking-wider text-[#B72E35] dark:text-[#F2C84B]">
-                            NEW ORDER
-                          </span>
-                        </div>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700/60 px-2.5 py-0.5 font-mono text-[11px] font-extrabold text-emerald-800 dark:text-emerald-300">
-                          <Check className="h-3 w-3" />
-                          Payment: {order.paymentStatus || "PAID"}
-                        </span>
-                      </div>
+                {pendingOrders.map((order) => {
+                  const totalRupees = Math.round(order.totalPaise / 100);
 
-                      <div className="flex items-start justify-between pt-2.5 pb-2">
-                        <div>
-                          <h2 className="font-mono text-2xl font-black text-[#241F1C] dark:text-white">
-                            Table {order.tableLabel}
-                          </h2>
-                          <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
-                            Order #{order.orderNo} • {new Date(order.submittedAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3]/70 dark:bg-stone-800/80 px-3 py-1 text-right">
-                          <span className="block font-mono text-[8.5px] uppercase font-bold text-[#725039] dark:text-stone-400 tracking-wider">
-                            PIN
-                          </span>
-                          <span className="font-mono text-lg font-black text-[#241F1C] dark:text-white">
-                            {order.verificationCode}
-                          </span>
-                        </div>
-                      </div>
-
-                      {order.instructions && (
-                        <div className="mt-1 rounded-xl border border-amber-300 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/20 p-2 text-xs text-amber-900 dark:text-amber-300 font-serif italic">
-                          &quot;{order.instructions}&quot;
-                        </div>
-                      )}
-
-                      <div className="mt-2 space-y-1.5 font-sans text-xs divide-y divide-[#C9AE8B]/20 dark:divide-stone-800/60">
-                        {order.items.map((item) => (
-                          <div key={item.id} className="pt-1.5 flex items-center justify-between">
-                            <span className="font-medium text-[#241F1C] dark:text-stone-200">
-                              <strong className="font-mono text-[#B72E35] dark:text-[#F6AD55]">{item.qty}×</strong> {item.name}
-                            </span>
-                            <span className="font-mono text-[#725039] dark:text-stone-400">
-                              ₹{Math.round(item.lineSubtotal / 100)}
+                  return (
+                    <div
+                      key={order.id}
+                      className="relative flex flex-col justify-between rounded-3xl border-2 border-[#F2C84B] dark:border-amber-500/60 bg-[#FAF4EB] dark:bg-[#1A1715] p-5 shadow-lg space-y-4 animate-scale-in transition-colors"
+                    >
+                      <div>
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-[#B72E35] animate-pulse" />
+                            <span className="font-mono text-xs font-black uppercase tracking-wider text-[#B72E35] dark:text-[#F2C84B]">
+                              PAY AT CASHIER
                             </span>
                           </div>
-                        ))}
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-700/60 px-2.5 py-0.5 font-mono text-[11px] font-extrabold text-amber-800 dark:text-amber-300">
+                            Awaiting Cashier Approval
+                          </span>
+                        </div>
+
+                        {/* Table, Order # & PIN */}
+                        <div className="flex items-start justify-between pt-2.5 pb-2">
+                          <div>
+                            <h2 className="font-mono text-2xl font-black text-[#241F1C] dark:text-white">
+                              Table {order.tableLabel}
+                            </h2>
+                            <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                              Order #{order.orderNo} •{" "}
+                              {new Date(order.submittedAt || Date.now()).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3]/70 dark:bg-stone-800/80 px-3 py-1 text-right">
+                            <span className="block font-mono text-[8.5px] uppercase font-bold text-[#725039] dark:text-stone-400 tracking-wider">
+                              PIN
+                            </span>
+                            <span className="font-mono text-lg font-black text-[#241F1C] dark:text-white">
+                              {order.verificationCode}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Special Instructions */}
+                        {order.instructions && (
+                          <div className="mt-1 rounded-xl border border-amber-300 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/20 p-2 text-xs text-amber-900 dark:text-amber-300 font-serif italic">
+                            &quot;{order.instructions}&quot;
+                          </div>
+                        )}
+
+                        {/* Items Breakdown with Station Tags */}
+                        <div className="mt-2 space-y-1.5 font-sans text-xs divide-y divide-[#C9AE8B]/20 dark:divide-stone-800/60">
+                          {order.items.map((item) => (
+                            <div key={item.id} className="pt-1.5 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.2 font-mono text-[9.5px] font-bold ${
+                                    item.isBeverage
+                                      ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                                      : "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border border-orange-300 dark:border-orange-800"
+                                  }`}
+                                >
+                                  {item.isBeverage ? <Coffee className="h-2.5 w-2.5" /> : <UtensilsCrossed className="h-2.5 w-2.5" />}
+                                  <span>{item.isBeverage ? "Barista" : "Kitchen"}</span>
+                                </span>
+                                <span className="font-medium text-[#241F1C] dark:text-stone-200 truncate">
+                                  <strong className="font-mono text-[#B72E35] dark:text-[#F6AD55]">{item.qty}×</strong>{" "}
+                                  {item.name}
+                                </span>
+                              </div>
+                              <span className="font-mono text-[#725039] dark:text-stone-400 shrink-0">
+                                ₹{Math.round(item.lineSubtotal / 100)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Card Bottom / Actions */}
+                      <div className="border-t border-[#C9AE8B]/30 dark:border-stone-800 pt-3 space-y-3">
+                        <div className="flex items-baseline justify-between">
+                          <div>
+                            <span className="block font-mono text-[9px] uppercase font-bold text-[#8C6D53] dark:text-stone-500">
+                              ORDER AMOUNT
+                            </span>
+                            <span className="font-mono text-xl font-black text-[#B72E35] dark:text-[#F6AD55]">
+                              ₹{totalRupees}
+                            </span>
+                          </div>
+
+                          {/* OPTION 1: EDIT ORDER BUTTON */}
+                          <button
+                            type="button"
+                            onClick={() => setEditingOrder(order)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/60 dark:border-stone-700 bg-[#F3E7D3] dark:bg-stone-800 px-3 py-1.5 text-xs font-bold text-[#725039] dark:text-stone-200 hover:bg-[#EBDDC8] dark:hover:bg-stone-700 active:scale-95 transition cursor-pointer shadow-xs"
+                          >
+                            <Edit3 className="h-3.5 w-3.5 text-[#B72E35] dark:text-[#F6AD55]" />
+                            <span>Edit Order</span>
+                          </button>
+                        </div>
+
+                        {/* OPTION 2: CONFIRMATION DISPATCH BUTTONS */}
+                        <div className="grid grid-cols-1 gap-2">
+                          {/* If order has both Food and Beverage items, offer station-wise or combined confirm */}
+                          {order.hasFoodItems && order.hasBeverageItems ? (
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={() => handleConfirmOrder(order.id, "KITCHEN")}
+                                className="flex items-center justify-center gap-1 rounded-xl bg-orange-600 hover:bg-orange-500 text-white px-2.5 py-2 text-[11px] font-bold shadow-xs active:scale-95 transition cursor-pointer"
+                                title="Send only Food items to Kitchen KDS"
+                              >
+                                <UtensilsCrossed className="h-3.5 w-3.5" />
+                                <span>Confirm for Kitchen</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={() => handleConfirmOrder(order.id, "BARISTA")}
+                                className="flex items-center justify-center gap-1 rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-2 text-[11px] font-bold shadow-xs active:scale-95 transition cursor-pointer"
+                                title="Send only Beverage items to Barista Desk"
+                              >
+                                <Coffee className="h-3.5 w-3.5" />
+                                <span>Confirm for Barista</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={() => handleConfirmOrder(order.id, "ALL")}
+                                className="col-span-2 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2 text-xs font-bold shadow-md active:scale-95 transition cursor-pointer"
+                              >
+                                <Check className="h-4 w-4" />
+                                <span>Confirm All (Kitchen &amp; Barista)</span>
+                              </button>
+                            </div>
+                          ) : order.hasFoodItems ? (
+                            <button
+                              type="button"
+                              disabled={isSubmitting}
+                              onClick={() => handleConfirmOrder(order.id, "KITCHEN")}
+                              className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 text-xs font-bold shadow-md active:scale-95 transition cursor-pointer"
+                            >
+                              <UtensilsCrossed className="h-4 w-4" />
+                              <span>Confirm for Kitchen (Food)</span>
+                            </button>
+                          ) : order.hasBeverageItems ? (
+                            <button
+                              type="button"
+                              disabled={isSubmitting}
+                              onClick={() => handleConfirmOrder(order.id, "BARISTA")}
+                              className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 text-xs font-bold shadow-md active:scale-95 transition cursor-pointer"
+                            >
+                              <Coffee className="h-4 w-4" />
+                              <span>Confirm for Barista (Drinks)</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isSubmitting}
+                              onClick={() => handleConfirmOrder(order.id, "ALL")}
+                              className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 text-xs font-bold shadow-md active:scale-95 transition cursor-pointer"
+                            >
+                              <Check className="h-4 w-4" />
+                              <span>Confirm &amp; Dispatch Order</span>
+                            </button>
+                          )}
+
+                          {/* Reject Option */}
+                          <button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={() => handleRejectOrder(order.id)}
+                            className="w-full text-center text-[11px] font-semibold text-rose-700 dark:text-rose-400 hover:underline py-1"
+                          >
+                            Reject / Cancel Order
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="border-t border-[#C9AE8B]/30 dark:border-stone-800 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                      <div>
-                        <span className="block font-mono text-[9px] uppercase font-bold text-[#8C6D53] dark:text-stone-500">
-                          ORDER TOTAL (PAID)
-                        </span>
-                        <span className="font-mono text-xl font-black text-emerald-600 dark:text-emerald-400">
-                          ₹{Math.round(order.totalPaise / 100)}
-                        </span>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          disabled={isSubmitting}
-                          onClick={() => handleRejectOrder(order.id)}
-                          className="flex-1 sm:flex-none rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 px-3 py-2 text-xs font-bold text-rose-800 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition active:scale-95 disabled:opacity-50 cursor-pointer text-center"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isSubmitting}
-                          onClick={() => handleConfirmOrder(order.id)}
-                          className="flex-2 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 active:scale-95 transition disabled:opacity-50 cursor-pointer text-center"
-                        >
-                          <Check className="h-4 w-4" />
-                          <span>Pushed to Kitchen</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
+        {/* TAB 2: ACTIVE TABLES & SETTLEMENT */}
         {activeTab === "tables" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -613,7 +729,6 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
             )}
           </div>
         )}
-        */}
 
         {/* TAB 3: PAID ORDERS & SETTLEMENT AUDIT */}
         {activeTab === "paid" && (
@@ -734,7 +849,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                   ))}
                 </div>
 
-                {/* Tablet / Desktop View: Clean Table with horizontal scroll support */}
+                {/* Tablet / Desktop View */}
                 <div className="hidden sm:block rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
                   <div className="overflow-x-auto scrollbar-none">
                     <table className="w-full min-w-[560px] text-left text-xs">
@@ -882,7 +997,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                   }}
                   className="w-full rounded-2xl bg-[#241F1C] dark:bg-stone-800 py-3 text-xs font-bold text-[#F3E7D3] dark:text-white transition hover:bg-[#362B24] dark:hover:bg-stone-700 cursor-pointer"
                 >
-                  Close & Done
+                  Close &amp; Done
                 </button>
               </div>
             ) : (
@@ -951,6 +1066,19 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* Cashier Order Editor Modal (Edit Order feature) */}
+      {editingOrder && (
+        <CashierOrderEditorModal
+          order={editingOrder}
+          isOpen={Boolean(editingOrder)}
+          onClose={() => setEditingOrder(null)}
+          onSaveSuccess={() => {
+            setActionFeedback({ type: "success", text: "Order items and totals updated successfully!" });
+            refreshData();
+          }}
+        />
       )}
 
       {/* JSON Table Tag Inspector Modal */}

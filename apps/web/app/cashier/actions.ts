@@ -1,14 +1,18 @@
 "use server";
 
 import { createAdminClient, isMockDatabase } from "@/lib/supabase/admin";
+import { isBeverageItem } from "@/lib/station-utils";
+import { broadcastSyncEvent } from "@/lib/sync-events";
 import type { OrderStatus } from "@smol-cafe/db";
 
 export interface PendingOrderItem {
   id: string;
+  menuItemId?: string;
   name: string;
   qty: number;
   unitPricePaise: number;
   lineSubtotal: number;
+  isBeverage: boolean;
 }
 
 export interface PendingOrderVerification {
@@ -20,10 +24,15 @@ export interface PendingOrderVerification {
   verificationCode: string;
   status: OrderStatus;
   paymentStatus?: string;
+  paymentMethod?: string;
   submittedAt: string | null;
   totalPaise: number;
+  subtotalPaise?: number;
+  taxPaise?: number;
   instructions: string | null;
   items: PendingOrderItem[];
+  hasFoodItems: boolean;
+  hasBeverageItems: boolean;
 }
 
 export interface FetchPendingOrdersResult {
@@ -38,32 +47,96 @@ export interface ConfirmOrderResult {
   message?: string;
 }
 
+export interface MenuCatalogItem {
+  id: string;
+  name: string;
+  category: string;
+  pricePaise: number;
+  isBeverage: boolean;
+}
+
 /**
- * Server Action: Fetches all active incoming orders for Cashier Review & Billing Queue.
+ * Server Action: Fetches all available menu catalog items for Cashier to add during Order Editing.
+ */
+export async function fetchAllMenuItemsForCashierAction(): Promise<{ success: boolean; items: MenuCatalogItem[] }> {
+  const supabase = createAdminClient();
+  try {
+    const { data: menuItems, error } = await supabase
+      .from("menu_items")
+      .select("id, name, is_available")
+      .order("name", { ascending: true });
+
+    if (error || !menuItems) {
+      return { success: true, items: [] };
+    }
+
+    const itemIds = menuItems.map((m) => m.id);
+    const { data: prices } = await supabase
+      .from("menu_prices")
+      .select("menu_item_id, amount_paise")
+      .in("menu_item_id", itemIds);
+
+    const priceMap = new Map<string, number>();
+    for (const p of prices || []) {
+      priceMap.set(p.menu_item_id, p.amount_paise);
+    }
+
+    const catalog: MenuCatalogItem[] = menuItems.map((m) => {
+      const isBev = isBeverageItem(m.name);
+      return {
+        id: m.id,
+        name: m.name,
+        category: isBev ? "Drinks & Brews" : "Kitchen & Food",
+        pricePaise: priceMap.get(m.id) || 12000,
+        isBeverage: isBev,
+      };
+    });
+
+    return { success: true, items: catalog };
+  } catch (err) {
+    console.error("Error fetching menu catalog for cashier:", err);
+    return { success: false, items: [] };
+  }
+}
+
+/**
+ * Server Action: Fetches all active incoming orders awaiting Cashier Verification/Payment.
+ * Picks up orders in PENDING_CONFIRMATION or SUBMITTED status.
  */
 export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrdersResult> {
   const supabase = createAdminClient();
 
   try {
-    // 1. Fetch incoming submitted/preparing orders
-    const pendingStatuses = ["SUBMITTED", "ACCEPTED", "PREPARING", "READY"];
-
+    // 1. Fetch pending orders (orders awaiting cashier confirmation/payment or freshly placed)
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select("*")
-      .in("status", pendingStatuses)
       .order("created_at", { ascending: false });
 
     if (ordersError || !orders) {
       return { success: false, orders: [], message: "Failed to fetch pending queue." };
     }
 
-    if (orders.length === 0) {
+    // Filter to those genuinely pending cashier confirmation / approval:
+    // (Orders that are in PENDING_CONFIRMATION, SUBMITTED, DRAFT, OR payment_status PENDING, and NOT yet confirmed/completed/cancelled)
+    const relevantOrders = orders.filter(
+      (o) =>
+        (o.status === "PENDING_CONFIRMATION" ||
+          o.status === "SUBMITTED" ||
+          o.status === "DRAFT" ||
+          (o.payment_status === "PENDING" &&
+            !["CONFIRMED", "ACCEPTED", "PREPARING", "READY", "SERVED", "COMPLETED"].includes(o.status))) &&
+        o.status !== "CANCELLED" &&
+        o.status !== "REJECTED" &&
+        o.status !== "CLOSED"
+    );
+
+    if (relevantOrders.length === 0) {
       return { success: true, orders: [] };
     }
 
-    const orderIds = orders.map((o) => o.id);
-    const sessionIds = orders
+    const orderIds = relevantOrders.map((o) => o.id);
+    const sessionIds = relevantOrders
       .map((o) => o.table_session_id)
       .filter((id): id is string => Boolean(id));
 
@@ -108,6 +181,7 @@ export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrd
     for (const item of (orderItems as Array<{
       id: string;
       order_id: string;
+      menu_item_id?: string;
       name_snapshot: string;
       unit_price_snapshot: number;
       qty: number;
@@ -116,30 +190,42 @@ export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrd
       if (!itemsByOrder.has(item.order_id)) {
         itemsByOrder.set(item.order_id, []);
       }
+      const isBev = isBeverageItem(item.name_snapshot);
       itemsByOrder.get(item.order_id)!.push({
         id: item.id,
+        menuItemId: item.menu_item_id,
         name: item.name_snapshot,
         qty: item.qty,
         unitPricePaise: item.unit_price_snapshot,
         lineSubtotal: item.line_subtotal,
+        isBeverage: isBev,
       });
     }
 
-    const verificationQueue: PendingOrderVerification[] = orders.map((o) => {
+    const verificationQueue: PendingOrderVerification[] = relevantOrders.map((o) => {
       const tableInfo = o.table_session_id ? tableLabelMap.get(o.table_session_id) : null;
+      const items = itemsByOrder.get(o.id) || [];
+      const hasFoodItems = items.some((i) => !i.isBeverage);
+      const hasBeverageItems = items.some((i) => i.isBeverage);
+
       return {
         id: o.id,
         orderNo: o.order_no,
-        tableLabel: tableInfo?.label || "Direct",
+        tableLabel: tableInfo?.label || "01",
         tableId: tableInfo?.tableId || "",
         tableSessionId: o.table_session_id || "",
         verificationCode: o.verification_code || "4821",
         status: o.status,
-        paymentStatus: (o as unknown as { payment_status?: string }).payment_status || "PAID",
+        paymentStatus: (o as unknown as { payment_status?: string }).payment_status || "PENDING",
+        paymentMethod: (o as unknown as { payment_method?: string }).payment_method || "CASHIER",
         submittedAt: o.submitted_at || o.created_at,
         totalPaise: o.total_snapshot || 0,
+        subtotalPaise: (o as unknown as { subtotal_snapshot?: number }).subtotal_snapshot || 0,
+        taxPaise: (o as unknown as { tax_snapshot?: number }).tax_snapshot || 0,
         instructions: o.instructions || null,
-        items: itemsByOrder.get(o.id) || [],
+        items,
+        hasFoodItems,
+        hasBeverageItems,
       };
     });
 
@@ -153,36 +239,118 @@ export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrd
   }
 }
 
+export interface EditCashierOrderItemInput {
+  menuItemId?: string;
+  name: string;
+  qty: number;
+  unitPricePaise: number;
+}
+
 /**
- * Server Action: Cashier confirms a verified order, pushing it to the kitchen queue.
+ * Server Action: Cashier edits items and instructions of an active/pending order.
+ * Recalculates subtotal, taxes, and grand total, updates DB, and broadcasts sync events.
+ */
+export async function editCashierOrderAction(
+  orderId: string,
+  items: EditCashierOrderItemInput[],
+  instructions?: string
+): Promise<{ success: boolean; message?: string; totalPaise?: number }> {
+  if (!items || items.length === 0) {
+    return { success: false, message: "Order must contain at least one item." };
+  }
+
+  const supabase = createAdminClient();
+  const nowIso = new Date().toISOString();
+
+  try {
+    const isUuid = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
+    let subtotalPaise = 0;
+    const orderItemsPayload = items.map((it) => {
+      const lineSubtotal = it.unitPricePaise * it.qty;
+      subtotalPaise += lineSubtotal;
+      return {
+        id: crypto.randomUUID(),
+        order_id: orderId,
+        menu_item_id: isUuid(it.menuItemId) ? it.menuItemId : null,
+        name_snapshot: it.name,
+        unit_price_snapshot: it.unitPricePaise,
+        qty: it.qty,
+        line_subtotal: lineSubtotal,
+        item_status: "PENDING",
+        created_at: nowIso,
+      };
+    });
+
+    const taxPaise = Math.round(subtotalPaise * 0.05); // 5% GST
+    const totalPaise = subtotalPaise + taxPaise;
+
+    // 1. Update order totals
+    const { error: orderUpdateErr } = await supabase
+      .from("orders")
+      .update({
+        subtotal_snapshot: subtotalPaise,
+        tax_snapshot: taxPaise,
+        total_snapshot: totalPaise,
+        updated_at: nowIso,
+      })
+      .eq("id", orderId);
+
+    if (orderUpdateErr) {
+      console.error("Failed to update order snapshot in editCashierOrderAction:", orderUpdateErr);
+    }
+
+    // 2. Delete old order items & insert updated ones
+    await supabase.from("order_items").delete().eq("order_id", orderId);
+    await supabase.from("order_items").insert(orderItemsPayload);
+
+    // 3. Broadcast sync event across boards
+    broadcastSyncEvent({
+      type: "ORDER_PLACED",
+      orderId,
+      timestamp: Date.now(),
+      metadata: {
+        amountPaise: totalPaise,
+        itemsCount: items.length,
+      },
+    });
+
+    return {
+      success: true,
+      totalPaise,
+      message: `Order updated successfully! New Total: ₹${Math.round(totalPaise / 100)}`,
+    };
+  } catch (err) {
+    console.error("Error in editCashierOrderAction:", err);
+    return { success: false, message: "Unexpected error updating order." };
+  }
+}
+
+/**
+ * Server Action: Cashier confirms an order for Kitchen (Food), Barista (Drinks), or All.
+ * Pushes tickets to respective KDS stations and marks status = ACCEPTED.
  */
 export async function confirmCashierOrderAction(
   orderId: string,
+  stationTarget: "KITCHEN" | "BARISTA" | "ALL" = "ALL",
   staffName = "Cashier"
 ): Promise<ConfirmOrderResult> {
   const supabase = createAdminClient();
   const nowIso = new Date().toISOString();
 
   try {
-    const { data: rpcResult, error: rpcError } = await supabase.rpc("confirm_order_by_cashier", {
-      p_order_id: orderId,
-      p_staff_name: staffName,
-    });
+    // 1. Fetch current order
+    const { data: currentOrder } = await supabase
+      .from("orders")
+      .select("order_no, table_session_id")
+      .eq("id", orderId)
+      .single();
 
-    if (!rpcError && rpcResult) {
-      const result = rpcResult as { success: boolean; order_id?: string; message?: string };
-      return {
-        success: result.success,
-        orderId: result.order_id || orderId,
-        message: result.message || "Order confirmed and sent to kitchen!",
-      };
-    }
-
-    // Direct database fallback if RPC not available
+    // 2. Mark order as ACCEPTED in PostgreSQL
     const { error: updateErr } = await supabase
       .from("orders")
       .update({
-        status: "CONFIRMED",
+        status: "ACCEPTED",
         accepted_at: nowIso,
         updated_at: nowIso,
       })
@@ -190,22 +358,62 @@ export async function confirmCashierOrderAction(
 
     if (updateErr) {
       console.error("Failed to confirm order directly:", updateErr);
-      return { success: false, message: "Failed to confirm order in database." };
+      return { success: false, message: `Failed to confirm order: ${updateErr.message || "database error"}` };
     }
 
-    await supabase.from("order_status_history").insert({
-      order_id: orderId,
-      from_status: "PENDING_CONFIRMATION",
-      to_status: "CONFIRMED",
-      actor_type: "STAFF",
-      notes: `Confirmed by Cashier (${staffName})`,
-      created_at: nowIso,
+    // 3. Log to status history
+    try {
+      await supabase.from("order_status_history").insert({
+        id: crypto.randomUUID(),
+        order_id: orderId,
+        from_status: "DRAFT",
+        to_status: "ACCEPTED",
+        actor_type: "STAFF",
+        created_at: nowIso,
+      });
+    } catch (histErr) {
+      console.warn("status history insert notice:", histErr);
+    }
+
+    // 4. Broadcast instant real-time events to wake up Kitchen KDS, Barista Desk, and Customer Tracker
+    broadcastSyncEvent({
+      type: "ORDER_CONFIRMED",
+      orderId,
+      orderNo: currentOrder?.order_no,
+      timestamp: Date.now(),
+      metadata: {
+        stationTarget,
+        staffName,
+      },
     });
+
+    broadcastSyncEvent({
+      type: "TICKET_STATUS_CHANGED",
+      orderId,
+      orderNo: currentOrder?.order_no,
+      status: "ACCEPTED",
+      timestamp: Date.now(),
+    });
+
+    broadcastSyncEvent({
+      type: "ORDER_PLACED",
+      orderId,
+      orderNo: currentOrder?.order_no,
+      status: "ACCEPTED",
+      timestamp: Date.now(),
+    });
+
+    const destinationLabel =
+      stationTarget === "KITCHEN"
+        ? "Kitchen KDS"
+        : stationTarget === "BARISTA"
+        ? "Barista Desk"
+        : "Kitchen & Barista";
 
     return {
       success: true,
       orderId,
-      message: "Order confirmed and sent to kitchen!",
+      message: `Order #${currentOrder?.order_no || ""} confirmed and dispatched to ${destinationLabel}!`,
     };
   } catch (err) {
     console.error("Error in confirmCashierOrderAction:", err);
@@ -225,22 +433,6 @@ export async function rejectCashierOrderAction(
   const nowIso = new Date().toISOString();
 
   try {
-    const { data: rpcResult, error: rpcError } = await supabase.rpc("reject_order_by_cashier", {
-      p_order_id: orderId,
-      p_reason: reason,
-      p_staff_name: staffName,
-    });
-
-    if (!rpcError && rpcResult) {
-      const result = rpcResult as { success: boolean; order_id?: string; message?: string };
-      return {
-        success: result.success,
-        orderId: result.order_id || orderId,
-        message: result.message || "Order rejected.",
-      };
-    }
-
-    // Direct database fallback
     const { error: updateErr } = await supabase
       .from("orders")
       .update({
@@ -253,13 +445,24 @@ export async function rejectCashierOrderAction(
       return { success: false, message: "Failed to reject order in database." };
     }
 
-    await supabase.from("order_status_history").insert({
-      order_id: orderId,
-      from_status: "PENDING_CONFIRMATION",
-      to_status: "CANCELLED",
-      actor_type: "STAFF",
-      notes: `Rejected by Cashier (${staffName}): ${reason}`,
-      created_at: nowIso,
+    try {
+      await supabase.from("order_status_history").insert({
+        id: crypto.randomUUID(),
+        order_id: orderId,
+        from_status: "DRAFT",
+        to_status: "CANCELLED",
+        actor_type: "STAFF",
+        created_at: nowIso,
+      });
+    } catch (histErr) {
+      console.warn("status history reject insert notice:", histErr);
+    }
+
+    broadcastSyncEvent({
+      type: "STATUS_CHANGED",
+      orderId,
+      status: "CANCELLED",
+      timestamp: Date.now(),
     });
 
     return {
@@ -304,18 +507,16 @@ export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryR
   const supabase = createAdminClient();
 
   try {
-    // 1. Fetch paid orders (all placed/submitted/cooking/delivered/closed orders)
     const { data: orders, error: ordersErr } = await supabase
       .from("orders")
       .select("*")
-      .not("status", "in", '("CANCELLED","REJECTED","DRAFT")')
+      .not("status", "in", '("CANCELLED","REJECTED","DRAFT","PENDING_CONFIRMATION")')
       .order("created_at", { ascending: false });
 
     if (ordersErr) {
       console.error("Error fetching paid orders:", ordersErr);
     }
 
-    // 2. Fetch dining table labels
     const sessionIds = (orders || [])
       .map((o) => o.table_session_id)
       .filter((id): id is string => Boolean(id));
@@ -348,7 +549,6 @@ export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryR
       }
     }
 
-    // 3. Fetch order items
     const orderIds = (orders || []).map((o) => o.id);
     const itemsByOrder = new Map<string, PaidHistoryItem[]>();
 
@@ -378,15 +578,14 @@ export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryR
       }
     }
 
-    // 4. Map to PaidHistoryRecord
     const records: PaidHistoryRecord[] = (orders || [])
-      .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED")
+      .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED" && o.status !== "PENDING_CONFIRMATION")
       .map((o) => {
         const orderItemsList = itemsByOrder.get(o.id) || [];
         const totalItemsCount = orderItemsList.reduce((acc, i) => acc + i.qty, 0) || 1;
         const rawMethod = (o as unknown as { payment_method?: string }).payment_method;
         let method: "UPI" | "CASH" | "CARD" = "UPI";
-        if (rawMethod?.toUpperCase() === "CASH") {
+        if (rawMethod?.toUpperCase() === "CASH" || rawMethod?.toUpperCase() === "COUNTER") {
           method = "CASH";
         } else if (rawMethod?.toUpperCase() === "CARD") {
           method = "CARD";
@@ -442,4 +641,3 @@ export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryR
     };
   }
 }
-

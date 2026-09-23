@@ -264,16 +264,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
         const finalTotalPaise = result.totalPaise || grandTotal * 100;
         const finalTableLabel = result.tableLabel || displayTable;
 
-        // Broadcast single source of truth order placed + paid event across Cashier & Kitchen KDS
+        const isCashier = paymentMethod === "CASHIER" || paymentMethod === "COUNTER";
+        const orderStatus = result.status || (isCashier ? "PENDING_CONFIRMATION" : "CONFIRMED");
+        const orderPaymentStatus = result.paymentStatus || (isCashier ? "PENDING" : "PAID");
+
+        // Broadcast single source of truth order placed event across Cashier & Kitchen KDS
         broadcastSyncEvent({
           type: "ORDER_PLACED",
           orderId: finalOrderId,
           orderNo: finalOrderNo,
           tableLabel: finalTableLabel,
-          status: "CONFIRMED",
+          status: orderStatus as any,
           timestamp: Date.now(),
           metadata: {
-            paymentStatus: "PAID",
+            paymentStatus: orderPaymentStatus,
             paymentMethod,
             transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
             amountPaise: finalTotalPaise,
@@ -281,19 +285,29 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
           },
         });
 
-        broadcastSyncEvent({
-          type: "PAYMENT_COMPLETED",
-          orderId: finalOrderId,
-          orderNo: finalOrderNo,
-          tableLabel: finalTableLabel,
-          status: "PAID",
-          timestamp: Date.now(),
-          metadata: {
-            transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
-            amountPaise: finalTotalPaise,
-            paymentMethod,
-          },
-        });
+        if (isCashier) {
+          broadcastSyncEvent({
+            type: "ORDER_PENDING_CASHIER" as any,
+            orderId: finalOrderId,
+            orderNo: finalOrderNo,
+            tableLabel: finalTableLabel,
+            timestamp: Date.now(),
+          });
+        } else {
+          broadcastSyncEvent({
+            type: "PAYMENT_COMPLETED",
+            orderId: finalOrderId,
+            orderNo: finalOrderNo,
+            tableLabel: finalTableLabel,
+            status: "PAID",
+            timestamp: Date.now(),
+            metadata: {
+              transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
+              amountPaise: finalTotalPaise,
+              paymentMethod,
+            },
+          });
+        }
 
         // If customer redeemed points for bill discount, record deduction & sync
         if (redeemPoints && pointsDiscountRupees > 0) {
