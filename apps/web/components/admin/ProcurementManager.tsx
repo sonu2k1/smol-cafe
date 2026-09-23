@@ -156,7 +156,35 @@ export const ProcurementManager: React.FC<ProcurementManagerProps> = ({ initialD
 
       if (res.success) {
         playStockIngestSound();
-        setFeedback({ type: "success", text: res.message || "Stock restocked successfully!" });
+        setFeedback({ type: "success", text: res.message || `Restocked +${quickRestockQty} ${quickRestockItem.unitSymbol} successfully!` });
+
+        // Optimistically update local radar data
+        setData((prev) => {
+          if (!prev.radarData) return prev;
+          const updatedIngredients = prev.radarData.ingredients.map((ing) => {
+            if (ing.id === quickRestockItem.id) {
+              const newStock = Number((ing.currentStock + quickRestockQty).toFixed(1));
+              return {
+                ...ing,
+                currentStock: newStock,
+                status: (newStock <= ing.minThreshold * 0.4
+                  ? "CRITICAL_LOW"
+                  : newStock <= ing.minThreshold
+                  ? "LOW_STOCK"
+                  : "OPTIMAL") as IngredientStockItem["status"],
+              };
+            }
+            return ing;
+          });
+          return {
+            ...prev,
+            radarData: {
+              ...prev.radarData,
+              ingredients: updatedIngredients,
+            },
+          };
+        });
+
         setQuickRestockItem(null);
         await refreshData();
         broadcastSyncEvent({ type: "INVENTORY_UPDATED" });
