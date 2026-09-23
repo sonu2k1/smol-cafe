@@ -504,23 +504,6 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
                   <span>Browse Menu &amp; Order →</span>
                 </Link>
               </div>
-
-              <div className="pt-2 flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-mono text-[#7A583E] dark:text-[#C9AE8B]">
-                <span>Testing another table?</span>
-                {["01", "02", "03", "04"].map((num) => (
-                  <a
-                    key={num}
-                    href={`/t/table-${num}`}
-                    className={`rounded-lg px-2.5 py-1 border text-xs font-bold transition ${
-                      tableLabel === num
-                        ? "bg-[#B72E35] text-white border-[#B72E35]"
-                        : "bg-white/80 dark:bg-stone-800 border-[#C9AE8B]/50 hover:bg-[#F3E7D3] text-[#241F1C] dark:text-white"
-                    }`}
-                  >
-                    Table {num}
-                  </a>
-                ))}
-              </div>
             </div>
           </div>
         )}

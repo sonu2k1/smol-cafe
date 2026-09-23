@@ -68,39 +68,14 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
   const supabase = createAdminClient();
 
   try {
-    // 1. Fetch Orders for this table session
-    let { data: orders, error: ordersError } = await supabase
+    // 1. Fetch Orders strictly for this active table session
+    const { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select("*")
       .eq("table_session_id", session.sessionId)
       .order("order_no", { ascending: false });
 
-    // Fallback: If no orders found for this exact session (e.g., session was restarted, regenerated, or settled),
-    // retrieve recent orders for this dining table from the past 2 hours
-    if ((!orders || orders.length === 0) && session.tableId && isValidUuid(session.tableId)) {
-      const { data: recentSessions } = await supabase
-        .from("table_sessions")
-        .select("id")
-        .eq("table_id", session.tableId)
-        .order("opened_at", { ascending: false })
-        .limit(5);
-
-      if (recentSessions && recentSessions.length > 0) {
-        const sessionIds = recentSessions.map((s) => s.id);
-        const { data: tableOrders } = await supabase
-          .from("orders")
-          .select("*")
-          .in("table_session_id", sessionIds)
-          .order("order_no", { ascending: false })
-          .limit(10);
-
-        if (tableOrders && tableOrders.length > 0) {
-          orders = tableOrders;
-        }
-      }
-    }
-
-    if (ordersError && (!orders || orders.length === 0)) {
+    if (ordersError) {
       console.error("Error fetching orders:", ordersError);
       return {
         success: false,

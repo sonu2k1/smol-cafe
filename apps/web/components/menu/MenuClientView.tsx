@@ -14,6 +14,7 @@ import { BottomNavBar } from "@/components/navigation/BottomNavBar";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { subscribeToSyncEvents } from "@/lib/sync-events";
 import { cacheMenuCatalog, getCachedMenuCatalog } from "@/lib/offline-cache";
+import { fetchLiveMenuCatalogAction } from "@/app/admin/menu-actions";
 import MenuLoading from "@/app/menu/loading";
 
 interface MenuClientViewProps {
@@ -53,29 +54,42 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
     }
   }, [initialCategories]);
 
-  // Listen for real-time 86'd / item stock availability sync across all tabs & devices
+  // Listen for real-time item stock, new items, and menu changes across all tabs & devices
   useEffect(() => {
-    const unsub = subscribeToSyncEvents((event) => {
-      if (event.type === "ITEM_AVAILABILITY_CHANGED" && event.itemId) {
-        setCategories((prev) =>
-          prev.map((cat) => ({
-            ...cat,
-            items: cat.items.map((item) => {
-              if (item.id === event.itemId) {
-                return {
-                  ...item,
-                  status: event.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : "ACTIVE",
-                  metadata: {
-                    ...item.metadata,
-                    availability: event.stockStatus,
-                    low_stock_portions: (event.metadata as any)?.lowStockCount,
-                  },
-                };
-              }
-              return item;
-            }),
-          }))
-        );
+    const unsub = subscribeToSyncEvents(async (event) => {
+      if (event.type === "ITEM_AVAILABILITY_CHANGED") {
+        if (event.itemId && event.stockStatus) {
+          setCategories((prev) =>
+            prev.map((cat) => ({
+              ...cat,
+              items: cat.items.map((item) => {
+                if (item.id === event.itemId) {
+                  return {
+                    ...item,
+                    status: event.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : "ACTIVE",
+                    metadata: {
+                      ...item.metadata,
+                      availability: event.stockStatus,
+                      low_stock_portions: (event.metadata as any)?.lowStockCount,
+                    },
+                  };
+                }
+                return item;
+              }),
+            }))
+          );
+        }
+
+        // Fetch latest catalog to sync new items, price changes, or edits
+        try {
+          const res = await fetchLiveMenuCatalogAction();
+          if (res.success && res.categories && res.categories.length > 0) {
+            setCategories(res.categories);
+            cacheMenuCatalog(res.categories);
+          }
+        } catch {
+          // ignore
+        }
       }
     });
 
