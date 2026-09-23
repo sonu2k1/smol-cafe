@@ -148,7 +148,8 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
       const res = await confirmCashierOrderAction(orderId, stationTarget, staffName);
       if (res.success) {
         setActionFeedback({ type: "success", text: res.message || "Order confirmed & dispatched!" });
-        refreshData();
+        await refreshData();
+        setActiveTab("paid");
       } else {
         setActionFeedback({ type: "error", text: res.message || "Failed to confirm order." });
       }
@@ -656,11 +657,25 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                             <span>CARD</span>
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50">
-                            {rec.paymentMethod}
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/50">
+                            CASH / COUNTER
                           </span>
                         )}
                       </div>
+
+                      {/* Items Details List */}
+                      {rec.items && rec.items.length > 0 && (
+                        <div className="bg-[#F3E7D3]/60 dark:bg-stone-900/60 rounded-xl p-2.5 space-y-1 text-xs font-mono">
+                          {rec.items.map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-[#241F1C] dark:text-stone-300 text-[11px]">
+                              <span>
+                                <strong className="text-[#B72E35] dark:text-[#F6AD55]">{item.qty}×</strong> {item.name}
+                              </span>
+                              <span className="text-[#725039] dark:text-stone-400">₹{item.subtotalRupees}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       {/* Bottom Row: Timestamp, Amount, and Chit Action */}
                       <div className="flex items-center justify-between pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/80">
@@ -705,11 +720,12 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                 {/* Tablet / Desktop View */}
                 <div className="hidden sm:block rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1A1715] overflow-hidden shadow-xs transition-colors">
                   <div className="overflow-x-auto scrollbar-none">
-                    <table className="w-full min-w-[560px] text-left text-xs">
+                    <table className="w-full min-w-[620px] text-left text-xs">
                       <thead className="bg-[#F3E7D3] dark:bg-stone-900 text-[10px] uppercase tracking-wider font-mono text-[#725039] dark:text-stone-400 border-b border-[#C9AE8B]/30 dark:border-stone-800">
                         <tr>
-                          <th className="p-3.5 whitespace-nowrap">Settlement ID</th>
+                          <th className="p-3.5 whitespace-nowrap">Order / Chit #</th>
                           <th className="p-3.5 whitespace-nowrap">Table</th>
+                          <th className="p-3.5 whitespace-nowrap">Items Breakdown</th>
                           <th className="p-3.5 whitespace-nowrap">Method</th>
                           <th className="p-3.5 whitespace-nowrap">Amount</th>
                           <th className="p-3.5 whitespace-nowrap">Settled At</th>
@@ -721,6 +737,20 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                           <tr key={rec.id} className="hover:bg-[#F3E7D3]/60 dark:hover:bg-stone-900/50 transition">
                             <td className="p-3.5 font-bold text-[#241F1C] dark:text-stone-200 whitespace-nowrap">{rec.id}</td>
                             <td className="p-3.5 text-[#8C6207] dark:text-[#F6AD55] font-bold whitespace-nowrap">Table {rec.tableLabel}</td>
+                            <td className="p-3.5 max-w-[280px]">
+                              {rec.items && rec.items.length > 0 ? (
+                                <div className="space-y-0.5">
+                                  {rec.items.map((item, idx) => (
+                                    <div key={idx} className="text-[11px] text-[#241F1C] dark:text-stone-300 truncate">
+                                      <strong className="text-[#B72E35] dark:text-[#F6AD55]">{item.qty}×</strong> {item.name}
+                                      <span className="text-[#8C6D53] dark:text-stone-500 text-[10px] ml-1.5">(₹{item.subtotalRupees})</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-stone-400">{rec.itemsCount} items</span>
+                              )}
+                            </td>
                             <td className="p-3.5 whitespace-nowrap">
                               {rec.paymentMethod === "UPI" ? (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white dark:bg-stone-800 border border-[#C9AE8B]/40 dark:border-stone-700 shadow-2xs">
@@ -751,8 +781,8 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                                   <span>CARD</span>
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50">
-                                  {rec.paymentMethod}
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/50">
+                                  CASH
                                 </span>
                               )}
                             </td>

@@ -339,12 +339,15 @@ export async function confirmCashierOrderAction(
   const nowIso = new Date().toISOString();
 
   try {
-    // 1. Fetch current order
+    // 1. Fetch current order with totals and items
     const { data: currentOrder } = await supabase
       .from("orders")
-      .select("order_no, table_session_id")
+      .select("id, order_no, table_session_id, total_snapshot, subtotal_snapshot, tax_snapshot")
       .eq("id", orderId)
       .single();
+
+    const orderTotalPaise = currentOrder?.total_snapshot || 0;
+    const sessionId = currentOrder?.table_session_id;
 
     // 2. Mark order as ACCEPTED in PostgreSQL
     const { error: updateErr } = await supabase
@@ -361,7 +364,56 @@ export async function confirmCashierOrderAction(
       return { success: false, message: `Failed to confirm order: ${updateErr.message || "database error"}` };
     }
 
-    // 3. Log to status history
+    // 3. Settle bill and payment attempt for Cashier Audit
+    if (sessionId) {
+      try {
+        let billId: string | null = null;
+        const { data: existingBill } = await supabase
+          .from("bills")
+          .select("id, paid_amount")
+          .eq("table_session_id", sessionId)
+          .maybeSingle();
+
+        if (existingBill) {
+          billId = existingBill.id;
+          const newPaidAmount = (existingBill.paid_amount || 0) + orderTotalPaise;
+          await supabase.from("bills").update({
+            status: "PAID",
+            paid_amount: newPaidAmount,
+            total: newPaidAmount,
+            closed_at: nowIso,
+          }).eq("id", billId);
+        } else {
+          const { data: newBill } = await supabase.from("bills").insert({
+            table_session_id: sessionId,
+            status: "PAID",
+            subtotal: currentOrder?.subtotal_snapshot || Math.round(orderTotalPaise / 1.05),
+            tax: currentOrder?.tax_snapshot || Math.round(orderTotalPaise - orderTotalPaise / 1.05),
+            total: orderTotalPaise,
+            paid_amount: orderTotalPaise,
+            closed_at: nowIso,
+          }).select("id").single();
+          billId = newBill?.id || null;
+        }
+
+        if (billId) {
+          await supabase.from("payment_attempts").insert({
+            bill_id: billId,
+            provider: "CASH",
+            amount: orderTotalPaise,
+            currency: "INR",
+            status: "CAPTURED",
+            idempotency_key: `cashier_confirm_${orderId}_${Date.now()}`,
+            created_at: nowIso,
+            captured_at: nowIso,
+          });
+        }
+      } catch (billErr) {
+        console.warn("Notice updating cashier bill record:", billErr);
+      }
+    }
+
+    // 4. Log to status history
     try {
       await supabase.from("order_status_history").insert({
         id: crypto.randomUUID(),
@@ -578,19 +630,53 @@ export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryR
       }
     }
 
+    // Also fetch payment attempts for session bills if available
+    const billSessionIds = Array.from(tableLabelMap.keys());
+    const sessionPaymentMap = new Map<string, "UPI" | "CASH" | "CARD">();
+    if (billSessionIds.length > 0) {
+      try {
+        const { data: bills } = await supabase
+          .from("bills")
+          .select("id, table_session_id")
+          .in("table_session_id", billSessionIds);
+        
+        if (bills && bills.length > 0) {
+          const billIds = bills.map((b) => b.id);
+          const { data: attempts } = await supabase
+            .from("payment_attempts")
+            .select("bill_id, provider")
+            .in("bill_id", billIds);
+
+          const billProviderMap = new Map<string, string>();
+          for (const att of attempts || []) {
+            billProviderMap.set(att.bill_id, att.provider);
+          }
+
+          for (const b of bills) {
+            const prov = billProviderMap.get(b.id)?.toUpperCase();
+            if (prov === "CASH") {
+              sessionPaymentMap.set(b.table_session_id, "CASH");
+            } else if (prov === "CARD") {
+              sessionPaymentMap.set(b.table_session_id, "CARD");
+            } else if (prov) {
+              sessionPaymentMap.set(b.table_session_id, "UPI");
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Notice fetching payment attempts:", err);
+      }
+    }
+
     const records: PaidHistoryRecord[] = (orders || [])
-      .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED" && o.status !== "PENDING_CONFIRMATION")
+      .filter((o) => o.status !== "CANCELLED" && o.status !== "REJECTED" && o.status !== "PENDING_CONFIRMATION" && o.status !== "DRAFT")
       .map((o) => {
         const orderItemsList = itemsByOrder.get(o.id) || [];
         const totalItemsCount = orderItemsList.reduce((acc, i) => acc + i.qty, 0) || 1;
-        const rawMethod = (o as unknown as { payment_method?: string }).payment_method;
-        let method: "UPI" | "CASH" | "CARD" = "UPI";
-        if (rawMethod?.toUpperCase() === "CASH" || rawMethod?.toUpperCase() === "COUNTER") {
-          method = "CASH";
-        } else if (rawMethod?.toUpperCase() === "CARD") {
-          method = "CARD";
-        } else {
-          method = "UPI";
+        
+        let method: "UPI" | "CASH" | "CARD" = "CASH";
+        if (o.table_session_id && sessionPaymentMap.has(o.table_session_id)) {
+          method = sessionPaymentMap.get(o.table_session_id)!;
         }
 
         let tableLabel = "01";
@@ -611,7 +697,7 @@ export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryR
           tableLabel,
           totalRupees: Math.round((o.total_snapshot || 0) / 100),
           paymentMethod: method,
-          paidAt: o.confirmed_at || o.submitted_at || o.created_at,
+          paidAt: o.accepted_at || o.submitted_at || o.created_at,
           itemsCount: totalItemsCount,
           items: orderItemsList.length > 0 ? orderItemsList : [
             {
