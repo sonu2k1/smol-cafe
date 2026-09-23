@@ -57,6 +57,11 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
   const [pendingOrders, setPendingOrders] = useState<PendingOrderVerification[]>(initialPendingOrders);
   const [paidHistory, setPaidHistory] = useState<PaidHistoryRecord[]>(initialPaidHistory);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   const [selectedTable, setSelectedTable] = useState<ActiveCashierTable | null>(null);
   const [inspectingTag, setInspectingTag] = useState<TableJsonTag | null>(null);
   const [activeUpiTable, setActiveUpiTable] = useState<ActiveCashierTable | null>(null);
@@ -465,12 +470,16 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                             <h2 className="font-mono text-2xl font-black text-[#241F1C] dark:text-white">
                               Table {order.tableLabel}
                             </h2>
-                            <p className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                            <p className="font-mono text-xs text-[#725039] dark:text-stone-400" suppressHydrationWarning>
                               Order #{order.orderNo} •{" "}
-                              {new Date(order.submittedAt || Date.now()).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                              <span suppressHydrationWarning>
+                                {isMounted
+                                  ? new Date(order.submittedAt || Date.now()).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : "Recently"}
+                              </span>
                             </p>
                           </div>
 
@@ -727,8 +736,10 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                       <div className="flex items-center justify-between pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800/80">
                         <div className="flex flex-col">
                           <span className="text-[10px] uppercase font-mono text-[#8C6D53] dark:text-stone-500">Settled At</span>
-                          <span className="font-mono text-xs text-[#725039] dark:text-stone-400">
-                            {new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <span className="font-mono text-xs text-[#725039] dark:text-stone-400" suppressHydrationWarning>
+                            {isMounted
+                              ? new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : "Recently"}
                           </span>
                         </div>
 
@@ -833,8 +844,10 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                               )}
                             </td>
                             <td className="p-3.5 font-bold text-[#241F1C] dark:text-white font-serif text-sm whitespace-nowrap">₹{rec.totalRupees}</td>
-                            <td className="p-3.5 text-[#725039] dark:text-stone-400 text-[11px] whitespace-nowrap">
-                              {new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            <td className="p-3.5 text-[#725039] dark:text-stone-400 text-[11px] whitespace-nowrap" suppressHydrationWarning>
+                              {isMounted
+                                ? new Date(rec.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                : "Recently"}
                             </td>
                             <td className="p-3.5 text-right whitespace-nowrap">
                               <button
