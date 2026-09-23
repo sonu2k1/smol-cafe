@@ -702,7 +702,7 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
   }> = [
     { id: "overview", label: "Overview", icon: BarChart3 },
     { id: "orders", label: "Orders", icon: ShoppingBag, badge: `${orders.length}` },
-    { id: "tables", label: "Tables", icon: Armchair, badge: `${overviewData?.kpis?.totalTablesCount || 10}` },
+    { id: "tables", label: "Tables", icon: Armchair, badge: `${overviewData?.kpis?.totalTablesCount || 14}` },
     { id: "menu", label: "Menu", icon: Coffee, badge: "59" },
     { id: "inventory", label: "Grocery & Stock", icon: Flame, badge: procurementData?.radarData?.criticalCount ? `${procurementData.radarData.criticalCount} Low` : undefined },
     { id: "customers", label: "Customers", icon: Users },
@@ -1014,8 +1014,8 @@ export const AdminTowerDashboard: React.FC<AdminTowerProps> = ({ initialOverview
                 },
                 {
                   label: "ACTIVE TABLES",
-                  value: `${overviewData?.kpis.activeTablesCount ?? 1} / 12`,
-                  trend: `${Math.round(((overviewData?.kpis.activeTablesCount ?? 1) / 12) * 100)}% capacity`,
+                  value: `${overviewData?.kpis.activeTablesCount ?? 1} / ${overviewData?.kpis?.totalTablesCount || 14}`,
+                  trend: `${Math.round(((overviewData?.kpis.activeTablesCount ?? 1) / (overviewData?.kpis?.totalTablesCount || 14)) * 100)}% capacity`,
                   color: "#ED8936",
                 },
                 {

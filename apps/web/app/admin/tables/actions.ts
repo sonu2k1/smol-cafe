@@ -30,11 +30,16 @@ export interface UpdateTableInput {
 }
 
 const DEFAULT_SECTIONS = [
-  "Café",
-  "Lounge",
+  "smol-cafe",
+  "smol-lounge",
+  "smol-terrace",
 ];
 
 const LEGACY_SECTIONS = new Set([
+  "Café",
+  "Cafe",
+  "Lounge",
+  "Terrace",
   "Indoor Cozy",
   "Courtyard Verandah",
   "Garden Terrace",
@@ -46,19 +51,22 @@ declare global {
   var __SMOL_TABLE_SECTIONS_MAP__: Record<string, string> | undefined;
 }
 
-// Enforce standard table mapping for 10 tables
+// Enforce standard table mapping for 14 tables
 globalThis.__SMOL_TABLE_SECTIONS_MAP__ = {
-  ...(globalThis.__SMOL_TABLE_SECTIONS_MAP__ || {}),
-  "01": "Café",
-  "02": "Café",
-  "03": "Café",
-  "04": "Café",
-  "05": "Café",
-  "06": "Café",
-  "07": "Lounge",
-  "08": "Lounge",
-  "09": "Lounge",
-  "10": "Lounge",
+  "01": "smol-cafe",
+  "02": "smol-cafe",
+  "03": "smol-cafe",
+  "04": "smol-cafe",
+  "05": "smol-cafe",
+  "06": "smol-cafe",
+  "07": "smol-lounge",
+  "08": "smol-lounge",
+  "09": "smol-lounge",
+  "10": "smol-lounge",
+  "11": "smol-terrace",
+  "12": "smol-terrace",
+  "13": "smol-terrace",
+  "14": "smol-terrace",
 };
 
 // Clean legacy custom sections
@@ -109,31 +117,35 @@ export async function fetchTablesAndSectionsAction(): Promise<{
     const occupiedTableIds = new Set((sessionsData || []).map((s: { table_id: string }) => s.table_id));
 
     const defaultZoneMap: Record<string, string> = {
-      "01": "Café",
-      "02": "Café",
-      "03": "Café",
-      "04": "Café",
-      "05": "Café",
-      "06": "Café",
-      "07": "Lounge",
-      "08": "Lounge",
-      "09": "Lounge",
-      "10": "Lounge",
+      "01": "smol-cafe",
+      "02": "smol-cafe",
+      "03": "smol-cafe",
+      "04": "smol-cafe",
+      "05": "smol-cafe",
+      "06": "smol-cafe",
+      "07": "smol-lounge",
+      "08": "smol-lounge",
+      "09": "smol-lounge",
+      "10": "smol-lounge",
+      "11": "smol-terrace",
+      "12": "smol-terrace",
+      "13": "smol-terrace",
+      "14": "smol-terrace",
     };
 
     const sectionMap = globalThis.__SMOL_TABLE_SECTIONS_MAP__ || defaultZoneMap;
 
     const tables: DiningTableRecord[] = (tablesData || []).map((t: any) => {
       const cleanNum = t.label?.toString().padStart(2, "0");
-      let section = t.section || sectionMap[t.id] || sectionMap[t.label] || sectionMap[cleanNum] || defaultZoneMap[cleanNum] || "Café";
-      if (LEGACY_SECTIONS.has(section)) {
-        section = defaultZoneMap[cleanNum] || (parseInt(cleanNum, 10) > 6 ? "Lounge" : "Café");
+      let section = t.section || sectionMap[t.id] || sectionMap[t.label] || sectionMap[cleanNum] || defaultZoneMap[cleanNum] || "smol-cafe";
+      if (LEGACY_SECTIONS.has(section) || section === "Café" || section === "Lounge" || section === "Terrace") {
+        section = defaultZoneMap[cleanNum] || (parseInt(cleanNum, 10) > 10 ? "smol-terrace" : parseInt(cleanNum, 10) > 6 ? "smol-lounge" : "smol-cafe");
       }
       return {
         id: t.id,
         location_id: t.location_id,
         label: t.label,
-        seats: t.seats || (["07", "08", "09", "10"].includes(cleanNum) ? 4 : 2),
+        seats: t.seats || (["07", "08", "09", "10"].includes(cleanNum) ? 4 : ["13", "14"].includes(cleanNum) ? 4 : 2),
         active: t.active !== undefined ? t.active : true,
         section,
         isOccupied: occupiedTableIds.has(t.id),
@@ -179,7 +191,7 @@ export async function createTableAction(input: CreateTableInput): Promise<{
     }
 
     const cleanNum = label.padStart(2, "0");
-    const section = input.section?.trim() || "Café";
+    const section = input.section?.trim() || "smol-cafe";
     const seats = Number(input.seats) || 2;
     const active = input.active !== undefined ? input.active : true;
 
