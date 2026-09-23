@@ -20,41 +20,48 @@ export default function MenuLoading() {
         {/* Search Bar Skeleton */}
         <div className="h-11 w-full rounded-2xl bg-[#EAE0D2] dark:bg-[#201A18] border border-[#C9AE8B]/20 dark:border-white/5 animate-pulse" />
 
-        {/* Category Pills Skeleton */}
+        {/* Category Pills Strip */}
         <div className="flex gap-2 overflow-x-hidden py-1">
-          {["All Items", "Coffee", "All-Day Brews", "Treats", "Breakfast"].map((_, i) => (
+          {["All Items", "☕ All-Day Brews", "🥐 Bakery & Treats", "🍳 Breakfast", "🥪 Sandwiches"].map((_, i) => (
             <div
               key={i}
-              className="h-8 w-24 shrink-0 rounded-full bg-[#E5D7C3] dark:bg-[#221C1A] animate-pulse"
+              className="h-8 w-28 shrink-0 rounded-full bg-[#E5D7C3] dark:bg-[#221C1A] animate-pulse"
               style={{ animationDelay: `${i * 100}ms` }}
             />
           ))}
         </div>
 
-        {/* Category Heading Skeleton */}
+        {/* Category Section Header */}
         <div className="pt-2 flex items-center justify-between">
           <div className="h-6 w-36 rounded-md bg-[#E5D7C3] dark:bg-stone-800 animate-pulse" />
           <div className="h-4 w-12 rounded-md bg-[#E5D7C3]/60 dark:bg-stone-800/60 animate-pulse" />
         </div>
 
-        {/* Food Items Cards Skeleton */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {/* Menu Item Cards Skeleton (Matching Horizontal MenuItemCard) */}
+        <div className="space-y-3">
           {[1, 2, 3, 4, 5, 6].map((idx) => (
             <div
               key={idx}
-              className="rounded-3xl border border-[#E2D7C7] dark:border-stone-800/80 bg-[#FAF4EB] dark:bg-[#1C1715] p-3 space-y-2.5 shadow-2xs animate-pulse"
+              className="flex items-start justify-between gap-3.5 rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 animate-pulse shadow-xs"
               style={{ animationDelay: `${idx * 80}ms` }}
             >
-              {/* Arched image skeleton */}
-              <div className="aspect-[4/3.5] w-full rounded-t-2xl rounded-b-lg bg-[#EAE0D2] dark:bg-[#28211E]" />
-              <div className="space-y-1.5 pt-1">
-                <div className="h-3.5 w-4/5 rounded bg-[#E5D7C3] dark:bg-stone-800" />
-                <div className="h-2.5 w-full rounded bg-[#E5D7C3]/70 dark:bg-stone-800/70" />
-                <div className="h-2.5 w-3/4 rounded bg-[#E5D7C3]/70 dark:bg-stone-800/70" />
+              {/* Details column */}
+              <div className="flex-1 min-w-0 pr-2 space-y-2">
+                {/* Title and dietary dot */}
+                <div className="flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full bg-[#75AFA7]/60 shrink-0" />
+                  <div className="h-4 w-40 rounded bg-[#E5D7C3] dark:bg-stone-800" />
+                </div>
+                {/* Description lines */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="h-3 w-full rounded bg-[#E5D7C3]/70 dark:bg-stone-800/70" />
+                  <div className="h-3 w-3/4 rounded bg-[#E5D7C3]/50 dark:bg-stone-800/50" />
+                </div>
               </div>
-              <div className="flex items-center justify-between pt-1 border-t border-[#E2D7C7]/60 dark:border-stone-800/60">
+
+              {/* Price on right */}
+              <div className="shrink-0 pt-0.5">
                 <div className="h-4 w-12 rounded bg-[#E5D7C3] dark:bg-stone-800" />
-                <div className="h-7 w-7 rounded-full bg-[#B72E35]/30 dark:bg-[#B72E35]/40" />
               </div>
             </div>
           ))}

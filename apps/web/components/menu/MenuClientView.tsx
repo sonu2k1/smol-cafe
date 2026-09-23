@@ -14,12 +14,14 @@ import { BottomNavBar } from "@/components/navigation/BottomNavBar";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { subscribeToSyncEvents } from "@/lib/sync-events";
 import { cacheMenuCatalog, getCachedMenuCatalog } from "@/lib/offline-cache";
+import MenuLoading from "@/app/menu/loading";
 
 interface MenuClientViewProps {
   categories: CategoryWithItems[];
   tableLabel?: string;
   locationName?: string;
   guestName?: string;
+  customTitle?: string;
 }
 
 const MenuContentInner: React.FC<MenuClientViewProps> = ({
@@ -27,6 +29,7 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
   tableLabel,
   locationName = "Smol Café",
   guestName = "",
+  customTitle,
 }) => {
   const searchParams = useSearchParams();
   const categoryParam = searchParams ? searchParams.get("category") : null;
@@ -175,7 +178,7 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
           {/* Title & Location Context */}
           <div className="text-center">
             <h1 className="font-serif text-2xl font-bold tracking-tight text-[#B72E35] dark:text-[#FF5B52] lowercase">
-              smol menu
+              {customTitle || "smol menu"}
             </h1>
             {tableLabel ? (
               <p className="text-[10px] font-mono font-medium text-[#725039] dark:text-[#C9AE8B]">
@@ -215,14 +218,14 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
         </div>
 
         {/* Category Horizontal Pill Scroller */}
-        <div className="mx-auto mt-3 flex max-w-md items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+        <div className="mx-auto mt-3 flex max-w-md items-center gap-2 overflow-x-auto no-scrollbar py-1 px-0.5">
           <button
             type="button"
             onClick={() => setActiveCategoryId("")}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-serif transition-colors ${
+            className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-serif transition-all duration-300 ease-[cubic-bezier(0.25,1,0.35,1)] active:scale-90 touch-manipulation cursor-pointer ${
               activeCategoryId === ""
-                ? "bg-[#B72E35] text-white font-bold shadow-xs dark:bg-[#B72E35] dark:shadow-[0_0_12px_rgba(183,46,53,0.4)]"
-                : "border border-[#C9AE8B]/60 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB] hover:bg-[#EFE7DC] dark:hover:bg-[#2C2420]"
+                ? "bg-gradient-to-r from-[#C22830] to-[#B72E35] text-white font-bold shadow-[0_4px_14px_rgba(183,46,53,0.32),inset_0_1px_1px_rgba(255,255,255,0.3)] ring-1 ring-white/20 scale-[1.03]"
+                : "border border-[#C9AE8B]/60 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB] hover:bg-[#EFE7DC] dark:hover:bg-[#2C2420] scale-100 hover:scale-[1.02]"
             }`}
           >
             all items
@@ -235,10 +238,10 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
                 key={cat.id}
                 type="button"
                 onClick={() => handleSelectCategory(cat.id)}
-                className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-serif transition-colors lowercase ${
+                className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-serif lowercase transition-all duration-300 ease-[cubic-bezier(0.25,1,0.35,1)] active:scale-90 touch-manipulation cursor-pointer ${
                   isActive
-                    ? "bg-[#B72E35] text-white font-bold shadow-xs dark:bg-[#B72E35] dark:shadow-[0_0_12px_rgba(183,46,53,0.4)]"
-                    : "border border-[#C9AE8B]/60 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB] hover:bg-[#EFE7DC] dark:hover:bg-[#2C2420]"
+                    ? "bg-gradient-to-r from-[#C22830] to-[#B72E35] text-white font-bold shadow-[0_4px_14px_rgba(183,46,53,0.32),inset_0_1px_1px_rgba(255,255,255,0.3)] ring-1 ring-white/20 scale-[1.03]"
+                    : "border border-[#C9AE8B]/60 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB] hover:bg-[#EFE7DC] dark:hover:bg-[#2C2420] scale-100 hover:scale-[1.02]"
                 }`}
               >
                 {cat.name}
@@ -353,9 +356,6 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
           onClose={() => setSelectedItem(null)}
         />
       )}
-
-      {/* Bottom Sticky Navigation */}
-      <BottomNavBar />
     </div>
   );
 };
@@ -363,7 +363,7 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
 export const MenuClientView: React.FC<MenuClientViewProps> = (props) => {
   return (
     <CartProvider>
-      <Suspense fallback={<div className="min-h-screen bg-[#F3E7D3] p-8 text-center font-serif">Loading smol menu...</div>}>
+      <Suspense fallback={<MenuLoading />}>
         <MenuContentInner {...props} />
       </Suspense>
     </CartProvider>

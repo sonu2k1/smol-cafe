@@ -262,9 +262,6 @@ export const EventsClientView: React.FC<EventsClientViewProps> = ({ initialEvent
           </div>
         </div>
       )}
-
-      {/* Bottom Sticky Navigation */}
-      <BottomNavBar />
     </div>
   );
 };

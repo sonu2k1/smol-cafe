@@ -10,6 +10,8 @@ import { captureAppException } from "@/lib/observability/sentry";
 
 const STAFF_SESSION_COOKIE = "smol_staff_session";
 
+import { isBeverageItem } from "@/lib/station-utils";
+
 export interface BaristaOrderItem {
   id: string;
   name: string;
@@ -39,34 +41,6 @@ export interface FetchBaristaOrdersResult {
   success: boolean;
   orders: BaristaTicket[];
   message?: string;
-}
-
-function isBeverageItem(name: string): boolean {
-  const n = (name || "").toLowerCase().trim();
-  return (
-    n.includes("coffee") ||
-    n.includes("espresso") ||
-    n.includes("americano") ||
-    n.includes("latte") ||
-    n.includes("cappuccino") ||
-    n.includes("mocha") ||
-    n.includes("cortado") ||
-    n.includes("macchiato") ||
-    n.includes("flat white") ||
-    n.includes("brew") ||
-    n.includes("pour over") ||
-    n.includes("aeropress") ||
-    n.includes("tonic") ||
-    n.includes("shake") ||
-    n.includes("frappe") ||
-    n.includes("tea") ||
-    n.includes("chai") ||
-    n.includes("matcha") ||
-    n.includes("smoothie") ||
-    n.includes("kombucha") ||
-    n.includes("beverage") ||
-    n.includes("hot chocolate")
-  );
 }
 
 /**
