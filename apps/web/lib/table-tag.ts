@@ -34,6 +34,13 @@ export const TABLE_ZONES_CONFIG: Record<string, { zone: TableZone; capacity: num
   "11": { zone: "Garden Terrace", capacity: 4 },
   "12": { zone: "Courtyard Verandah", capacity: 4 },
   "13": { zone: "Indoor Cozy", capacity: 2 },
+  "14": { zone: "Courtyard Verandah", capacity: 4 },
+  "15": { zone: "Garden Terrace", capacity: 4 },
+  "16": { zone: "Indoor Cozy", capacity: 2 },
+  "17": { zone: "Garden Terrace", capacity: 6 },
+  "18": { zone: "Brew Bar", capacity: 2 },
+  "19": { zone: "Indoor Cozy", capacity: 4 },
+  "20": { zone: "Courtyard Verandah", capacity: 4 },
 };
 
 /**

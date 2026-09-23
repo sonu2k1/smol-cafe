@@ -13,7 +13,7 @@ interface TableScannerModalProps {
   initialTab?: "camera" | "picker";
 }
 
-const DEFAULT_TABLE_LIST: ClientTableInfo[] = Array.from({ length: 12 }, (_, i) => {
+const DEFAULT_TABLE_LIST: ClientTableInfo[] = Array.from({ length: 20 }, (_, i) => {
   const label = (i + 1).toString().padStart(2, "0");
   const info = TABLE_ZONES_CONFIG[label] || { zone: "Indoor Cozy", capacity: 2 };
   return {

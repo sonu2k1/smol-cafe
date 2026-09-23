@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { MenuItemWithDetails } from "@/lib/queries/menu";
-import { getFoodImage } from "@/lib/food-images";
+import { getFoodImage, SHOW_MENU_IMAGES } from "@/lib/food-images";
 import { Coffee, Flame, Sparkles } from "lucide-react";
 
 interface MenuItemCardProps {
@@ -16,6 +16,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
   const spiceLevel = item.metadata?.spice || "";
   const pairing = item.metadata?.best_pairing || "";
   const foodImageUrl = getFoodImage(item.name, item.imageUrl);
+  const hasImage = Boolean(SHOW_MENU_IMAGES && foodImageUrl && !imageError);
   const isSoldOut =
     item.status === "SOLD_OUT" ||
     (item.metadata as any)?.availability === "SOLD_OUT" ||
@@ -43,9 +44,9 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
           : "border-[#C9AE8B]/50 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] hover:border-[#B72E35]/60 dark:hover:border-[#FF5B52]/50 active:scale-[0.98]"
       }`}
     >
-      {/* Left: Arched Real Food Image (Full Grayscale B&W on Sold Out) */}
-      <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-t-full rounded-b-xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#EFE7DC] dark:bg-[#171311] shadow-inner">
-        {!imageError ? (
+      {/* Optional: Arched Food Image (Rendered only when SHOW_MENU_IMAGES is enabled) */}
+      {hasImage && (
+        <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-t-full rounded-b-xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#EFE7DC] dark:bg-[#171311] shadow-inner">
           <img
             src={foodImageUrl}
             alt={item.name}
@@ -55,14 +56,10 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
               isSoldOut ? "grayscale contrast-125 brightness-95" : ""
             }`}
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-[#725039] dark:text-[#C9AE8B]">
-            <Coffee className="h-6 w-6" />
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Middle: Details */}
+      {/* Details */}
       <div className="flex-1 min-w-0 pr-2">
         {/* Title & Dietary Dot */}
         <div className="flex items-center gap-1.5">
