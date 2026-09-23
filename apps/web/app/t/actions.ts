@@ -91,41 +91,59 @@ export async function resolveQrToken(
 
     if (!qrError && qrTokens && qrTokens.length > 0) {
       const qrToken = qrTokens[0] as unknown as TableQrToken;
-      // Check if token was revoked
-      if (qrToken.revoked_at) {
-        return {
-          success: false,
-          error: "REVOKED_TOKEN",
-          message: "This QR code has expired or was revoked. Please ask staff for a fresh QR.",
-        };
-      }
-      qrVersion = qrToken.version || 1;
+      // If token wasn't revoked, resolve linked table
+      if (!qrToken.revoked_at) {
+        qrVersion = qrToken.version || 1;
+        const { data: table } = await supabase
+          .from("dining_tables")
+          .select("*")
+          .eq("id", qrToken.table_id)
+          .maybeSingle();
 
-      // 2. Fetch dining table details
-      const { data: table } = await supabase
-        .from("dining_tables")
-        .select("*")
-        .eq("id", qrToken.table_id)
-        .maybeSingle();
-
-      if (table) {
-        diningTable = table as unknown as DiningTable;
+        if (table) {
+          diningTable = table as unknown as DiningTable;
+        }
       }
     }
 
-    // Fallback: match table number directly or resolve table by label (padded and unpadded)
+    // Fallback 1: match table number directly or resolve table by label (padded and unpadded) or id
     if (!diningTable && (standardTableLabel || plainToken)) {
       const targetLabel = standardTableLabel || plainToken;
+      const targetId = `tbl_${standardTableLabel || plainToken}`;
       const { data: tableByLabel } = await supabase
         .from("dining_tables")
         .select("*")
-        .or(`label.eq.${targetLabel},label.eq.${rawNumberLabel || targetLabel}`)
+        .or(`label.eq.${targetLabel},label.eq.${rawNumberLabel || targetLabel},id.eq.${targetId}`)
         .limit(1)
         .maybeSingle();
 
       if (tableByLabel) {
         diningTable = tableByLabel as unknown as DiningTable;
       }
+    }
+
+    // Fallback 2: Auto-provision standard cafe table if missing
+    if (!diningTable && standardTableLabel) {
+      const tableConfig = TABLE_ZONES_CONFIG[standardTableLabel] || {
+        zone: "Indoor Cozy",
+        capacity: 4,
+      };
+      const now = new Date().toISOString();
+      const provisionedTable: DiningTable = {
+        id: `tbl_${standardTableLabel}`,
+        location_id: "loc_smol_main",
+        label: standardTableLabel,
+        seats: tableConfig.capacity,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      };
+      try {
+        await supabase.from("dining_tables").upsert(provisionedTable);
+      } catch (upsertErr) {
+        console.warn("Could not upsert dining table:", upsertErr);
+      }
+      diningTable = provisionedTable;
     }
 
     if (!diningTable) {
@@ -349,6 +367,14 @@ export async function fetchActiveTablesAction(): Promise<ClientTableInfo[]> {
     "10": "Indoor Cozy",
     "11": "Garden Terrace",
     "12": "Courtyard Verandah",
+    "13": "Indoor Cozy",
+    "14": "Courtyard Verandah",
+    "15": "Garden Terrace",
+    "16": "Indoor Cozy",
+    "17": "Garden Terrace",
+    "18": "Brew Bar",
+    "19": "Indoor Cozy",
+    "20": "Courtyard Verandah",
   };
 
   try {
@@ -359,7 +385,7 @@ export async function fetchActiveTablesAction(): Promise<ClientTableInfo[]> {
       .order("label", { ascending: true });
 
     if (error || !tablesData || tablesData.length === 0) {
-      return Array.from({ length: 12 }, (_, i) => {
+      return Array.from({ length: 20 }, (_, i) => {
         const label = (i + 1).toString().padStart(2, "0");
         const info = TABLE_ZONES_CONFIG[label] || { zone: "Indoor Cozy", capacity: 2 };
         return { label, zone: info.zone, capacity: info.capacity, active: true };

@@ -14,11 +14,24 @@ export interface NetworkHealthState {
  * Hook to detect client offline status and backend outage for graceful degradation
  */
 export function useNetworkHealth(): NetworkHealthState {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    if (typeof navigator !== "undefined") {
+      return navigator.onLine;
+    }
+    return true;
+  });
   const [isBackendReachable, setIsBackendReachable] = useState(true);
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
 
   const checkHealth = useCallback(async () => {
+    const navOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+    if (!navOnline) {
+      setIsOnline(false);
+      setIsBackendReachable(false);
+      setLastCheckedAt(new Date());
+      return;
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -34,15 +47,13 @@ export function useNetworkHealth(): NetworkHealthState {
         setIsOnline(true);
         setIsBackendReachable(true);
       } else {
-        const navOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
         setIsOnline(navOnline);
-        setIsBackendReachable(false);
+        setIsBackendReachable(true);
       }
       setLastCheckedAt(new Date());
     } catch {
-      const navOnline = typeof navigator !== "undefined" ? navigator.onLine : false;
       setIsOnline(navOnline);
-      setIsBackendReachable(false);
+      setIsBackendReachable(true);
       setLastCheckedAt(new Date());
     }
   }, []);

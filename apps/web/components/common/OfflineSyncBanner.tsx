@@ -54,12 +54,12 @@ export const OfflineSyncBanner: React.FC = () => {
     }
   };
 
-  // If online, not degraded, and no queued orders, do not render banner
-  if (isOnline && !isDegraded && queuedOrders.length === 0 && !syncNotice) {
+  // If online and no queued orders and no sync notice, do not render banner
+  if (isOnline && queuedOrders.length === 0 && !syncNotice) {
     return null;
   }
 
-  if (isDismissed && isOnline && queuedOrders.length === 0) {
+  if (isDismissed && queuedOrders.length === 0) {
     return null;
   }
 
