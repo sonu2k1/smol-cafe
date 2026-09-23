@@ -401,7 +401,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
         orderId: orderRes.orderId,
         orderNo: orderRes.orderNo,
         tableLabel: displayTable,
-        zone: "Indoor Cozy",
+        zone: (["07", "08", "09", "10"].includes(displayTable)) ? "Lounge" : "Café",
         totalRupees: Math.round(orderRes.totalPaise / 100),
         items: currentItemsSnapshot.length > 0 ? currentItemsSnapshot : [
           { name: "Artisanal Table Order", qty: 1, priceRupees: Math.round(orderRes.totalPaise / 100), subtotalRupees: Math.round(orderRes.totalPaise / 100) }
@@ -1148,7 +1148,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                 orderId: created.orderId,
                 orderNo: created.orderNo,
                 tableLabel: displayTable,
-                zone: "Indoor Cozy",
+                zone: (["07", "08", "09", "10"].includes(displayTable)) ? "Lounge" : "Café",
                 totalRupees: Math.round(created.totalPaise / 100),
                 items: currentItemsSnapshot.length > 0 ? currentItemsSnapshot : [
                   { name: "Artisanal Table Order", qty: 1, priceRupees: Math.round(created.totalPaise / 100), subtotalRupees: Math.round(created.totalPaise / 100) }

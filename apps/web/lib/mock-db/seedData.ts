@@ -180,44 +180,36 @@ export const MOCK_LOCATION: MockLocation = {
 };
 
 const DEFAULT_ZONES: Record<string, string> = {
-  "01": "Indoor Cozy",
-  "02": "Indoor Cozy",
-  "03": "Courtyard Verandah",
-  "04": "Courtyard Verandah",
-  "05": "Brew Bar",
-  "06": "Brew Bar",
-  "07": "Garden Terrace",
-  "08": "Garden Terrace",
-  "09": "Indoor Cozy",
-  "10": "Indoor Cozy",
-  "11": "Garden Terrace",
-  "12": "Courtyard Verandah",
-  "13": "Indoor Cozy",
-  "14": "Courtyard Verandah",
-  "15": "Garden Terrace",
-  "16": "Indoor Cozy",
-  "17": "Garden Terrace",
-  "18": "Brew Bar",
-  "19": "Indoor Cozy",
-  "20": "Courtyard Verandah",
+  "01": "Café",
+  "02": "Café",
+  "03": "Café",
+  "04": "Café",
+  "05": "Café",
+  "06": "Café",
+  "07": "Lounge",
+  "08": "Lounge",
+  "09": "Lounge",
+  "10": "Lounge",
 };
 
-// 20 Dining Tables
-export const MOCK_TABLES: MockDiningTable[] = Array.from({ length: 20 }, (_, i) => {
+// 10 Dining Tables: 6 Café (01-06) + 4 Lounge (07-10)
+export const MOCK_TABLES: MockDiningTable[] = Array.from({ length: 10 }, (_, i) => {
   const tableNum = (i + 1).toString().padStart(2, "0");
+  const isLounge = i >= 6; // 0..5 => Cafe, 6..9 => Lounge
+  const section = isLounge ? "Lounge" : "Café";
   return {
     id: `tbl_${tableNum}`,
     location_id: MOCK_LOCATION_ID,
     label: `${tableNum}`,
-    seats: i % 2 === 0 ? 4 : 2,
+    seats: isLounge ? (i % 2 === 0 ? 6 : 4) : (i % 2 === 0 ? 4 : 2),
     active: true,
-    section: DEFAULT_ZONES[tableNum] || "Indoor Cozy",
+    section,
     created_at: "2026-08-01T00:00:00.000Z",
     updated_at: "2026-08-01T00:00:00.000Z",
   };
 });
 
-// SHA-256 tokens for tables 01-20
+// QR tokens for tables 01-10
 export const MOCK_QR_TOKENS: MockTableQrToken[] = MOCK_TABLES.map((t) => {
   const tokenStr = `table-${t.label.toLowerCase()}`;
   return {
