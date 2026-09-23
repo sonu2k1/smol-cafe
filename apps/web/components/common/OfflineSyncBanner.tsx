@@ -16,6 +16,7 @@ export const OfflineSyncBanner: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Poll / refresh queued orders
   const refreshQueue = () => {
@@ -23,6 +24,7 @@ export const OfflineSyncBanner: React.FC = () => {
   };
 
   useEffect(() => {
+    setIsMounted(true);
     refreshQueue();
 
     const cleanup = registerOfflineAutoSync((syncedCount) => {
@@ -54,12 +56,12 @@ export const OfflineSyncBanner: React.FC = () => {
     }
   };
 
-  // If online, not degraded, and no queued orders, do not render banner
-  if (isOnline && !isDegraded && queuedOrders.length === 0 && !syncNotice) {
+  // Only render if mounted on client AND (offline OR has queued orders waiting to sync OR active sync notice)
+  if (!isMounted || (isOnline && queuedOrders.length === 0 && !syncNotice)) {
     return null;
   }
 
-  if (isDismissed && isOnline && queuedOrders.length === 0) {
+  if (isDismissed && queuedOrders.length === 0) {
     return null;
   }
 
