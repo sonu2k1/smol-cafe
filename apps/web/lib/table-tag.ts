@@ -4,7 +4,7 @@
  * and session tagging for cross-interface synchronization.
  */
 
-export type TableZone = "Indoor Cozy" | "Courtyard Verandah" | "Garden Terrace" | "Brew Bar" | (string & {});
+export type TableZone = "Café" | "Lounge" | "Indoor Cozy" | "Courtyard Verandah" | "Garden Terrace" | "Brew Bar" | (string & {});
 
 export interface TableJsonTag {
   table_id: string;
@@ -21,26 +21,19 @@ export interface TableJsonTag {
 }
 
 export const TABLE_ZONES_CONFIG: Record<string, { zone: TableZone; capacity: number }> = {
-  "01": { zone: "Indoor Cozy", capacity: 2 },
-  "02": { zone: "Indoor Cozy", capacity: 4 },
-  "03": { zone: "Courtyard Verandah", capacity: 2 },
-  "04": { zone: "Courtyard Verandah", capacity: 4 },
-  "05": { zone: "Brew Bar", capacity: 2 },
-  "06": { zone: "Brew Bar", capacity: 2 },
-  "07": { zone: "Garden Terrace", capacity: 6 },
-  "08": { zone: "Garden Terrace", capacity: 4 },
-  "09": { zone: "Indoor Cozy", capacity: 4 },
-  "10": { zone: "Indoor Cozy", capacity: 2 },
-  "11": { zone: "Garden Terrace", capacity: 4 },
-  "12": { zone: "Courtyard Verandah", capacity: 4 },
-  "13": { zone: "Indoor Cozy", capacity: 2 },
-  "14": { zone: "Courtyard Verandah", capacity: 4 },
-  "15": { zone: "Garden Terrace", capacity: 4 },
-  "16": { zone: "Indoor Cozy", capacity: 2 },
-  "17": { zone: "Garden Terrace", capacity: 6 },
-  "18": { zone: "Brew Bar", capacity: 2 },
-  "19": { zone: "Indoor Cozy", capacity: 4 },
-  "20": { zone: "Courtyard Verandah", capacity: 4 },
+  // 6 Café Tables
+  "01": { zone: "Café", capacity: 2 },
+  "02": { zone: "Café", capacity: 2 },
+  "03": { zone: "Café", capacity: 4 },
+  "04": { zone: "Café", capacity: 4 },
+  "05": { zone: "Café", capacity: 2 },
+  "06": { zone: "Café", capacity: 4 },
+
+  // 4 Lounge Tables
+  "07": { zone: "Lounge", capacity: 4 },
+  "08": { zone: "Lounge", capacity: 4 },
+  "09": { zone: "Lounge", capacity: 6 },
+  "10": { zone: "Lounge", capacity: 6 },
 };
 
 /**
@@ -53,7 +46,7 @@ export function createTableJsonTag(
 ): TableJsonTag {
   const cleanLabel = tableLabel.padStart(2, "0");
   const config = TABLE_ZONES_CONFIG[cleanLabel] || {
-    zone: "Indoor Cozy" as TableZone,
+    zone: "Café" as TableZone,
     capacity: 2,
   };
 

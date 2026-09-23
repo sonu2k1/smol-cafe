@@ -204,7 +204,7 @@ export async function fetchAdminOverviewAction(): Promise<{
         activeTableIds.add(tableLabel);
       }
 
-      const zoneInfo = TABLE_ZONES_CONFIG[tableLabel] || { zone: "Indoor Cozy" };
+      const zoneInfo = TABLE_ZONES_CONFIG[tableLabel] || { zone: "Café" };
       const orderItems = itemsByOrder.get(o.id) || [];
       const itemSummaries = orderItems.map((i) => `${i.name} (x${i.qty})`);
 
@@ -316,17 +316,15 @@ export async function fetchAdminOverviewAction(): Promise<{
       orders: count,
     }));
 
-    // 7. Zone Utilization Calculation
+    // 7. Zone Utilization Calculation (6 Café, 4 Lounge)
     const zoneTableCounts: Record<string, { total: number; occupied: number }> = {
-      "Indoor Cozy": { total: 4, occupied: 0 },
-      "Courtyard Verandah": { total: 4, occupied: 0 },
-      "Garden Terrace": { total: 3, occupied: 0 },
-      "Brew Bar": { total: 1, occupied: 0 },
+      "Café": { total: 6, occupied: 0 },
+      "Lounge": { total: 4, occupied: 0 },
     };
 
-    for (let i = 1; i <= 12; i++) {
+    for (let i = 1; i <= 10; i++) {
       const label = i.toString().padStart(2, "0");
-      const zName = TABLE_ZONES_CONFIG[label]?.zone || "Indoor Cozy";
+      const zName = TABLE_ZONES_CONFIG[label]?.zone || "Café";
       if (zoneTableCounts[zName]) {
         if (activeTableIds.has(label)) {
           zoneTableCounts[zName].occupied++;
@@ -336,24 +334,14 @@ export async function fetchAdminOverviewAction(): Promise<{
 
     const zoneUtilization: AdminZoneUtil[] = [
       {
-        zone: "Indoor Cozy",
-        occ: `${Math.round((zoneTableCounts["Indoor Cozy"].occupied / zoneTableCounts["Indoor Cozy"].total) * 100)}%`,
+        zone: "Café",
+        occ: `${Math.round((zoneTableCounts["Café"].occupied / (zoneTableCounts["Café"].total || 1)) * 100)}%`,
         color: "#F2C84B",
       },
       {
-        zone: "Courtyard Verandah",
-        occ: `${Math.round((zoneTableCounts["Courtyard Verandah"].occupied / zoneTableCounts["Courtyard Verandah"].total) * 100)}%`,
-        color: "#B72E35",
-      },
-      {
-        zone: "Garden Terrace",
-        occ: `${Math.round((zoneTableCounts["Garden Terrace"].occupied / zoneTableCounts["Garden Terrace"].total) * 100)}%`,
-        color: "#48BB78",
-      },
-      {
-        zone: "Brew Bar",
-        occ: `${Math.round((zoneTableCounts["Brew Bar"].occupied / zoneTableCounts["Brew Bar"].total) * 100)}%`,
-        color: "#4299E1",
+        zone: "Lounge",
+        occ: `${Math.round((zoneTableCounts["Lounge"].occupied / (zoneTableCounts["Lounge"].total || 1)) * 100)}%`,
+        color: "#9F7AEA",
       },
     ];
 
@@ -408,8 +396,8 @@ export async function fetchAdminOverviewAction(): Promise<{
         kpis: {
           todaysOrders: mappedOrders.length,
           grossRevenueRupees,
-          activeTablesCount: Math.min(12, Math.max(activeTableIds.size, 1)),
-          totalTablesCount: 12,
+          activeTablesCount: Math.min(10, Math.max(activeTableIds.size, 1)),
+          totalTablesCount: 10,
           pendingKdsCount: pendingKdsTickets,
           avgOrderRupees,
           topSellerName: topSeller.name,

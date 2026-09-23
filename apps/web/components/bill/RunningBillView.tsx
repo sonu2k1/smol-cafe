@@ -154,7 +154,7 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
         orderId: res.orderId || bill?.sessionId || `ORD-${Date.now().toString().slice(-6)}`,
         orderNo: res.orderNo,
         tableLabel: bill?.tableLabel || "01",
-        zone: "Indoor Cozy",
+        zone: (bill?.tableLabel && ["07", "08", "09", "10"].includes(bill.tableLabel)) ? "Lounge" : "Café",
         totalRupees: grandTotal,
         items: itemsList,
         transactionId,
