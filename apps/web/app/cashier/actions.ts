@@ -559,15 +559,27 @@ export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryR
   const supabase = createAdminClient();
 
   try {
-    const { data: orders, error: ordersErr } = await supabase
+    const { data: allOrders, error: ordersErr } = await supabase
       .from("orders")
       .select("*")
-      .not("status", "in", '("CANCELLED","REJECTED","DRAFT","PENDING_CONFIRMATION")')
       .order("created_at", { ascending: false });
 
     if (ordersErr) {
       console.error("Error fetching paid orders:", ordersErr);
     }
+
+    const orders = (allOrders || []).filter((o) => {
+      const s = o.status;
+      return (
+        s === "ACCEPTED" ||
+        s === "PREPARING" ||
+        s === "READY" ||
+        s === "SERVED" ||
+        s === "COMPLETED" ||
+        s === "CLOSED" ||
+        (o as unknown as { payment_status?: string }).payment_status === "PAID"
+      );
+    });
 
     const sessionIds = (orders || [])
       .map((o) => o.table_session_id)
