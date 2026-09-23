@@ -396,8 +396,8 @@ export async function fetchAdminOverviewAction(): Promise<{
         kpis: {
           todaysOrders: mappedOrders.length,
           grossRevenueRupees,
-          activeTablesCount: Math.min(10, Math.max(activeTableIds.size, 1)),
-          totalTablesCount: 10,
+          activeTablesCount: Math.min(diningTables?.length || 10, Math.max(activeTableIds.size, 1)),
+          totalTablesCount: diningTables && diningTables.length > 0 ? diningTables.length : 10,
           pendingKdsCount: pendingKdsTickets,
           avgOrderRupees,
           topSellerName: topSeller.name,
