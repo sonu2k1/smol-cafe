@@ -4,6 +4,7 @@ import { getTableSessionCookie, isValidUuid } from "@/lib/session";
 import { resolveQrToken } from "@/app/t/actions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TableSessionStatus, OrderStatus } from "@smol-cafe/db";
+import { getPhoneUuid, normalizePhoneNumber, doesOrderMatchCustomerPhone } from "@/lib/customer-phone";
 
 export interface BillOrderRoundItem {
   id: string;
@@ -58,7 +59,7 @@ export interface RecordCashPaymentResult {
 /**
  * Server Action: Fetches the running bill breakdown for the current customer session
  */
-export async function fetchRunningBillAction(): Promise<FetchBillResult> {
+export async function fetchRunningBillAction(overridePhone?: string): Promise<FetchBillResult> {
   let session = await getTableSessionCookie();
 
   if (!session || !session.sessionId || !isValidUuid(session.sessionId)) {
@@ -95,18 +96,31 @@ export async function fetchRunningBillAction(): Promise<FetchBillResult> {
       };
     }
 
+    const cleanPhone = normalizePhoneNumber(overridePhone || session.guestPhone);
+    const phoneUuid = cleanPhone ? getPhoneUuid(cleanPhone) : null;
+
     // 2. Fetch all orders for this table session
-    const { data: orders, error: ordersErr } = await supabase
+    let ordersQuery = supabase
       .from("orders")
       .select("*")
-      .eq("table_session_id", session.sessionId)
       .order("order_no", { ascending: true });
+
+    if (phoneUuid) {
+      ordersQuery = ordersQuery.or(`table_session_id.eq.${session.sessionId},customer_id.eq.${phoneUuid}`);
+    } else {
+      ordersQuery = ordersQuery.eq("table_session_id", session.sessionId);
+    }
+
+    const { data: rawOrders, error: ordersErr } = await ordersQuery;
 
     if (ordersErr) {
       console.error("Error fetching orders for bill:", ordersErr);
     }
 
-    const orderIds = (orders || []).map((o) => o.id);
+    // Filter orders strictly for this customer's phone number
+    const orders = (rawOrders || []).filter((o) => doesOrderMatchCustomerPhone(o, cleanPhone, session.sessionId));
+
+    const orderIds = orders.map((o) => o.id);
 
     // 3. Fetch order items
     const itemsByOrder = new Map<string, BillOrderRoundItem[]>();

@@ -157,14 +157,17 @@ export const BottomNavBar: React.FC = () => {
       className="fixed bottom-4 left-0 right-0 z-50 px-3 pb-[max(0.25rem,env(safe-area-inset-bottom))] pointer-events-none select-none"
     >
       <div className="relative pointer-events-auto mx-auto w-full max-w-[375px]">
-        {/* Floating Semi-Transparent Warm Cream Glass Container */}
+        {/* Ambient Backlight Glass Diffusion */}
+        <div className="absolute -inset-1.5 rounded-full bg-gradient-to-r from-amber-600/10 via-[#B72E35]/15 to-amber-500/10 dark:from-purple-600/20 dark:via-purple-800/30 dark:to-purple-600/20 blur-xl -z-10 opacity-80" />
+
+        {/* Floating Ultra-Frosted Glassmorphic Container */}
         <div
           className="relative h-[62px] rounded-full px-3 py-1.5 flex items-center justify-around gap-1
-            bg-[#FAF4EB]/85 dark:bg-[#1E1714]/85
-            backdrop-blur-[24px] backdrop-saturate-[180%]
-            border border-white/70 dark:border-white/10
-            shadow-[0_10px_30px_rgba(74,46,27,0.10),0_2px_8px_rgba(0,0,0,0.04)]
-            dark:shadow-[0_14px_36px_rgba(0,0,0,0.6)]
+            bg-white/45 dark:bg-[#1C1613]/55
+            backdrop-blur-[28px] backdrop-saturate-[200%]
+            border border-white/70 dark:border-white/15
+            shadow-[0_12px_40px_rgba(74,46,27,0.12),0_4px_12px_rgba(0,0,0,0.04),inset_0_1.5px_1.5px_rgba(255,255,255,0.9),inset_0_-1px_1.5px_rgba(0,0,0,0.05)]
+            dark:shadow-[0_18px_48px_rgba(0,0,0,0.7),inset_0_1.5px_1px_rgba(255,255,255,0.16),inset_0_-1px_1px_rgba(0,0,0,0.5)]
             transition-all duration-300"
         >
           {navItems.map((item, index) => {
@@ -179,15 +182,20 @@ export const BottomNavBar: React.FC = () => {
                 onClick={() => setActiveIndex(index)}
                 className={`group relative flex items-center justify-center rounded-full transition-all duration-[650ms] ease-[cubic-bezier(0.25,1,0.35,1)] active:scale-95 touch-manipulation focus:outline-none ${
                   active
-                    ? "bg-gradient-to-r from-[#C22830] to-[#B72E35] text-white px-4 h-[46px] shadow-[0_6px_18px_rgba(183,46,53,0.36),inset_0_1px_1.5px_rgba(255,255,255,0.32)] ring-1 ring-white/20"
-                    : "w-[46px] h-[46px] text-[#4A2E1B] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#FAF4EB] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                    ? "relative bg-gradient-to-b from-[#E03A43]/65 via-[#B72E35]/75 to-[#7D1217]/85 dark:from-[#A855F7]/70 dark:via-[#7E22CE]/80 dark:to-[#4C1D95]/90 text-white px-4 h-[46px] backdrop-blur-[16px] border border-white/55 dark:border-purple-300/40 shadow-[0_8px_24px_rgba(183,46,53,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.4),inset_0_0_14px_rgba(255,140,140,0.35)] dark:shadow-[0_8px_26px_rgba(126,34,206,0.5),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.5),inset_0_0_16px_rgba(192,132,252,0.45)]"
+                    : "w-[46px] h-[46px] text-[#4A2E1B] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#FAF4EB] hover:bg-white/40 dark:hover:bg-white/[0.08] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] backdrop-blur-xs"
                 }`}
               >
-                <div className="flex items-center overflow-hidden">
+                {/* Curved Specular Glass Gloss Reflection */}
+                {active && (
+                  <span className="absolute inset-x-2 top-1 h-[42%] rounded-full bg-gradient-to-b from-white/50 via-white/15 to-transparent pointer-events-none opacity-90" />
+                )}
+
+                <div className="relative z-10 flex items-center overflow-hidden">
                   <div
                     className={`shrink-0 flex items-center justify-center transition-all duration-[550ms] ease-[cubic-bezier(0.25,1,0.35,1)] ${
                       active
-                        ? "text-white scale-105"
+                        ? "text-white scale-105 drop-shadow-[0_1.5px_2.5px_rgba(0,0,0,0.35)]"
                         : "group-hover:scale-110 group-active:scale-95"
                     }`}
                   >
@@ -201,7 +209,7 @@ export const BottomNavBar: React.FC = () => {
                     }`}
                   >
                     <div className="overflow-hidden">
-                      <span className="text-[13.5px] font-sans font-semibold tracking-tight text-white whitespace-nowrap block">
+                      <span className="text-[13.5px] font-sans font-bold tracking-tight text-white whitespace-nowrap block drop-shadow-[0_1.5px_2.5px_rgba(0,0,0,0.35)]">
                         {item.label}
                       </span>
                     </div>

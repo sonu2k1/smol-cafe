@@ -41,7 +41,11 @@ export const RunningBillView: React.FC<RunningBillViewProps> = ({ initialBill, h
 
   const refreshBill = useCallback(async () => {
     try {
-      const result = await fetchRunningBillAction();
+      let clientPhone: string | undefined = undefined;
+      if (typeof window !== "undefined") {
+        clientPhone = localStorage.getItem("smol_guest_phone") || undefined;
+      }
+      const result = await fetchRunningBillAction(clientPhone);
       if (result.success && result.bill) {
         setBill(result.bill);
         if (result.bill.sessionStatus === "PAYMENT_PENDING") {

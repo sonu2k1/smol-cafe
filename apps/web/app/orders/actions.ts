@@ -42,10 +42,12 @@ export interface FetchOrdersResult {
   message?: string;
 }
 
+import { getPhoneUuid, normalizePhoneNumber, doesOrderMatchCustomerPhone } from "@/lib/customer-phone";
+
 /**
- * Server Action: Fetches active orders for the current table session.
+ * Server Action: Fetches active orders for the current table session, strictly isolated by customer phone.
  */
-export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
+export async function fetchActiveOrdersAction(overridePhone?: string): Promise<FetchOrdersResult> {
   let session = await getTableSessionCookie();
 
   if (!session || !session.sessionId || !isValidUuid(session.sessionId)) {
@@ -65,42 +67,27 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
     };
   }
 
+  const cleanPhone = normalizePhoneNumber(overridePhone || session.guestPhone);
+  const phoneUuid = cleanPhone ? getPhoneUuid(cleanPhone) : null;
   const supabase = createAdminClient();
 
   try {
-    // 1. Fetch Orders for this table session
-    let { data: orders, error: ordersError } = await supabase
+    // 1. Fetch Orders for this table session AND customer profile
+    let ordersQuery = supabase
       .from("orders")
       .select("*")
-      .eq("table_session_id", session.sessionId)
       .order("order_no", { ascending: false });
 
-    // Fallback: If no orders found for this exact session (e.g., session was restarted, regenerated, or settled),
-    // retrieve recent orders for this dining table from the past 2 hours
-    if ((!orders || orders.length === 0) && session.tableId && isValidUuid(session.tableId)) {
-      const { data: recentSessions } = await supabase
-        .from("table_sessions")
-        .select("id")
-        .eq("table_id", session.tableId)
-        .order("opened_at", { ascending: false })
-        .limit(5);
-
-      if (recentSessions && recentSessions.length > 0) {
-        const sessionIds = recentSessions.map((s) => s.id);
-        const { data: tableOrders } = await supabase
-          .from("orders")
-          .select("*")
-          .in("table_session_id", sessionIds)
-          .order("order_no", { ascending: false })
-          .limit(10);
-
-        if (tableOrders && tableOrders.length > 0) {
-          orders = tableOrders;
-        }
-      }
+    if (cleanPhone && cleanPhone.length >= 10) {
+      // Fetch orders belonging to this table session OR matching customer profile UUID OR matching phone idempotency key
+      ordersQuery = ordersQuery.or(`table_session_id.eq.${session.sessionId},customer_id.eq.${phoneUuid},idempotency_key.ilike.%${cleanPhone}%`);
+    } else {
+      ordersQuery = ordersQuery.eq("table_session_id", session.sessionId);
     }
 
-    if (ordersError && (!orders || orders.length === 0)) {
+    const { data: rawOrders, error: ordersError } = await ordersQuery;
+
+    if (ordersError) {
       console.error("Error fetching orders:", ordersError);
       return {
         success: false,
@@ -112,19 +99,27 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
       };
     }
 
-    if (!orders || orders.length === 0) {
+    // 2. Strict Customer Phone Isolation:
+    // Filter out any orders that were placed by a DIFFERENT phone number
+    const filteredOrders = (rawOrders || []).filter((order) =>
+      doesOrderMatchCustomerPhone(order, cleanPhone, session.sessionId)
+    );
+
+    if (filteredOrders.length === 0) {
       return {
         success: true,
         hasSession: true,
         orders: [],
         tableLabel: session.tableLabel,
         locationName: session.locationName,
+        guestName: session.guestName,
+        guestPhone: cleanPhone || undefined,
       };
     }
 
-    const orderIds = orders.map((o) => o.id);
+    const orderIds = filteredOrders.map((o) => o.id);
 
-    // 2. Fetch Order Items for these orders
+    // 3. Fetch Order Items for these filtered orders
     const { data: orderItems, error: itemsError } = await supabase
       .from("order_items")
       .select("*")
@@ -134,10 +129,27 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
       console.error("Error fetching order items:", itemsError);
     }
 
+    // Resolve real names for any items with generic name snapshots
+    const missingNameIds = (orderItems || [])
+      .filter((it: any) => (!it.name_snapshot || it.name_snapshot === "Smol Item" || it.name_snapshot === "Artisanal Item") && it.menu_item_id)
+      .map((it: any) => it.menu_item_id);
+
+    const nameLookup = new Map<string, string>();
+    if (missingNameIds.length > 0) {
+      const { data: dbMenuItems } = await supabase
+        .from("menu_items")
+        .select("id, name")
+        .in("id", missingNameIds);
+      for (const m of dbMenuItems || []) {
+        nameLookup.set(m.id, m.name);
+      }
+    }
+
     const itemsByOrder = new Map<string, OrderItemSnapshot[]>();
     for (const item of (orderItems as Array<{
       id: string;
       order_id: string;
+      menu_item_id?: string;
       name_snapshot: string;
       unit_price_snapshot: number;
       qty: number;
@@ -147,9 +159,14 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
       if (!itemsByOrder.has(item.order_id)) {
         itemsByOrder.set(item.order_id, []);
       }
+      const resolvedName =
+        item.name_snapshot && item.name_snapshot !== "Smol Item" && item.name_snapshot !== "Artisanal Item"
+          ? item.name_snapshot
+          : (item.menu_item_id && nameLookup.get(item.menu_item_id)) || item.name_snapshot || "Artisanal Item";
+
       itemsByOrder.get(item.order_id)!.push({
         id: item.id,
-        name: item.name_snapshot,
+        name: resolvedName,
         unitPricePaise: item.unit_price_snapshot,
         qty: item.qty,
         lineSubtotal: item.line_subtotal,
@@ -159,7 +176,7 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
 
     // 3. Assemble structured orders
     const structuredOrders: CustomerOrderDetails[] = (
-      orders as Array<{
+      filteredOrders as Array<{
         id: string;
         order_no: number;
         status: OrderStatus;

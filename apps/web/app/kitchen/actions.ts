@@ -54,10 +54,8 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
   recordKdsHeartbeat();
 
   try {
-    // 1. Fetch active orders across all 4 KDS phases: New, Preparing, Ready, and recent Completed
-    const activeStatuses = isMockDatabase()
-      ? ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED", "PREPARING", "READY", "SERVED", "COMPLETED"]
-      : ["SUBMITTED", "ACCEPTED", "PREPARING", "READY", "SERVED"];
+    // 1. Fetch active orders across confirmed KDS phases: Accepted, Preparing, Ready, and recent Served/Completed
+    const activeStatuses = ["ACCEPTED", "PREPARING", "READY", "SERVED", "COMPLETED"];
 
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
@@ -125,10 +123,27 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
       .select("*")
       .in("order_id", orderIds);
 
+    // Resolve real names for generic name snapshots
+    const missingNameIds = (orderItems || [])
+      .filter((it: any) => (!it.name_snapshot || it.name_snapshot === "Smol Item" || it.name_snapshot === "Artisanal Item") && it.menu_item_id)
+      .map((it: any) => it.menu_item_id);
+
+    const nameLookup = new Map<string, string>();
+    if (missingNameIds.length > 0) {
+      const { data: dbMenuItems } = await supabase
+        .from("menu_items")
+        .select("id, name")
+        .in("id", missingNameIds);
+      for (const m of dbMenuItems || []) {
+        nameLookup.set(m.id, m.name);
+      }
+    }
+
     const itemsByOrder = new Map<string, KitchenOrderItem[]>();
     for (const item of (orderItems as Array<{
       id: string;
       order_id: string;
+      menu_item_id?: string;
       name_snapshot: string;
       qty: number;
       item_status: string;
@@ -136,9 +151,14 @@ export async function fetchKitchenOrdersAction(): Promise<FetchKitchenOrdersResu
       if (!itemsByOrder.has(item.order_id)) {
         itemsByOrder.set(item.order_id, []);
       }
+      const resolvedName =
+        item.name_snapshot && item.name_snapshot !== "Smol Item" && item.name_snapshot !== "Artisanal Item"
+          ? item.name_snapshot
+          : (item.menu_item_id && nameLookup.get(item.menu_item_id)) || item.name_snapshot || "Artisanal Item";
+
       itemsByOrder.get(item.order_id)!.push({
         id: item.id,
-        name: item.name_snapshot,
+        name: resolvedName,
         qty: item.qty,
         itemStatus: item.item_status || "PENDING",
       });
