@@ -6,17 +6,12 @@ import {
   Search,
   CheckCircle2,
   AlertTriangle,
-  Flame,
   Sparkles,
-  Layers,
   Edit3,
   Edit2,
-  Trash2,
   X,
   Plus,
-  Minus,
   Check,
-  Package,
   RefreshCw,
   Ban,
   CheckCheck,
@@ -24,16 +19,15 @@ import {
 import {
   type KitchenMenuItem,
   type KitchenIngredientItem,
-  type ItemStockStatus,
   fetchKitchenMenuCatalogAction,
   updateMenuItemStockAction,
   updateChefItemNotesAction,
-  updateIngredientStockAction,
   bulkSetCategoryStockAction,
 } from "@/app/kitchen/menu-actions";
-import { saveMenuItemAction, deleteMenuItemAction } from "@/app/admin/menu-actions";
+import { saveMenuItemAction } from "@/app/admin/menu-actions";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
-import { getFoodImage, FOOD_PRESET_OPTIONS } from "@/lib/food-images";
+import { getFoodImage } from "@/lib/food-images";
+import { DishImagePicker } from "@/components/common/DishImagePicker";
 
 interface KitchenMenuManagerProps {
   onClose?: () => void;
@@ -41,11 +35,11 @@ interface KitchenMenuManagerProps {
 
 export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
   const [items, setItems] = useState<KitchenMenuItem[]>([]);
-  const [ingredients, setIngredients] = useState<KitchenIngredientItem[]>([]);
+  const [, setIngredients] = useState<KitchenIngredientItem[]>([]);
   const [stations, setStations] = useState<string[]>([]);
   const [selectedStation, setSelectedStation] = useState<string>("All Stations");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [stockFilter, setStockFilter] = useState<"ALL" | "IN_STOCK" | "LOW_STOCK" | "SOLD_OUT">("ALL");
+  const [stockFilter, setStockFilter] = useState<"ALL" | "IN_STOCK" | "SOLD_OUT">("ALL");
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -99,21 +93,22 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
     return () => unsub();
   }, [loadData]);
 
-  // Compute stats
+  // Compute stats (Simple 2-state: In Stock vs Out of Stock)
   const stats = useMemo(() => {
     const total = items.length;
-    const inStock = items.filter((i) => i.stockStatus === "IN_STOCK").length;
-    const lowStock = items.filter((i) => i.stockStatus === "LOW_STOCK").length;
+    const inStock = items.filter((i) => i.stockStatus !== "SOLD_OUT").length;
     const soldOut = items.filter((i) => i.stockStatus === "SOLD_OUT").length;
     const specials = items.filter((i) => i.isChefSpecial).length;
-    return { total, inStock, lowStock, soldOut, specials };
+    return { total, inStock, soldOut, specials };
   }, [items]);
 
   // Filtered menu items
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       const matchStation = selectedStation === "All Stations" || item.station === selectedStation;
-      const matchStock = stockFilter === "ALL" || item.stockStatus === stockFilter;
+      const matchStock =
+        stockFilter === "ALL" ||
+        (stockFilter === "IN_STOCK" ? item.stockStatus !== "SOLD_OUT" : item.stockStatus === "SOLD_OUT");
       const matchSearch =
         !searchQuery.trim() ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -123,24 +118,26 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
     });
   }, [items, selectedStation, stockFilter, searchQuery]);
 
-  // Toggle Item Stock Status (IN_STOCK / LOW_STOCK / SOLD_OUT)
-  const handleSetStock = async (itemId: string, newStatus: ItemStockStatus, count: number = 3) => {
+  // Toggle Item Stock Status (IN_STOCK / SOLD_OUT)
+  const handleSetStock = async (itemId: string, newStatus: "IN_STOCK" | "SOLD_OUT") => {
     // Optimistic update
     setItems((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, stockStatus: newStatus, lowStockCount: count } : i))
+      prev.map((i) => (i.id === itemId ? { ...i, stockStatus: newStatus } : i))
     );
 
     try {
-      const res = await updateMenuItemStockAction(itemId, newStatus, count);
+      const res = await updateMenuItemStockAction(itemId, newStatus);
       if (res.success) {
         broadcastSyncEvent({
           type: "ITEM_AVAILABILITY_CHANGED",
           itemId: itemId,
           availability: newStatus,
-          portionsLeft: newStatus === "LOW_STOCK" ? count : undefined,
           timestamp: Date.now(),
         });
-        setFeedback({ type: "success", text: res.message });
+        setFeedback({
+          type: "success",
+          text: newStatus === "IN_STOCK" ? "Marked as In Stock" : "Marked as Out Of Stock",
+        });
       }
     } catch {
       setFeedback({ type: "error", text: "Failed to update item availability." });
@@ -149,7 +146,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
   };
 
   // Bulk Station Stock Change
-  const handleBulkStationStock = async (stockStatus: ItemStockStatus) => {
+  const handleBulkStationStock = async (stockStatus: "IN_STOCK" | "SOLD_OUT") => {
     const target = selectedStation === "All Stations" ? "ALL" : selectedStation;
     try {
       const res = await bulkSetCategoryStockAction(target, stockStatus);
@@ -159,40 +156,17 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
             type: "ITEM_AVAILABILITY_CHANGED",
             itemId: id,
             availability: stockStatus,
-            portionsLeft: stockStatus === "LOW_STOCK" ? 3 : undefined,
             timestamp: Date.now(),
           });
         });
         loadData();
-        setFeedback({ type: "success", text: res.message });
+        setFeedback({
+          type: "success",
+          text: stockStatus === "IN_STOCK" ? "All items marked In Stock" : "All items marked Out Of Stock",
+        });
       }
     } catch {
       setFeedback({ type: "error", text: "Bulk action failed." });
-    }
-  };
-
-  // Adjust Low Stock Count
-  const handleAdjustCount = async (itemId: string, delta: number) => {
-    const current = items.find((i) => i.id === itemId);
-    if (!current) return;
-    const currentCount = current.lowStockCount ?? 3;
-    const newCount = Math.max(1, currentCount + delta);
-
-    setItems((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, lowStockCount: newCount } : i))
-    );
-
-    try {
-      await updateMenuItemStockAction(itemId, "LOW_STOCK", newCount);
-      broadcastSyncEvent({
-        type: "ITEM_AVAILABILITY_CHANGED",
-        itemId,
-        availability: "LOW_STOCK",
-        portionsLeft: newCount,
-        timestamp: Date.now(),
-      });
-    } catch {
-      // ignore
     }
   };
 
@@ -292,21 +266,6 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
     }
   };
 
-  // Toggle Ingredient Stock
-  const handleToggleIngredient = async (name: string, current: boolean) => {
-    const nextState = !current;
-    setIngredients((prev) =>
-      prev.map((ing) => (ing.name === name ? { ...ing, inStock: nextState } : ing))
-    );
-
-    try {
-      const res = await updateIngredientStockAction(name, nextState);
-      setFeedback({ type: "success", text: res.message });
-    } catch {
-      setFeedback({ type: "error", text: "Failed to update ingredient." });
-    }
-  };
-
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Toast Feedback */}
@@ -324,7 +283,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
             ) : (
               <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
             )}
-            <span>{feedback.text}</span>
+            <span className="font-semibold">{feedback.text}</span>
           </div>
           <button onClick={() => setFeedback(null)} className="text-stone-400 hover:text-stone-700 cursor-pointer">
             <X className="h-4 w-4" />
@@ -341,14 +300,14 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-serif text-lg sm:text-2xl font-bold text-[#241F1C] dark:text-white leading-tight">
-                Daily Kitchen Menu &amp; 86 Editor
+                Kitchen Menu &amp; Stock Manager
               </h1>
-              <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 text-[10px] sm:text-[11px] font-mono font-bold shrink-0">
-                Chef Live
+              <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-mono font-bold shrink-0">
+                Live Kitchen Sync
               </span>
             </div>
             <p className="font-mono text-[11px] sm:text-xs text-[#725039] dark:text-stone-400 mt-1">
-              Toggle dish availability (86), set low-stock portion alerts, and update daily chef specials in real time.
+              Easily toggle dishes between In Stock and Out Of Stock in real time.
             </p>
           </div>
         </div>
@@ -372,35 +331,30 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
         </div>
       </div>
 
-      {/* Chef Quick Status Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {/* Simplified Status Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1C1815] p-3 shadow-xs">
-          <span className="text-[10px] font-mono uppercase text-[#725039] dark:text-stone-400 block">Total Dishes</span>
+          <span className="text-[10px] font-mono uppercase text-[#725039] dark:text-stone-400 block font-semibold">
+            Total Dishes
+          </span>
           <p className="mt-1 text-2xl font-serif font-bold text-[#241F1C] dark:text-white">{stats.total}</p>
         </div>
 
-        <div className="rounded-2xl border border-emerald-300/60 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 shadow-xs">
+        <div className="rounded-2xl border border-emerald-300/60 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 shadow-xs">
           <span className="text-[10px] font-mono uppercase text-emerald-800 dark:text-emerald-300 block font-bold">
-            In Stock
+            1. In Stock
           </span>
           <p className="mt-1 text-2xl font-serif font-bold text-emerald-700 dark:text-emerald-400">{stats.inStock}</p>
         </div>
 
-        <div className="rounded-2xl border border-amber-300/60 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20 p-3 shadow-xs">
-          <span className="text-[10px] font-mono uppercase text-amber-800 dark:text-amber-300 block font-bold">
-            Low Stock
-          </span>
-          <p className="mt-1 text-2xl font-serif font-bold text-amber-700 dark:text-amber-400">{stats.lowStock}</p>
-        </div>
-
-        <div className="rounded-2xl border border-rose-300/60 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 p-3 shadow-xs">
+        <div className="rounded-2xl border border-rose-300/60 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/20 p-3 shadow-xs">
           <span className="text-[10px] font-mono uppercase text-rose-800 dark:text-rose-300 block font-bold">
-            86 / Sold Out
+            2. Out Of Stock
           </span>
           <p className="mt-1 text-2xl font-serif font-bold text-rose-700 dark:text-rose-400">{stats.soldOut}</p>
         </div>
 
-        <div className="col-span-2 sm:col-span-1 rounded-2xl border border-purple-300/60 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20 p-3 shadow-xs">
+        <div className="rounded-2xl border border-purple-300/60 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20 p-3 shadow-xs">
           <span className="text-[10px] font-mono uppercase text-purple-800 dark:text-purple-300 block font-bold">
             Chef Specials
           </span>
@@ -427,31 +381,31 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
           ))}
         </div>
 
-        {/* Bulk Action Buttons */}
+        {/* Bulk Quick Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => handleBulkStationStock("SOLD_OUT")}
-            className="flex-1 md:flex-none flex items-center justify-center gap-1 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 px-3 py-1.5 text-xs font-mono font-bold hover:bg-rose-200 transition cursor-pointer"
-            title={`86 all items in ${selectedStation}`}
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 px-3 py-1.5 text-xs font-mono font-bold hover:bg-rose-200 dark:hover:bg-rose-900 transition cursor-pointer shadow-xs"
+            title={`Mark all items in ${selectedStation} as Out Of Stock`}
           >
             <Ban className="h-3.5 w-3.5" />
-            <span>86 {selectedStation === "All Stations" ? "All" : selectedStation.split(" ")[0]}</span>
+            <span>Mark All Out Of Stock</span>
           </button>
 
           <button
             onClick={() => handleBulkStationStock("IN_STOCK")}
-            className="flex-1 md:flex-none flex items-center justify-center gap-1 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 px-3 py-1.5 text-xs font-mono font-bold hover:bg-emerald-200 transition cursor-pointer"
-            title={`Mark all items in ${selectedStation} In Stock`}
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 px-3 py-1.5 text-xs font-mono font-bold hover:bg-emerald-200 dark:hover:bg-emerald-900 transition cursor-pointer shadow-xs"
+            title={`Restore all items in ${selectedStation} to In Stock`}
           >
             <CheckCheck className="h-3.5 w-3.5" />
-            <span>Restore All</span>
+            <span>Restore All In Stock</span>
           </button>
         </div>
       </div>
 
-      {/* Search & Stock Filter Bar */}
+      {/* Search & Simple 2-State Filter Pills */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Search */}
+        {/* Search Input */}
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
           <input
@@ -463,21 +417,40 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
           />
         </div>
 
-        {/* Stock Filter Pills */}
+        {/* Filter Pills */}
         <div className="flex items-center gap-1 rounded-2xl bg-[#EFE7DC] dark:bg-stone-900 p-1 border border-[#C9AE8B]/30 dark:border-stone-800 shrink-0">
-          {(["ALL", "IN_STOCK", "LOW_STOCK", "SOLD_OUT"] as const).map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setStockFilter(filter)}
-              className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition cursor-pointer ${
-                stockFilter === filter
-                  ? "bg-[#241F1C] dark:bg-white text-white dark:text-[#241F1C] shadow-xs"
-                  : "text-[#725039] dark:text-stone-400 hover:text-[#241F1C] dark:hover:text-white"
-              }`}
-            >
-              {filter === "ALL" ? "All" : filter.replace("_", " ")}
-            </button>
-          ))}
+          <button
+            onClick={() => setStockFilter("ALL")}
+            className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition cursor-pointer ${
+              stockFilter === "ALL"
+                ? "bg-[#241F1C] dark:bg-white text-white dark:text-[#241F1C] shadow-xs"
+                : "text-[#725039] dark:text-stone-400 hover:text-[#241F1C] dark:hover:text-white"
+            }`}
+          >
+            All Dishes
+          </button>
+
+          <button
+            onClick={() => setStockFilter("IN_STOCK")}
+            className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition cursor-pointer ${
+              stockFilter === "IN_STOCK"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "text-[#725039] dark:text-stone-400 hover:text-emerald-700 dark:hover:text-emerald-400"
+            }`}
+          >
+            In Stock
+          </button>
+
+          <button
+            onClick={() => setStockFilter("SOLD_OUT")}
+            className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition cursor-pointer ${
+              stockFilter === "SOLD_OUT"
+                ? "bg-rose-600 text-white shadow-xs"
+                : "text-[#725039] dark:text-stone-400 hover:text-rose-700 dark:hover:text-rose-400"
+            }`}
+          >
+            Out Of Stock
+          </button>
         </div>
       </div>
 
@@ -488,28 +461,25 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
           Loading kitchen catalog...
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="py-16 text-center text-stone-500 font-mono text-xs">
+        <div className="py-16 text-center text-stone-500 font-mono text-xs bg-[#FAF4EB] dark:bg-[#1A1715] rounded-3xl border border-[#C9AE8B]/30 dark:border-stone-800">
           No menu items found matching current filters.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {filteredItems.map((item) => {
-            const is86 = item.stockStatus === "SOLD_OUT";
-            const isLow = item.stockStatus === "LOW_STOCK";
+            const isOutOfStock = item.stockStatus === "SOLD_OUT";
             const imgUrl = item.imageUrl ? getFoodImage(item.name, item.imageUrl) : "";
 
             return (
               <div
                 key={item.id}
                 className={`rounded-3xl border p-4 transition-all relative flex flex-col justify-between shadow-xs bg-[#FAF4EB] dark:bg-[#1A1715] ${
-                  is86
+                  isOutOfStock
                     ? "border-rose-300 dark:border-rose-900/80 bg-rose-50/30 dark:bg-rose-950/20"
-                    : isLow
-                    ? "border-amber-300 dark:border-amber-900/80 bg-amber-50/30 dark:bg-amber-950/20"
-                    : "border-[#C9AE8B]/40 dark:border-stone-800"
+                    : "border-[#C9AE8B]/40 dark:border-stone-800 hover:border-[#C9AE8B]/70"
                 }`}
               >
-                {/* Item Card Header */}
+                {/* Item Card Content */}
                 <div>
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="flex items-start gap-2.5 min-w-0 flex-1">
@@ -518,8 +488,8 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                           <img
                             src={imgUrl}
                             alt={item.name}
-                            className={`h-full w-full object-cover ${
-                              is86 ? "grayscale contrast-125" : ""
+                            className={`h-full w-full object-cover transition-all ${
+                              isOutOfStock ? "grayscale opacity-60" : ""
                             }`}
                           />
                         </div>
@@ -534,8 +504,19 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                               <Sparkles className="h-2.5 w-2.5" /> Special
                             </span>
                           )}
+                          {isOutOfStock && (
+                            <span className="text-[9.5px] font-mono font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 px-1.5 py-0.5 rounded-md border border-rose-300 dark:border-rose-800">
+                              Out Of Stock
+                            </span>
+                          )}
                         </div>
-                        <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white leading-tight mt-0.5 line-clamp-1">
+                        <h3
+                          className={`font-serif text-base font-bold leading-tight mt-0.5 line-clamp-1 ${
+                            isOutOfStock
+                              ? "text-stone-500 dark:text-stone-400 line-through decoration-rose-500/60"
+                              : "text-[#241F1C] dark:text-white"
+                          }`}
+                        >
                           {item.name}
                         </h3>
                         <p className="text-[11px] font-mono text-[#725039] dark:text-stone-400">
@@ -545,7 +526,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                     </div>
 
                     {/* Action Buttons: Edit Dish & Chef Note */}
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => handleOpenEditDish(item)}
                         className="p-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition text-[#725039] dark:text-stone-300 cursor-pointer"
@@ -571,72 +552,35 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                   )}
                 </div>
 
-                {/* 3-State Availability Control Bar */}
-                <div className="mt-4 pt-3 border-t border-[#C9AE8B]/20 dark:border-stone-800 space-y-2">
-                  <div className="grid grid-cols-3 gap-1">
-                    {/* State 1: IN STOCK */}
+                {/* 2-BUTTON STOCK TOGGLE: 1. IN STOCK  2. OUT OF STOCK */}
+                <div className="mt-4 pt-3 border-t border-[#C9AE8B]/20 dark:border-stone-800">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Button 1: IN STOCK */}
                     <button
                       onClick={() => handleSetStock(item.id, "IN_STOCK")}
-                      className={`py-1.5 px-2 rounded-xl font-mono text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
-                        item.stockStatus === "IN_STOCK"
-                          ? "bg-emerald-600 text-white shadow-xs"
-                          : "bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                      className={`py-2 px-3 rounded-xl font-mono text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                        !isOutOfStock
+                          ? "bg-emerald-600 text-white hover:bg-emerald-700 border border-emerald-600"
+                          : "bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700"
                       }`}
                     >
-                      {item.stockStatus === "IN_STOCK" && <Check className="h-3 w-3" />}
-                      <span>IN STOCK</span>
+                      <Check className="h-3.5 w-3.5 shrink-0" />
+                      <span>In Stock</span>
                     </button>
 
-                    {/* State 2: LOW STOCK */}
-                    <button
-                      onClick={() => handleSetStock(item.id, "LOW_STOCK", item.lowStockCount || 3)}
-                      className={`py-1.5 px-2 rounded-xl font-mono text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
-                        isLow
-                          ? "bg-amber-500 text-white shadow-xs"
-                          : "bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                      }`}
-                    >
-                      <span>LOW</span>
-                    </button>
-
-                    {/* State 3: 86 / SOLD OUT */}
+                    {/* Button 2: OUT OF STOCK */}
                     <button
                       onClick={() => handleSetStock(item.id, "SOLD_OUT")}
-                      className={`py-1.5 px-2 rounded-xl font-mono text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
-                        is86
-                          ? "bg-rose-600 text-white shadow-xs"
-                          : "bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                      className={`py-2 px-3 rounded-xl font-mono text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                        isOutOfStock
+                          ? "bg-rose-600 text-white hover:bg-rose-700 border border-rose-600"
+                          : "bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700"
                       }`}
                     >
-                      <span>86 (OUT)</span>
+                      <Ban className="h-3.5 w-3.5 shrink-0" />
+                      <span>Out Of Stock</span>
                     </button>
                   </div>
-
-                  {/* Low Stock Portions Counter */}
-                  {isLow && (
-                    <div className="flex items-center justify-between bg-amber-100/70 dark:bg-amber-950/40 p-1.5 rounded-xl border border-amber-300 dark:border-amber-800">
-                      <span className="text-[10px] font-mono text-amber-900 dark:text-amber-300 font-bold">
-                        Remaining Portions:
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleAdjustCount(item.id, -1)}
-                          className="h-6 w-6 flex items-center justify-center rounded-lg bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200 border border-amber-300 dark:border-amber-800 cursor-pointer"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="font-mono text-xs font-bold text-amber-900 dark:text-amber-200 min-w-4 text-center">
-                          {item.lowStockCount ?? 3}
-                        </span>
-                        <button
-                          onClick={() => handleAdjustCount(item.id, 1)}
-                          className="h-6 w-6 flex items-center justify-center rounded-lg bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200 border border-amber-300 dark:border-amber-800 cursor-pointer"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             );
@@ -823,7 +767,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                     className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-xs font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
                   >
                     <option value="AVAILABLE">In Stock</option>
-                    <option value="SOLD_OUT">86 / Sold Out</option>
+                    <option value="SOLD_OUT">Out Of Stock</option>
                   </select>
                 </div>
               </div>
@@ -842,61 +786,12 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                 />
               </div>
 
-              {/* Photo / Image Selection */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300">
-                    Dish Photo (URL / Preset)
-                  </label>
-                  {dishImageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setDishImageUrl("")}
-                      className="text-[10.5px] font-mono text-red-600 hover:underline"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    placeholder="https://images.unsplash.com/... or pick below"
-                    value={dishImageUrl}
-                    onChange={(e) => setDishImageUrl(e.target.value)}
-                    className="flex-1 rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-xs font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
-                  />
-                  {dishImageUrl && (
-                    <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0 border border-[#C9AE8B]/40 dark:border-stone-700 bg-stone-100 dark:bg-stone-800">
-                      <img src={dishImageUrl} alt="Preview" className="h-full w-full object-cover" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Preset Chips */}
-                <div>
-                  <span className="text-[10px] font-mono text-stone-500 block mb-1">
-                    Presets:
-                  </span>
-                  <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                    {FOOD_PRESET_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setDishImageUrl(opt.url)}
-                        className={`text-[9.5px] px-2 py-0.5 rounded-lg border transition font-mono ${
-                          dishImageUrl === opt.url
-                            ? "bg-[#B72E35] text-white border-[#B72E35]"
-                            : "bg-white dark:bg-stone-900 border-[#C9AE8B]/40 dark:border-stone-700 text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3]"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              {/* Photo / Image Selection with Camera & Upload Support */}
+              <DishImagePicker
+                imageUrl={dishImageUrl}
+                onChange={setDishImageUrl}
+                dishName={dishName}
+              />
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800">
                 <button

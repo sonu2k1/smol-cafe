@@ -28,7 +28,8 @@ import {
   type AdminCategoryOption,
 } from "@/app/admin/menu-actions";
 import { broadcastSyncEvent } from "@/lib/sync-events";
-import { getFoodImage, FOOD_PRESET_OPTIONS } from "@/lib/food-images";
+import { getFoodImage } from "@/lib/food-images";
+import { DishImagePicker } from "@/components/common/DishImagePicker";
 
 interface AdminMenuManagerProps {
   onItemChange?: () => void;
@@ -630,61 +631,12 @@ export const AdminMenuManager: React.FC<AdminMenuManagerProps> = ({ onItemChange
                 />
               </div>
 
-              {/* Image URL & Preset Selection */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300">
-                    Dish Photo (URL or Presets)
-                  </label>
-                  {formImageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setFormImageUrl("")}
-                      className="text-[11px] text-red-600 hover:underline"
-                    >
-                      Clear Photo
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    placeholder="https://images.unsplash.com/... or pick below"
-                    value={formImageUrl}
-                    onChange={(e) => setFormImageUrl(e.target.value)}
-                    className="flex-1 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 text-xs text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-[#B72E35]/40 font-mono"
-                  />
-                  {formImageUrl && (
-                    <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800">
-                      <img src={formImageUrl} alt="Preview" className="h-full w-full object-cover" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Quick Presets */}
-                <div>
-                  <span className="text-[10.5px] font-mono text-stone-500 dark:text-stone-400 block mb-1">
-                    Quick Photo Presets:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                    {FOOD_PRESET_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setFormImageUrl(opt.url)}
-                        className={`text-[10px] px-2 py-0.5 rounded-lg border transition font-mono ${
-                          formImageUrl === opt.url
-                            ? "bg-[#B72E35] text-white border-[#B72E35]"
-                            : "bg-stone-100 dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              {/* Photo / Image Selection with Camera & Upload Support */}
+              <DishImagePicker
+                imageUrl={formImageUrl}
+                onChange={setFormImageUrl}
+                dishName={formName}
+              />
 
               {/* Actions */}
               <div className="pt-3 border-t border-stone-200 dark:border-stone-800 flex items-center justify-end gap-2.5">

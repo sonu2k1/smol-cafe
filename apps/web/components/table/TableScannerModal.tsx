@@ -1,37 +1,20 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { TABLE_ZONES_CONFIG } from "@/lib/table-tag";
-import { fetchActiveTablesAction, type ClientTableInfo } from "@/app/t/actions";
-import { QrCode, Camera, Check, X, MapPin, RefreshCw, Sparkles, Upload } from "lucide-react";
+import { QrCode, Camera, Check, X, MapPin, RefreshCw, Upload, AlertCircle } from "lucide-react";
 import jsQR from "jsqr";
 
 interface TableScannerModalProps {
   currentTable: string;
   onClose: () => void;
   onSelectTable: (tableLabel: string) => void;
-  initialTab?: "camera" | "picker";
 }
-
-const DEFAULT_TABLE_LIST: ClientTableInfo[] = Array.from({ length: 10 }, (_, i) => {
-  const label = (i + 1).toString().padStart(2, "0");
-  const info = TABLE_ZONES_CONFIG[label] || { zone: "Café", capacity: 2 };
-  return {
-    label,
-    zone: info.zone,
-    capacity: info.capacity,
-    active: true,
-  };
-});
 
 export const TableScannerModal: React.FC<TableScannerModalProps> = ({
   currentTable,
   onClose,
   onSelectTable,
-  initialTab = "camera",
 }) => {
-  const [activeTab, setActiveTab] = useState<"camera" | "picker">(initialTab);
-  const [tables, setTables] = useState<ClientTableInfo[]>(DEFAULT_TABLE_LIST);
   const [cameraState, setCameraState] = useState<
     "idle" | "requesting" | "needs_tap" | "active" | "denied" | "unsupported" | "error"
   >("idle");
@@ -56,23 +39,6 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
       const isSecure = window.isSecureContext || isLocalhost;
       setIsSecureContextEnv(isSecure);
     }
-  }, []);
-
-  // Load dynamic tables from DB (including newly added tables like Table 13)
-  useEffect(() => {
-    let isMounted = true;
-    fetchActiveTablesAction()
-      .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          setTables(data);
-        }
-      })
-      .catch((err) => {
-        console.warn("Could not fetch dynamic active tables:", err);
-      });
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   // Stop camera tracks cleanly
@@ -122,7 +88,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
       setTimeout(() => {
         stopCamera();
         onSelectTable(tableLabel);
-      }, 200);
+      }, 300);
     },
     [onSelectTable, stopCamera]
   );
@@ -165,7 +131,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
       setErrorMessage(
         isSecureContextEnv
           ? "Camera is not supported on this browser."
-          : "Mobile browsers require HTTPS or native photo capture for camera access."
+          : "Mobile browsers require HTTPS or native camera capture."
       );
       return;
     }
@@ -188,7 +154,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
           audio: false,
         });
       } catch {
-        // Fallback: simple video constraint without facingMode (essential for some Android/iOS devices)
+        // Fallback: simple video constraint
         stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false,
@@ -217,7 +183,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
       console.warn("Camera access request error:", error);
       if (error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError") {
         setCameraState("denied");
-        setErrorMessage("Camera permission was denied. Tap 'Snap Table QR' to use native phone camera or select your table below.");
+        setErrorMessage("Camera permission was denied. Tap 'Open Phone Camera to Scan' to use native phone camera.");
       } else {
         setCameraState("error");
         setErrorMessage(error?.message || "Could not start camera stream.");
@@ -225,19 +191,14 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
     }
   }, [facingMode, isSecureContextEnv, stopCamera, tickScan]);
 
-  // Activate / deactivate camera depending on activeTab
   useEffect(() => {
-    if (activeTab === "camera") {
-      startCamera();
-    } else {
-      stopCamera();
-    }
+    startCamera();
     return () => {
       stopCamera();
     };
-  }, [activeTab, startCamera, stopCamera]);
+  }, [startCamera, stopCamera]);
 
-  // Handle Photo Snap / Upload from Native Phone Camera (100% works on all phones & HTTP/IP)
+  // Handle Photo Snap / Upload from Native Phone Camera
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -250,7 +211,6 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
       const img = new Image();
       img.onload = () => {
         const canvas = canvasRef.current || document.createElement("canvas");
-        // Limit max dimensions for fast decoding on high-megapixel mobile phones
         const maxDim = 1200;
         let w = img.width;
         let h = img.height;
@@ -281,7 +241,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
           }
         }
         setCameraState("error");
-        setErrorMessage("QR code was not clearly detected in the photo. Please tap closer to the QR stand or select your table.");
+        setErrorMessage("QR code was not clearly detected in the photo. Please point closer to the table QR code stand.");
       };
       img.onerror = () => {
         setCameraState("error");
@@ -292,17 +252,13 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleSimulateScan = (label: string) => {
-    handleTableDetected(label);
-  };
-
   const toggleFacingMode = () => {
     setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#241F1C]/80 backdrop-blur-sm p-3 sm:p-4 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#241F1C]/85 backdrop-blur-sm p-3 sm:p-4 animate-fade-in"
       onClick={() => {
         stopCamera();
         onClose();
@@ -311,7 +267,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
       {/* Hidden processing canvas for QR decoder */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Hidden native mobile camera input (Always triggers native camera on iOS & Android) */}
+      {/* Hidden native mobile camera input */}
       <input
         ref={fileInputRef}
         id="phone-camera-input-file"
@@ -323,7 +279,7 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
       />
 
       <div
-        className="w-full max-w-md rounded-3xl sm:rounded-[2rem] border border-[#725039]/20 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#1E1916] p-4 sm:p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] text-[#241F1C] dark:text-[#F3E7D3] transition-all animate-scale-in max-h-[92vh] overflow-hidden flex flex-col relative"
+        className="w-full max-w-md rounded-3xl sm:rounded-[2rem] border border-[#725039]/20 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#1E1916] p-4 sm:p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] text-[#241F1C] dark:text-[#F3E7D3] transition-all animate-scale-in overflow-hidden flex flex-col relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -333,11 +289,11 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
               <QrCode className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-[#B72E35] dark:text-[#9D7BFF]" />
             </div>
             <div>
-              <h3 className="font-serif text-base sm:text-lg font-medium tracking-tight text-[#241F1C] dark:text-[#F3E7D3] lowercase">
-                select your table
+              <h3 className="font-serif text-base sm:text-lg font-bold tracking-tight text-[#241F1C] dark:text-[#F3E7D3]">
+                Scan Table QR
               </h3>
               <p className="font-serif italic text-[11px] text-[#725039] dark:text-[#C9AE8B]">
-                tap your table or scan the qr stand
+                Point camera at your seat&apos;s QR stand
               </p>
             </div>
           </div>
@@ -352,263 +308,142 @@ export const TableScannerModal: React.FC<TableScannerModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex rounded-xl bg-[#EFE3D3] dark:bg-[#161210] p-1 text-xs font-medium my-3 sm:my-4 border border-[#725039]/15 dark:border-white/10">
-          <button
-            onClick={() => setActiveTab("camera")}
-            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 sm:py-2.5 transition-all font-sans cursor-pointer ${
-              activeTab === "camera"
-                ? "bg-[#FAF4EB] dark:bg-[#2A2420] font-semibold text-[#B72E35] dark:text-[#9D7BFF] shadow-sm border border-[#725039]/15 dark:border-[#754CFF]/30"
-                : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#F3E7D3] border border-transparent"
+        {/* Live Camera Scanner Viewport */}
+        <div className="my-3 sm:my-4 flex flex-col items-center justify-center rounded-2xl border border-[#725039]/20 bg-[#161210] text-white text-center relative overflow-hidden min-h-[330px] sm:min-h-[360px]">
+          {/* Live Video Feed */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+              cameraState === "active" ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
-          >
-            <Camera className="h-3.5 w-3.5" />
-            scan qr (camera)
-          </button>
-          <button
-            onClick={() => setActiveTab("picker")}
-            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 sm:py-2.5 transition-all font-sans cursor-pointer ${
-              activeTab === "picker"
-                ? "bg-[#FAF4EB] dark:bg-[#2A2420] font-semibold text-[#B72E35] dark:text-[#9D7BFF] shadow-sm border border-[#725039]/15 dark:border-[#754CFF]/30"
-                : "text-[#725039] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#F3E7D3] border border-transparent"
-            }`}
-          >
-            <MapPin className="h-3.5 w-3.5" />
-            select table
-          </button>
-        </div>
+          />
 
-        {/* Tab 1: Live Camera Scanner */}
-        {activeTab === "camera" && (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-[#725039]/20 bg-[#161210] text-white text-center relative overflow-hidden flex-1 min-h-[320px] sm:min-h-[350px]">
-            {/* Native Mobile Camera File Input (Triggered via native <label>) */}
-            <input
-              id="phone-camera-input-file"
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleImageFile}
-              className="sr-only opacity-0 absolute pointer-events-none w-0 h-0"
-            />
+          {/* Active Live Video Stream View */}
+          {cameraState === "active" && (
+            <>
+              <div className="relative z-10 h-48 w-48 sm:h-56 sm:w-56 flex items-center justify-center pointer-events-none">
+                {/* 4 Corner brackets */}
+                <div className="absolute top-0 left-0 h-7 w-7 sm:h-8 sm:w-8 border-t-3 border-l-3 border-[#B72E35] dark:border-[#754CFF] rounded-tl-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
+                <div className="absolute top-0 right-0 h-7 w-7 sm:h-8 sm:w-8 border-t-3 border-r-3 border-[#B72E35] dark:border-[#754CFF] rounded-tr-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
+                <div className="absolute bottom-0 left-0 h-7 w-7 sm:h-8 sm:w-8 border-b-3 border-l-3 border-[#B72E35] dark:border-[#754CFF] rounded-bl-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
+                <div className="absolute bottom-0 right-0 h-7 w-7 sm:h-8 sm:w-8 border-b-3 border-r-3 border-[#B72E35] dark:border-[#754CFF] rounded-br-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
 
-            {/* Live Video Feed */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
-                cameraState === "active" ? "opacity-100" : "opacity-0 pointer-events-none"
-              }`}
-            />
+                {/* Animated Laser Beam */}
+                <div className="absolute inset-x-2 h-[2.5px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[#FF5B52] dark:via-[#B89EFF] to-transparent shadow-[0_0_12px_#FF5B52] dark:shadow-[0_0_14px_#754CFF] animate-laser-scan pointer-events-none" />
 
-            {/* Active Live Video Stream View */}
-            {cameraState === "active" && (
-              <>
-                <div className="relative z-10 h-48 w-48 sm:h-56 sm:w-56 flex items-center justify-center pointer-events-none">
-                  {/* 4 Corner brackets */}
-                  <div className="absolute top-0 left-0 h-7 w-7 sm:h-8 sm:w-8 border-t-3 border-l-3 border-[#B72E35] dark:border-[#754CFF] rounded-tl-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
-                  <div className="absolute top-0 right-0 h-7 w-7 sm:h-8 sm:w-8 border-t-3 border-r-3 border-[#B72E35] dark:border-[#754CFF] rounded-tr-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
-                  <div className="absolute bottom-0 left-0 h-7 w-7 sm:h-8 sm:w-8 border-b-3 border-l-3 border-[#B72E35] dark:border-[#754CFF] rounded-bl-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
-                  <div className="absolute bottom-0 right-0 h-7 w-7 sm:h-8 sm:w-8 border-b-3 border-r-3 border-[#B72E35] dark:border-[#754CFF] rounded-br-xl shadow-[0_0_8px_#B72E35] dark:shadow-[0_0_12px_#754CFF]" />
+                {/* Center target indicator */}
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full border border-white/20 flex items-center justify-center">
+                  <div className="h-2 w-2 rounded-full bg-[#B72E35] dark:bg-[#9D7BFF] animate-ping opacity-75" />
+                </div>
+              </div>
 
-                  {/* Animated Laser Beam sweeping bottom to top */}
-                  <div className="absolute inset-x-2 h-[2.5px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[#FF5B52] dark:via-[#B89EFF] to-transparent shadow-[0_0_12px_#FF5B52,0_0_4px_#FFA8A3] dark:shadow-[0_0_14px_#754CFF,0_0_6px_#D6C4FF] animate-laser-scan pointer-events-none" />
-
-                  {/* Center target indicator */}
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full border border-white/20 flex items-center justify-center">
-                    <div className="h-2 w-2 rounded-full bg-[#B72E35] dark:bg-[#9D7BFF] animate-ping opacity-75" />
-                  </div>
+              {/* Camera Active Controls Bar */}
+              <div className="relative z-10 w-full px-3 sm:px-4 mt-2 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs border border-white/10 text-[10.5px] text-[#C9AE8B]">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Scanning table QR...</span>
                 </div>
 
-                {/* Camera Active Controls Bar */}
-                <div className="relative z-10 w-full px-3 sm:px-4 mt-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-xs border border-white/10 text-[10.5px] text-[#C9AE8B]">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>scanning table qr...</span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      title="Snap photo directly"
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-xs border border-white/10 text-[10.5px] text-[#C9AE8B] hover:text-white transition cursor-pointer"
-                    >
-                      <Upload className="h-3 w-3" />
-                      <span>photo</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={toggleFacingMode}
-                      title="Flip camera"
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-xs border border-white/10 text-[10.5px] text-[#C9AE8B] hover:text-white transition cursor-pointer"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      <span>flip</span>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* When Camera is Not Active (Mobile on HTTP, user gesture needed, or initial state) */}
-            {cameraState !== "active" && (
-              <div className="relative z-10 flex flex-col items-center justify-center p-4 sm:p-6 text-center max-w-sm w-full">
-                {/* Viewfinder Preview Box */}
-                <div className="relative h-36 w-36 sm:h-40 sm:w-40 flex items-center justify-center mb-3">
-                  <div className="absolute top-0 left-0 h-6 w-6 border-t-2 border-l-2 border-[#B72E35] dark:border-[#754CFF] rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 h-6 w-6 border-t-2 border-r-2 border-[#B72E35] dark:border-[#754CFF] rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-[#B72E35] dark:border-[#754CFF] rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-[#B72E35] dark:border-[#754CFF] rounded-br-lg" />
-                  <div className="absolute inset-x-2 h-[2px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[#B72E35] dark:via-[#B89EFF] to-transparent animate-laser-scan" />
-                  <QrCode className="h-14 w-14 text-[#C9AE8B]/30" />
-                </div>
-
-                {errorMessage ? (
-                  <p className="text-xs text-[#FF6358] mb-3 max-w-xs leading-relaxed">
-                    {errorMessage}
-                  </p>
-                ) : (
-                  <p className="font-serif italic text-xs text-[#C9AE8B] mb-3">
-                    point your phone camera at the table qr stand
-                  </p>
-                )}
-
-                {/* Primary Action: Direct Native Mobile Camera Trigger */}
-                <div className="flex flex-col w-full gap-2 px-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center justify-center gap-2.5 w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#A5242A] via-[#B72E35] to-[#C93840] text-white text-xs sm:text-sm font-semibold shadow-[0_8px_20px_rgba(183,46,53,0.5)] hover:brightness-110 active:scale-[0.98] transition cursor-pointer"
+                    title="Snap photo directly"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs border border-white/10 text-[10.5px] text-[#C9AE8B] hover:text-white transition cursor-pointer"
                   >
-                    <Camera className="h-4.5 w-4.5 shrink-0" />
-                    <span>Open Phone Camera to Scan</span>
+                    <Upload className="h-3 w-3" />
+                    <span>Upload QR</span>
                   </button>
-
-                  {/* Secondary Actions */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-[#FAF4EB] text-xs font-medium transition cursor-pointer"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      <span>Live Stream</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("picker")}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-[#FAF4EB] text-xs font-medium transition cursor-pointer"
-                    >
-                      <MapPin className="h-3 w-3 text-[#B72E35]" />
-                      <span>Select Table</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleFacingMode}
+                    title="Flip camera"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs border border-white/10 text-[10.5px] text-[#C9AE8B] hover:text-white transition cursor-pointer"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    <span>Flip</span>
+                  </button>
                 </div>
               </div>
-            )}
+            </>
+          )}
 
-            {/* Quick Demo Scan Fallback Chips */}
-            <div className="relative z-10 mt-2.5 w-full border-t border-white/10 pt-2 px-2">
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <Sparkles className="h-3 w-3 text-[#F2C84B]" />
-                <span className="font-mono text-[9px] text-[#C9AE8B]/80 uppercase tracking-wider">
-                  one-click instant test
-                </span>
+          {/* When Camera is Not Active */}
+          {cameraState !== "active" && (
+            <div className="relative z-10 flex flex-col items-center justify-center p-4 sm:p-6 text-center max-w-sm w-full">
+              <div className="relative h-36 w-36 sm:h-40 sm:w-40 flex items-center justify-center mb-3">
+                <div className="absolute top-0 left-0 h-6 w-6 border-t-2 border-l-2 border-[#B72E35] dark:border-[#754CFF] rounded-tl-lg" />
+                <div className="absolute top-0 right-0 h-6 w-6 border-t-2 border-r-2 border-[#B72E35] dark:border-[#754CFF] rounded-tr-lg" />
+                <div className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-[#B72E35] dark:border-[#754CFF] rounded-bl-lg" />
+                <div className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-[#B72E35] dark:border-[#754CFF] rounded-br-lg" />
+                <div className="absolute inset-x-2 h-[2px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[#B72E35] dark:via-[#B89EFF] to-transparent animate-laser-scan" />
+                <QrCode className="h-14 w-14 text-[#C9AE8B]/30" />
               </div>
-              <div className="flex justify-center gap-1.5 sm:gap-2 flex-wrap">
-                {Array.from(new Set(["01", "04", "07", "12", ...(tables.length > 0 ? [tables[tables.length - 1].label] : [])])).map((lbl) => (
-                  <button
-                    key={lbl}
-                    onClick={() => handleSimulateScan(lbl)}
-                    className="rounded-xl border border-[#725039]/40 bg-[#241F1C]/80 px-2.5 sm:px-3 py-1 font-mono text-xs font-medium text-[#FAF4EB] hover:border-[#B72E35] hover:text-[#B72E35] transition active:scale-95 cursor-pointer"
-                  >
-                    T-{lbl}
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            {/* Scan Success Overlay */}
-            {scannedTable && (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#241F1C]/95 gap-2 animate-fade-in">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#75AFA7]/20 border border-[#75AFA7] shadow-[0_0_15px_#75AFA7]">
-                  <Check className="h-6 w-6 text-[#75AFA7]" />
+              {errorMessage ? (
+                <div className="flex items-start gap-1.5 text-xs text-[#FF6358] mb-3 max-w-xs text-left">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{errorMessage}</span>
                 </div>
-                <span className="font-serif font-medium text-[#FAF4EB] text-base">
-                  table {scannedTable} connected
-                </span>
-                <span className="text-xs text-[#75AFA7] font-mono animate-pulse">
-                  loading artisanal menu...
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+              ) : (
+                <p className="font-serif italic text-xs text-[#C9AE8B] mb-3">
+                  Point your phone camera at the QR code stand at your table.
+                </p>
+              )}
 
-        {/* Tab 2: Dynamic Tables Grid */}
-        {activeTab === "picker" && (
-          <div className="space-y-3 overflow-y-auto pr-1 flex-1 min-h-0 -mr-1" style={{ maxHeight: "calc(90vh - 220px)" }}>
-            <p className="font-serif italic text-[11px] text-[#725039] dark:text-[#C9AE8B] px-0.5">
-              tap the table stand number at your seat
-            </p>
-            <div className="grid grid-cols-3 gap-2.5">
-              {tables.map((t) => {
-                const isSelected = currentTable === t.label;
-                return (
-                  <button
-                    key={t.label}
-                    onClick={() => {
-                      stopCamera();
-                      onSelectTable(t.label);
-                    }}
-                    className={`group relative flex flex-col items-center rounded-2xl border p-3 text-center transition-all duration-200 cursor-pointer ${
-                      isSelected
-                        ? "border-[#B72E35] bg-[#B72E35]/10 dark:bg-[#B72E35]/20 shadow-sm ring-1 ring-[#B72E35]/30"
-                        : "border-[#725039]/15 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#1A1613] hover:border-[#B72E35]/40 hover:bg-white dark:hover:bg-[#25201C] active:scale-[0.97]"
-                    }`}
-                  >
-                    {/* Table Number */}
-                    <div className="flex items-center gap-1">
-                      <span className={`font-mono text-base font-bold ${isSelected ? "text-[#B72E35]" : "text-[#241F1C] dark:text-[#F3E7D3]"}`}>
-                        T-{t.label}
-                      </span>
-                      {isSelected && (
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#B72E35] text-white">
-                          <Check className="h-2.5 w-2.5" />
-                        </span>
-                      )}
-                    </div>
-                    {/* Zone */}
-                    <span className={`mt-1 text-[10px] font-medium leading-tight ${isSelected ? "text-[#B72E35]" : "text-[#725039] dark:text-[#C9AE8B]"}`}>
-                      {t.zone}
-                    </span>
-                    {/* Capacity */}
-                    <span className="mt-0.5 text-[9px] text-[#C9AE8B] font-mono">
-                      {t.capacity} seats
-                    </span>
-                  </button>
-                );
-              })}
+              {/* Primary Action: Direct Native Mobile Camera Trigger */}
+              <div className="flex flex-col w-full gap-2 px-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2.5 w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#A5242A] via-[#B72E35] to-[#C93840] text-white text-xs sm:text-sm font-semibold shadow-[0_8px_20px_rgba(183,46,53,0.5)] hover:brightness-110 active:scale-[0.98] transition cursor-pointer"
+                >
+                  <Camera className="h-4.5 w-4.5 shrink-0" />
+                  <span>Open Phone Camera to Scan</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-[#FAF4EB] text-xs font-medium transition cursor-pointer"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Retry Live Camera Stream</span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Scan Success Overlay */}
+          {scannedTable && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#241F1C]/95 gap-2 animate-fade-in">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#75AFA7]/20 border border-[#75AFA7] shadow-[0_0_15px_#75AFA7]">
+                <Check className="h-6 w-6 text-[#75AFA7]" />
+              </div>
+              <span className="font-serif font-medium text-[#FAF4EB] text-base">
+                Table {scannedTable} Connected
+              </span>
+              <span className="text-xs text-[#75AFA7] font-mono animate-pulse">
+                Opening artisanal menu...
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Modal Footer */}
-        <div className="mt-3 sm:mt-4 flex items-center justify-between border-t border-[#725039]/15 dark:border-white/10 pt-2.5 sm:pt-3 text-[10px]">
+        <div className="flex items-center justify-between border-t border-[#725039]/15 dark:border-white/10 pt-2.5 sm:pt-3 text-[10px]">
           <div className="flex items-center gap-1.5 text-[#725039] dark:text-[#C9AE8B]">
             <MapPin className="h-3 w-3 text-[#B72E35]" />
-            <span className="font-serif italic">tapovan, rishikesh</span>
+            <span className="font-serif italic">Tapovan, Rishikesh</span>
           </div>
           <span className="font-mono text-[9px] text-[#C9AE8B]">
-            current table: {currentTable}
+            smol café qr portal
           </span>
         </div>
       </div>
     </div>
   );
 };
-
-

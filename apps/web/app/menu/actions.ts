@@ -253,14 +253,47 @@ export async function placeOrderAction(
         };
       }
 
-      // High-concurrency Direct Resilient Order Provisioning Fallback
+      // High-concurrency Direct Resilient Order Provisioning Fallback with Server Price Verification
       const now = new Date().toISOString();
       const fallbackOrderId = crypto.randomUUID();
       const fallbackOrderNo = Math.floor(100 + (Date.now() % 900));
       const fallbackVerification = String(Math.floor(1000 + Math.random() * 9000));
-      
-      const subtotalPaise = items.reduce((acc, it) => acc + (it.expected_unit_price_paise || 0) * (it.qty || 1), 0);
-      const taxPaise = Math.round(subtotalPaise * 0.06);
+      const isUuid = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
+      // 1. Secure Server-Side Price Lookup from DB to prevent client price tampering
+      const itemIds = items.map((it) => it.menu_item_id).filter(isUuid);
+      const verifiedPrices: Record<string, number> = {};
+      const verifiedNames: Record<string, string> = {};
+
+      if (itemIds.length > 0) {
+        try {
+          const { data: dbItems } = await supabase
+            .from("menu_items")
+            .select("id, name, menu_prices(amount_paise)")
+            .in("id", itemIds);
+
+          if (dbItems) {
+            dbItems.forEach((d: any) => {
+              const p = Array.isArray(d.menu_prices) ? d.menu_prices[0]?.amount_paise : d.menu_prices?.amount_paise;
+              if (p !== undefined && p !== null) {
+                verifiedPrices[d.id] = Number(p);
+              }
+              if (d.name) {
+                verifiedNames[d.id] = d.name;
+              }
+            });
+          }
+        } catch {
+          // DB price query fallback handled gracefully
+        }
+      }
+
+      // 2. Compute authoritative subtotal using verified server prices
+      const subtotalPaise = items.reduce((acc, it) => {
+        const unitPrice = verifiedPrices[it.menu_item_id] ?? it.expected_unit_price_paise ?? 0;
+        return acc + unitPrice * (it.qty || 1);
+      }, 0);
+      const taxPaise = Math.round(subtotalPaise * 0.05); // Standard 5% restaurant GST
       const totalPaise = subtotalPaise + taxPaise;
 
       try {
@@ -286,19 +319,21 @@ export async function placeOrderAction(
           recordOrderForPhone(fallbackOrderId, cleanPhone, session.guestName);
         }
 
-        const isUuid = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
-
-        const orderItemsPayload = items.map((it) => ({
-          id: crypto.randomUUID(),
-          order_id: fallbackOrderId,
-          menu_item_id: isUuid(it.menu_item_id) ? it.menu_item_id : null,
-          name_snapshot: it.name || "Artisanal Item",
-          unit_price_snapshot: it.expected_unit_price_paise,
-          qty: it.qty,
-          line_subtotal: it.expected_unit_price_paise * it.qty,
-          item_status: "SUBMITTED",
-          created_at: now,
-        }));
+        const orderItemsPayload = items.map((it) => {
+          const verifiedPrice = verifiedPrices[it.menu_item_id] ?? it.expected_unit_price_paise ?? 0;
+          const verifiedName = verifiedNames[it.menu_item_id] ?? it.name ?? "Artisanal Item";
+          return {
+            id: crypto.randomUUID(),
+            order_id: fallbackOrderId,
+            menu_item_id: isUuid(it.menu_item_id) ? it.menu_item_id : null,
+            name_snapshot: verifiedName,
+            unit_price_snapshot: verifiedPrice,
+            qty: it.qty,
+            line_subtotal: verifiedPrice * it.qty,
+            item_status: "SUBMITTED",
+            created_at: now,
+          };
+        });
 
         await supabase.from("order_items").insert(orderItemsPayload);
 

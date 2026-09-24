@@ -543,26 +543,35 @@ export async function clearAllPendingCashierOrdersAction(
     const { data: pendingOrders, error: fetchErr } = await supabase
       .from("orders")
       .select("id, order_no")
-      .in("status", ["PENDING_CONFIRMATION", "SUBMITTED", "DRAFT"]);
+      .in("status", ["PENDING_CONFIRMATION", "SUBMITTED", "DRAFT", "PENDING", "PLACED", "NEW"]);
 
-    if (fetchErr || !pendingOrders || pendingOrders.length === 0) {
+    if (fetchErr) {
+      return { success: false, count: 0, message: `Failed to fetch queue: ${fetchErr.message}` };
+    }
+
+    if (!pendingOrders || pendingOrders.length === 0) {
       return { success: true, count: 0, message: "Queue is already empty." };
     }
 
     const targetStatus = action === "CONFIRM" ? "ACCEPTED" : "CANCELLED";
     const orderIds = pendingOrders.map((o) => o.id);
 
-    const { error: updateErr } = await supabase
-      .from("orders")
-      .update({
-        status: targetStatus,
-        accepted_at: action === "CONFIRM" ? nowIso : null,
-        updated_at: nowIso,
-      })
-      .in("id", orderIds);
+    // Update in chunks of 50 to prevent URI/URL length overflow with large batch of IDs
+    const CHUNK_SIZE = 50;
+    for (let i = 0; i < orderIds.length; i += CHUNK_SIZE) {
+      const chunk = orderIds.slice(i, i + CHUNK_SIZE);
+      const { error: updateErr } = await supabase
+        .from("orders")
+        .update({
+          status: targetStatus,
+          accepted_at: action === "CONFIRM" ? nowIso : null,
+          updated_at: nowIso,
+        })
+        .in("id", chunk);
 
-    if (updateErr) {
-      return { success: false, count: 0, message: `Failed to clear orders: ${updateErr.message}` };
+      if (updateErr) {
+        return { success: false, count: 0, message: `Failed to clear orders: ${updateErr.message}` };
+      }
     }
 
     broadcastSyncEvent({
@@ -583,9 +592,9 @@ export async function clearAllPendingCashierOrdersAction(
           ? `All ${orderIds.length} orders confirmed and dispatched!`
           : `All ${orderIds.length} pending orders cleared from queue.`,
     };
-  } catch (err) {
-    console.error("Error clearing all pending orders:", err);
-    return { success: false, count: 0, message: "Unexpected error clearing queue." };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to clear pending orders.";
+    return { success: false, count: 0, message };
   }
 }
 

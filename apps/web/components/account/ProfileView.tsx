@@ -34,8 +34,6 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 
-import { BottomNavBar } from "@/components/navigation/BottomNavBar";
-
 interface ProfileViewProps {
   initialProfile: Profile | null;
   initialOrders: CustomerHistoricalOrder[];

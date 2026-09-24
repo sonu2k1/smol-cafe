@@ -95,6 +95,45 @@ export async function fetchAdminMenuCatalogAction(): Promise<{
 }
 
 /**
+ * Uploads a base64 image data string to Supabase Storage ('menu-photos' bucket)
+ * and returns the public CDN URL to prevent database text bloat.
+ */
+async function uploadBase64ToStorage(base64Data: string, itemId: string): Promise<string> {
+  if (!base64Data || !base64Data.startsWith("data:image")) {
+    return base64Data;
+  }
+  try {
+    const supabase = createAdminClient();
+    const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return base64Data;
+
+    const mimeType = matches[1];
+    const buffer = Buffer.from(matches[2], "base64");
+    const ext = mimeType.split("/")[1] || "jpeg";
+    const filename = `dishes/${itemId}_${Date.now()}.${ext}`;
+
+    const { data, error } = await supabase.storage
+      .from("menu-photos")
+      .upload(filename, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (!error && data?.path) {
+      const { data: publicUrlData } = supabase.storage
+        .from("menu-photos")
+        .getPublicUrl(data.path);
+      if (publicUrlData?.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
+    }
+  } catch (storageErr) {
+    console.warn("Storage upload notice (falling back to data string):", storageErr);
+  }
+  return base64Data;
+}
+
+/**
  * Add or Edit a Menu Item with real-time propagation to Customer Menu & KDS
  */
 export async function saveMenuItemAction(
@@ -106,6 +145,9 @@ export async function saveMenuItemAction(
     const itemId = id || `item_custom_${Date.now()}`;
     const amountPaise = Math.round(priceRupees * 100);
     const itemStatus = status || "AVAILABLE";
+
+    // Auto-upload base64 to Supabase Storage if present
+    const finalImageUrl = imageUrl ? await uploadBase64ToStorage(imageUrl, itemId) : null;
 
     const customStore = getCustomItemsStore();
     const overridesStore = getMenuOverridesStore();
@@ -121,7 +163,7 @@ export async function saveMenuItemAction(
         categoryId,
         pricePaise: amountPaise,
         description: description || "",
-        imageUrl: imageUrl || null,
+        imageUrl: finalImageUrl,
         status: itemStatus,
         metadata: {
           dietary: dietary || "veg",
@@ -138,7 +180,7 @@ export async function saveMenuItemAction(
           categoryId,
           pricePaise: amountPaise,
           description: description || "",
-          imageUrl: imageUrl || null,
+          imageUrl: finalImageUrl,
           status: itemStatus,
           metadata: {
             ...customStore[existingCustomIdx].metadata,
@@ -156,7 +198,7 @@ export async function saveMenuItemAction(
         status: itemStatus,
         description: description || "",
         pricePaise: amountPaise,
-        imageUrl: imageUrl || null,
+        imageUrl: finalImageUrl,
         metadata: {
           dietary: dietary || "veg",
           availability: itemStatus === "SOLD_OUT" ? "SOLD_OUT" : "IN_STOCK",

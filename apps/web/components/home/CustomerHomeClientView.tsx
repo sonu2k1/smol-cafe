@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BottomNavBar } from "@/components/navigation/BottomNavBar";
+import { useRouter } from "next/navigation";
 import { TodayBlackboardCard } from "@/components/home/TodayBlackboardCard";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 
@@ -232,6 +232,7 @@ export const CustomerHomeClientView: React.FC<CustomerHomeClientProps> = ({
               </Link>
               <Link
                 href="/smol-menu"
+                prefetch={true}
                 onClick={() => setIsSideMenuOpen(false)}
                 className="flex items-center gap-3 text-[#241F1C] dark:text-[#FAF4EB] hover:text-[#B72E35] dark:hover:text-[#FF5B52]"
               >
@@ -239,6 +240,7 @@ export const CustomerHomeClientView: React.FC<CustomerHomeClientProps> = ({
               </Link>
               <Link
                 href={`/t/table-${tableLabel}`}
+                prefetch={true}
                 onClick={() => setIsSideMenuOpen(false)}
                 className="flex items-center gap-3 text-[#241F1C] dark:text-[#FAF4EB] hover:text-[#B72E35] dark:hover:text-[#FF5B52]"
               >
@@ -246,6 +248,7 @@ export const CustomerHomeClientView: React.FC<CustomerHomeClientProps> = ({
               </Link>
               <Link
                 href="/orders"
+                prefetch={true}
                 onClick={() => setIsSideMenuOpen(false)}
                 className="flex items-center gap-3 text-[#241F1C] dark:text-[#FAF4EB] hover:text-[#B72E35] dark:hover:text-[#FF5B52]"
               >
@@ -253,6 +256,7 @@ export const CustomerHomeClientView: React.FC<CustomerHomeClientProps> = ({
               </Link>
               <Link
                 href="/bill"
+                prefetch={true}
                 onClick={() => setIsSideMenuOpen(false)}
                 className="flex items-center gap-3 text-[#241F1C] dark:text-[#FAF4EB] hover:text-[#B72E35] dark:hover:text-[#FF5B52]"
               >
@@ -260,6 +264,7 @@ export const CustomerHomeClientView: React.FC<CustomerHomeClientProps> = ({
               </Link>
               <Link
                 href="/profile"
+                prefetch={true}
                 onClick={() => setIsSideMenuOpen(false)}
                 className="flex items-center gap-3 text-[#241F1C] dark:text-[#FAF4EB] hover:text-[#B72E35] dark:hover:text-[#FF5B52]"
               >
@@ -267,6 +272,7 @@ export const CustomerHomeClientView: React.FC<CustomerHomeClientProps> = ({
               </Link>
               <Link
                 href="/"
+                prefetch={true}
                 onClick={() => setIsSideMenuOpen(false)}
                 className="flex items-center gap-3 text-[#241F1C] dark:text-[#FAF4EB] hover:text-[#B72E35] dark:hover:text-[#FF5B52]"
               >

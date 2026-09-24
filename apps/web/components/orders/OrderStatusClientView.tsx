@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { fetchActiveOrdersAction, type CustomerOrderDetails } from "@/app/orders/actions";
 import { OrderCard } from "./OrderCard";
 import { ConversationDeckModal } from "./ConversationDeckModal";
-import { BottomNavBar } from "@/components/navigation/BottomNavBar";
 import { Bell, BellRing, CheckCircle2, Sparkles, CreditCard, Tag, Receipt, Star, ExternalLink, MapPin } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { subscribeToSyncEvents } from "@/lib/sync-events";
@@ -118,16 +117,22 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
     enabled: true,
   });
 
-  // 3. 2-Second Polling Timer & Window Focus Revalidation for Guaranteed Realtime Sync
+  // 3. Window Focus & Fallback Polling Timer for Realtime Sync
   useEffect(() => {
-    const handleFocus = () => refreshOrders();
+    let isMounted = true;
+    const handleFocus = () => {
+      if (isMounted) refreshOrders();
+    };
     window.addEventListener("focus", handleFocus);
 
     const intervalId = setInterval(() => {
-      refreshOrders();
-    }, 2000);
+      if (isMounted) {
+        refreshOrders();
+      }
+    }, 15000);
 
     return () => {
+      isMounted = false;
       clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
     };

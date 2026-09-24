@@ -2,12 +2,13 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export const BottomNavBar: React.FC = () => {
   const pathname = usePathname();
+  const router = useRouter();
 
-  const getActiveIndex = React.useCallback(() => {
+  const activeIndex = React.useMemo(() => {
     if (pathname === "/home" || pathname === "/") return 0;
     if (pathname.startsWith("/drinks")) return 2;
     if (pathname.startsWith("/smol-menu") || pathname.startsWith("/menu")) return 1;
@@ -16,11 +17,17 @@ export const BottomNavBar: React.FC = () => {
     return 0;
   }, [pathname]);
 
-  const [activeIndex, setActiveIndex] = React.useState<number>(getActiveIndex);
-
+  // Aggressive route prefetching on mount for instant customer navigation
   React.useEffect(() => {
-    setActiveIndex(getActiveIndex());
-  }, [pathname, getActiveIndex]);
+    const routes = ["/home", "/smol-menu", "/drinks", "/orders", "/profile", "/bill"];
+    routes.forEach((r) => {
+      try {
+        router.prefetch(r);
+      } catch {
+        // safe
+      }
+    });
+  }, [router]);
 
   const navItems = [
     {
@@ -179,8 +186,17 @@ export const BottomNavBar: React.FC = () => {
                 href={item.href}
                 prefetch={true}
                 aria-label={item.label}
-                onClick={() => setActiveIndex(index)}
-                className={`group relative flex items-center justify-center rounded-full transition-all duration-[650ms] ease-[cubic-bezier(0.25,1,0.35,1)] active:scale-95 touch-manipulation focus:outline-none ${
+                onMouseEnter={() => {
+                  try {
+                    router.prefetch(item.href);
+                  } catch {}
+                }}
+                onTouchStart={() => {
+                  try {
+                    router.prefetch(item.href);
+                  } catch {}
+                }}
+                className={`group relative flex items-center justify-center rounded-full transition-all duration-[450ms] ease-[cubic-bezier(0.25,1,0.35,1)] active:scale-95 touch-manipulation focus:outline-none cursor-pointer ${
                   active
                     ? "relative bg-gradient-to-b from-[#E03A43]/65 via-[#B72E35]/75 to-[#7D1217]/85 dark:from-[#A855F7]/70 dark:via-[#7E22CE]/80 dark:to-[#4C1D95]/90 text-white px-4 h-[46px] backdrop-blur-[16px] border border-white/55 dark:border-purple-300/40 shadow-[0_8px_24px_rgba(183,46,53,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.4),inset_0_0_14px_rgba(255,140,140,0.35)] dark:shadow-[0_8px_26px_rgba(126,34,206,0.5),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.5),inset_0_0_16px_rgba(192,132,252,0.45)]"
                     : "w-[46px] h-[46px] text-[#4A2E1B] dark:text-[#C9AE8B] hover:text-[#241F1C] dark:hover:text-[#FAF4EB] hover:bg-white/40 dark:hover:bg-white/[0.08] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] backdrop-blur-xs"

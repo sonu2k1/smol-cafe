@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import type { CustomerOrderDetails } from "@/app/orders/actions";
 import { OrderStatusProgress } from "./OrderStatusProgress";
@@ -88,10 +88,18 @@ function formatRelativeTime(dateStr: string | null): string {
 export const OrderCard: React.FC<OrderCardProps> = ({ order, tableLabel = "01", guestName }) => {
   const [showItems, setShowItems] = useState(true);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [timeAgo, setTimeAgo] = useState<string>(() => formatRelativeTime(order.submittedAt));
   const copy = getStatusCopy(order.status);
   const totalRupees = Math.round(order.totalPaise / 100);
-  const timeAgo = formatRelativeTime(order.submittedAt);
   const canEdit = order.status === "PENDING_CONFIRMATION" || order.status === "DRAFT";
+
+  useEffect(() => {
+    setTimeAgo(formatRelativeTime(order.submittedAt));
+    const timer = setInterval(() => {
+      setTimeAgo(formatRelativeTime(order.submittedAt));
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [order.submittedAt]);
 
   const receiptData: InvoiceReceiptData = {
     orderId: order.id,
@@ -123,7 +131,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, tableLabel = "01", 
                 Order #{order.orderNo}
               </span>
               <span className="text-[#C9AE8B]">•</span>
-              <span className="text-xs text-[#725039] dark:text-[#C9AE8B] font-medium">{timeAgo}</span>
+              <span
+                suppressHydrationWarning
+                className="text-xs text-[#725039] dark:text-[#C9AE8B] font-medium"
+              >
+                {timeAgo}
+              </span>
             </div>
             <h3 className="mt-1 font-serif text-lg font-bold tracking-tight text-[#241F1C] dark:text-[#FAF4EB] drop-shadow-2xs">
               {copy.title}

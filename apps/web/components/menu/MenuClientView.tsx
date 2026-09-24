@@ -9,8 +9,6 @@ import { MenuItemCard } from "./MenuItemCard";
 import { ItemDetailModal } from "./ItemDetailModal";
 import { FloatingCartBar } from "@/components/cart/FloatingCartBar";
 import { CartDrawer } from "@/components/cart/CartDrawer";
-import { BottomNavBar } from "@/components/navigation/BottomNavBar";
-
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { subscribeToSyncEvents } from "@/lib/sync-events";
 import { cacheMenuCatalog, getCachedMenuCatalog } from "@/lib/offline-cache";

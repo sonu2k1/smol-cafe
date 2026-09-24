@@ -170,6 +170,7 @@ export async function processOfflineOrderQueue(): Promise<{
           menu_item_id: it.menu_item_id,
           expected_unit_price_paise: it.expected_unit_price_paise,
           qty: it.qty,
+          name: it.name,
         })),
         order.idempotencyKey,
         {

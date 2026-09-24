@@ -276,19 +276,20 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
           type: "success",
           text: res.message || `Cleared ${orderIds.length} orders from queue.`,
         });
+        await refreshData();
       } else {
         setActionFeedback({
           type: "error",
           text: res.message || "Failed to clear all orders.",
         });
-        refreshData();
+        await refreshData();
       }
     } catch {
       setActionFeedback({
         type: "error",
         text: "Network error clearing orders.",
       });
-      refreshData();
+      await refreshData();
     } finally {
       setIsClearingAll(false);
       orderIds.forEach((id) => submittingOrderIdsRef.current.delete(id));

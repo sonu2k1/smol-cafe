@@ -207,7 +207,7 @@ export async function updateMenuItemStockAction(
     revalidatePath("/orders");
 
     const statusLabel =
-      stockStatus === "SOLD_OUT" ? "86'd / SOLD OUT" : stockStatus === "LOW_STOCK" ? "LOW STOCK" : "IN STOCK";
+      stockStatus === "SOLD_OUT" ? "OUT OF STOCK" : stockStatus === "LOW_STOCK" ? "LOW STOCK" : "IN STOCK";
 
     return {
       success: true,
