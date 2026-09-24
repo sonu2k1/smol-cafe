@@ -50,11 +50,8 @@ export async function fetchBaristaOrdersAction(): Promise<FetchBaristaOrdersResu
   const supabase = createAdminClient();
 
   try {
-    const activeStatuses = isMockDatabase()
-      ? ["SUBMITTED", "PENDING_CONFIRMATION", "CONFIRMED", "ACCEPTED", "PREPARING", "READY", "SERVED", "COMPLETED"]
-      : ["SUBMITTED", "ACCEPTED", "PREPARING", "READY", "SERVED"];
-
-    // 1. Fetch active orders
+    // 1. Fetch active orders (only accepted & in-progress beverage tickets)
+    const activeStatuses = ["ACCEPTED", "PREPARING", "READY", "SERVED", "COMPLETED"];
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select("*")

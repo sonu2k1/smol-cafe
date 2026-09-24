@@ -264,16 +264,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
         const finalTotalPaise = result.totalPaise || grandTotal * 100;
         const finalTableLabel = result.tableLabel || displayTable;
 
-        // Broadcast single source of truth order placed + paid event across Cashier & Kitchen KDS
+        const isCashier = paymentMethod === "CASHIER" || paymentMethod === "COUNTER";
+        const orderStatus = result.status || (isCashier ? "PENDING_CONFIRMATION" : "CONFIRMED");
+        const orderPaymentStatus = result.paymentStatus || (isCashier ? "PENDING" : "PAID");
+
+        // Broadcast single source of truth order placed event across Cashier & Kitchen KDS
         broadcastSyncEvent({
           type: "ORDER_PLACED",
           orderId: finalOrderId,
           orderNo: finalOrderNo,
           tableLabel: finalTableLabel,
-          status: "CONFIRMED",
+          status: orderStatus as any,
           timestamp: Date.now(),
           metadata: {
-            paymentStatus: "PAID",
+            paymentStatus: orderPaymentStatus,
             paymentMethod,
             transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
             amountPaise: finalTotalPaise,
@@ -281,19 +285,29 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
           },
         });
 
-        broadcastSyncEvent({
-          type: "PAYMENT_COMPLETED",
-          orderId: finalOrderId,
-          orderNo: finalOrderNo,
-          tableLabel: finalTableLabel,
-          status: "PAID",
-          timestamp: Date.now(),
-          metadata: {
-            transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
-            amountPaise: finalTotalPaise,
-            paymentMethod,
-          },
-        });
+        if (isCashier) {
+          broadcastSyncEvent({
+            type: "ORDER_PENDING_CASHIER" as any,
+            orderId: finalOrderId,
+            orderNo: finalOrderNo,
+            tableLabel: finalTableLabel,
+            timestamp: Date.now(),
+          });
+        } else {
+          broadcastSyncEvent({
+            type: "PAYMENT_COMPLETED",
+            orderId: finalOrderId,
+            orderNo: finalOrderNo,
+            tableLabel: finalTableLabel,
+            status: "PAID",
+            timestamp: Date.now(),
+            metadata: {
+              transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
+              amountPaise: finalTotalPaise,
+              paymentMethod,
+            },
+          });
+        }
 
         // If customer redeemed points for bill discount, record deduction & sync
         if (redeemPoints && pointsDiscountRupees > 0) {
@@ -1101,9 +1115,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
             <button
               type="button"
               onClick={() => setActiveView("bill")}
-              className="w-full rounded-full bg-[#B72E35] hover:bg-[#9E252C] text-[#F3E7D3] font-serif text-[17.5px] font-medium py-3.5 shadow-sm active:scale-[0.99] transition duration-150 cursor-pointer text-center block"
+              className="group relative overflow-hidden w-full block rounded-full bg-gradient-to-b from-[#E03A43]/70 via-[#B72E35]/80 to-[#7D1217]/90 dark:from-[#A855F7]/70 dark:via-[#7E22CE]/80 dark:to-[#4C1D95]/90 text-white font-serif text-[17.5px] font-medium py-3.5 backdrop-blur-[16px] border border-white/55 dark:border-purple-300/40 shadow-[0_8px_26px_rgba(183,46,53,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.4),inset_0_0_14px_rgba(255,140,140,0.35)] dark:shadow-[0_8px_28px_rgba(126,34,206,0.5),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.5),inset_0_0_16px_rgba(192,132,252,0.45)] active:scale-[0.99] transition duration-150 cursor-pointer text-center"
             >
-              View Bill
+              {/* Curved Specular Glass Gloss Reflection */}
+              <span className="absolute inset-x-4 top-1 h-[42%] rounded-full bg-gradient-to-b from-white/50 via-white/15 to-transparent pointer-events-none opacity-90" />
+              <span className="relative z-10 drop-shadow-[0_1.5px_2.5px_rgba(0,0,0,0.35)]">
+                View Bill
+              </span>
             </button>
           </div>
         )}

@@ -234,21 +234,12 @@ export async function placeOrderAction(
           location_id: session.locationId,
           table_session_id: session.sessionId,
           order_no: fallbackOrderNo,
-          status: "CONFIRMED",
+          status: "DRAFT",
           service_mode: "DINE_IN",
-          instructions: instructions || null,
           submitted_at: now,
-          confirmed_at: now,
-          confirmed_by: "AUTOMATED_RESILIENT_GATEWAY",
           subtotal_snapshot: subtotalPaise,
           tax_snapshot: taxPaise,
           total_snapshot: totalPaise,
-          idempotency_key: idempotencyKey,
-          verification_code: fallbackVerification,
-          customer_name: session.guestName || "Guest",
-          customer_phone: session.guestPhone || null,
-          payment_status: "PAID",
-          payment_method: "UPI",
           version: 1,
           created_at: now,
           updated_at: now,
@@ -377,6 +368,9 @@ export async function placePaidOrderAction(
 
   const result = await placeOrderAction(items, idempotencyKey, rewardId, instructions, sessionOverride);
 
+  const isCashierPayment = paymentMethod === "CASHIER" || paymentMethod === "COUNTER";
+  const targetStatus = isCashierPayment ? "DRAFT" : "ACCEPTED";
+
   if (result.success && result.orderId) {
     try {
       const supabase = createAdminClient();
@@ -384,21 +378,20 @@ export async function placePaidOrderAction(
       await supabase
         .from("orders")
         .update({
-          payment_status: "PAID",
-          payment_method: paymentMethod,
-          status: "CONFIRMED",
-          confirmed_at: now,
-          confirmed_by: `${paymentMethod} (PAID)`,
+          status: targetStatus,
+          accepted_at: isCashierPayment ? null : now,
+          updated_at: now,
         })
         .eq("id", result.orderId);
     } catch (err) {
-      console.warn("Failed to mark payment status on order:", err);
+      console.warn("Failed to mark status on order:", err);
     }
   }
 
   return {
     ...result,
-    paymentStatus: "PAID",
+    status: isCashierPayment ? "PENDING_CONFIRMATION" : "CONFIRMED",
+    paymentStatus: isCashierPayment ? "PENDING" : "PAID",
     tableLabel: tableLabel || result.tableLabel || "01",
   };
 }
