@@ -59,7 +59,7 @@ export interface RecordCashPaymentResult {
 /**
  * Server Action: Fetches the running bill breakdown for the current customer session
  */
-export async function fetchRunningBillAction(): Promise<FetchBillResult> {
+export async function fetchRunningBillAction(overridePhone?: string): Promise<FetchBillResult> {
   let session = await getTableSessionCookie();
 
   if (!session || !session.sessionId || !isValidUuid(session.sessionId)) {
@@ -96,7 +96,7 @@ export async function fetchRunningBillAction(): Promise<FetchBillResult> {
       };
     }
 
-    const cleanPhone = normalizePhoneNumber(session.guestPhone);
+    const cleanPhone = normalizePhoneNumber(overridePhone || session.guestPhone);
     const phoneUuid = cleanPhone ? getPhoneUuid(cleanPhone) : null;
 
     // 2. Fetch all orders for this table session
@@ -118,7 +118,7 @@ export async function fetchRunningBillAction(): Promise<FetchBillResult> {
     }
 
     // Filter orders strictly for this customer's phone number
-    const orders = (rawOrders || []).filter((o) => doesOrderMatchCustomerPhone(o, cleanPhone));
+    const orders = (rawOrders || []).filter((o) => doesOrderMatchCustomerPhone(o, cleanPhone, session.sessionId));
 
     const orderIds = orders.map((o) => o.id);
 

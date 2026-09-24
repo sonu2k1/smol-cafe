@@ -216,9 +216,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
   };
 
   const handleProcessPaidOrder = async (paymentMethod = "UPI", transactionId?: string) => {
-    if (items.length === 0) return null;
+    let clientPhone = "";
+    let clientName = "";
+    if (typeof window !== "undefined") {
+      clientPhone = localStorage.getItem("smol_guest_phone") || "";
+      clientName = localStorage.getItem("smol_guest_name") || "";
+    }
+    const cleanPhone = clientPhone.replace(/\D/g, "").slice(-10);
+    const idempotencyKey = cleanPhone
+      ? `smol_ord_${cleanPhone}_${crypto.randomUUID()}`
+      : `smol_ord_guest_${crypto.randomUUID()}`;
 
-    const idempotencyKey = crypto.randomUUID();
     const orderPayload = items.map((cartItem) => ({
       menu_item_id: cartItem.item.id,
       expected_unit_price_paise: cartItem.item.pricePaise,
@@ -256,6 +264,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
         instructions: instructions || undefined,
         paymentMethod,
         tableLabel: displayTable,
+        guestName: clientName || undefined,
+        guestPhone: clientPhone || undefined,
       });
 
       if (result.success && result.orderId && result.orderNo) {
@@ -432,14 +442,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
 
       // Automated fallback redirect after celebration window
       setTimeout(() => {
-        setCelebrationData((prev) => {
-          if (prev) {
-            closeCart();
-            router.push("/orders");
-            return null;
-          }
-          return prev;
-        });
+        closeCart();
+        setCelebrationData(null);
+        router.push("/orders");
       }, 2000);
     } catch (err) {
       console.error("Test bypass payment failed:", err);
