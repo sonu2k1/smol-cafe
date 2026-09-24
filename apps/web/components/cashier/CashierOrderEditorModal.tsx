@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { X, Plus, Minus, Trash2, Search, Coffee, UtensilsCrossed, AlertCircle, Check, Loader2 } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { X, Plus, Minus, Trash2, Search, Coffee, UtensilsCrossed, AlertCircle, Check, Loader2, Sparkles } from "lucide-react";
 import {
   fetchAllMenuItemsForCashierAction,
   type PendingOrderVerification,
@@ -35,7 +35,8 @@ export const CashierOrderEditorModal: React.FC<CashierOrderEditorModalProps> = (
   const [instructions, setInstructions] = useState<string>("");
   const [catalog, setCatalog] = useState<MenuCatalogItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCatalogItem, setSelectedCatalogItem] = useState<MenuCatalogItem | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [justAddedKey, setJustAddedKey] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -54,10 +55,12 @@ export const CashierOrderEditorModal: React.FC<CashierOrderEditorModalProps> = (
       );
       setInstructions(order.instructions || "");
       setErrorMessage(null);
+      setSearchQuery("");
+      setSelectedCategory("ALL");
     }
   }, [order]);
 
-  // Fetch full menu catalog once
+  // Fetch full live menu catalog once modal opens
   useEffect(() => {
     if (isOpen) {
       fetchAllMenuItemsForCashierAction().then((res) => {
@@ -67,6 +70,29 @@ export const CashierOrderEditorModal: React.FC<CashierOrderEditorModalProps> = (
       });
     }
   }, [isOpen]);
+
+  // Extract unique menu categories for filter tabs
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    catalog.forEach((c) => {
+      if (c.category) cats.add(c.category);
+    });
+    return ["ALL", ...Array.from(cats)];
+  }, [catalog]);
+
+  // Filter catalog by search query and category
+  const filteredCatalog = useMemo(() => {
+    return catalog.filter((c) => {
+      const matchesSearch =
+        !searchQuery.trim() ||
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCat =
+        selectedCategory === "ALL" ||
+        c.category.toLowerCase() === selectedCategory.toLowerCase();
+      return matchesSearch && matchesCat;
+    });
+  }, [catalog, searchQuery, selectedCategory]);
 
   if (!isOpen || !order) return null;
 
@@ -93,14 +119,19 @@ export const CashierOrderEditorModal: React.FC<CashierOrderEditorModalProps> = (
       // Check if already in order
       const existing = prev.find((it) => it.name.toLowerCase() === item.name.toLowerCase());
       if (existing) {
+        setJustAddedKey(existing.key);
+        setTimeout(() => setJustAddedKey(null), 1200);
         return prev.map((it) =>
           it.key === existing.key ? { ...it, qty: it.qty + 1 } : it
         );
       }
+      const newKey = `new_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      setJustAddedKey(newKey);
+      setTimeout(() => setJustAddedKey(null), 1200);
       return [
         ...prev,
         {
-          key: `new_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          key: newKey,
           menuItemId: item.id,
           name: item.name,
           qty: 1,
@@ -109,8 +140,6 @@ export const CashierOrderEditorModal: React.FC<CashierOrderEditorModalProps> = (
         },
       ];
     });
-    setSelectedCatalogItem(null);
-    setSearchQuery("");
   };
 
   // Calculations
@@ -151,10 +180,6 @@ export const CashierOrderEditorModal: React.FC<CashierOrderEditorModalProps> = (
       setIsSaving(false);
     }
   };
-
-  const filteredCatalog = searchQuery
-    ? catalog.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : catalog.slice(0, 8);
 
   return (
     <div
@@ -199,24 +224,34 @@ export const CashierOrderEditorModal: React.FC<CashierOrderEditorModalProps> = (
 
           {/* Current Items List */}
           <div className="space-y-2.5">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#8C6D53] dark:text-stone-400">
-              Current Order Items ({items.length})
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#8C6D53] dark:text-stone-400">
+                Current Order Items ({items.length})
+              </h3>
+              <span className="font-mono text-xs text-[#725039] dark:text-stone-400">
+                Total {items.reduce((sum, i) => sum + i.qty, 0)} items
+              </span>
+            </div>
 
             {items.length === 0 ? (
               <div className="p-6 text-center rounded-2xl border border-dashed border-[#C9AE8B]/40 dark:border-stone-800 text-xs text-[#725039] dark:text-stone-500">
-                No items in order. Use the menu catalog below to add items.
+                No items in order. Select items from the menu catalog below to add.
               </div>
             ) : (
               <div className="space-y-2">
                 {items.map((it) => {
                   const lineTotal = Math.round((it.unitPricePaise * it.qty) / 100);
                   const unitPrice = Math.round(it.unitPricePaise / 100);
+                  const isJustAdded = it.key === justAddedKey;
 
                   return (
                     <div
                       key={it.key}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900/60 p-3 transition"
+                      className={`flex items-center justify-between gap-3 rounded-2xl border p-3 transition-all duration-200 ${
+                        isJustAdded
+                          ? "border-[#B72E35] bg-[#B72E35]/10 dark:bg-[#B72E35]/20 shadow-xs"
+                          : "border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-stone-900/60"
+                      }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -279,45 +314,107 @@ export const CashierOrderEditorModal: React.FC<CashierOrderEditorModalProps> = (
             )}
           </div>
 
-          {/* Add Item From Catalog Section */}
-          <div className="space-y-2.5 rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3]/40 dark:bg-stone-900/40 p-4">
+          {/* Add Item From Menu Catalog Section */}
+          <div className="space-y-3 rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#F3E7D3]/40 dark:bg-stone-900/40 p-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#8C6D53] dark:text-stone-400">
-                + Add Item from Menu Catalog
-              </h3>
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-[#B72E35] dark:text-[#F6AD55]" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#8C6D53] dark:text-stone-400">
+                  Add Item from Menu Catalog
+                </h3>
+              </div>
               <span className="text-[11px] font-mono text-[#725039] dark:text-stone-400">
                 {catalog.length} items available
               </span>
             </div>
 
+            {/* Search Bar */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8C6D53] dark:text-stone-500" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search coffee, burger, pasta, drinks..."
-                className="w-full rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 pl-9 pr-3 py-2 text-xs text-[#241F1C] dark:text-white placeholder-[#8C6D53]/60 focus:border-[#B72E35] focus:outline-none"
+                placeholder="Search coffee, sandwich, bowl, dessert..."
+                className="w-full rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 pl-9 pr-8 py-2 text-xs text-[#241F1C] dark:text-white placeholder-[#8C6D53]/60 focus:border-[#B72E35] focus:outline-none"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Quick Catalog Chips */}
-            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1 scrollbar-none">
-              {filteredCatalog.map((catItem) => (
-                <button
-                  key={catItem.id}
-                  type="button"
-                  onClick={() => handleAddItemFromCatalog(catItem)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-800/90 px-2.5 py-1 text-xs font-medium text-[#241F1C] dark:text-stone-200 hover:border-[#B72E35] hover:bg-[#F3E7D3] dark:hover:bg-stone-700 transition active:scale-95 cursor-pointer"
-                >
-                  <span>{catItem.isBeverage ? "☕" : "🍳"}</span>
-                  <span>{catItem.name}</span>
-                  <span className="font-mono text-[11px] font-bold text-[#B72E35] dark:text-[#F6AD55]">
-                    ₹{Math.round(catItem.pricePaise / 100)}
-                  </span>
-                  <Plus className="h-3 w-3 ml-0.5 text-stone-500" />
-                </button>
-              ))}
+            {/* Category Filter Tabs */}
+            {categories.length > 2 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                {categories.map((cat) => {
+                  const isSelected = selectedCategory === cat;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`shrink-0 rounded-full px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wide transition cursor-pointer ${
+                        isSelected
+                          ? "bg-[#B72E35] text-white shadow-xs"
+                          : "bg-[#FAF4EB] dark:bg-stone-800 text-[#725039] dark:text-stone-400 hover:bg-[#EAE0D2] dark:hover:bg-stone-700 border border-[#C9AE8B]/40 dark:border-stone-700"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Catalog Items Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 scrollbar-thin">
+              {filteredCatalog.length === 0 ? (
+                <div className="col-span-full py-4 text-center text-xs text-stone-500">
+                  No menu items found matching &quot;{searchQuery}&quot;
+                </div>
+              ) : (
+                filteredCatalog.map((catItem) => {
+                  const isCurrentlyInOrder = items.some(
+                    (i) => i.name.toLowerCase() === catItem.name.toLowerCase()
+                  );
+
+                  return (
+                    <button
+                      key={catItem.id}
+                      type="button"
+                      onClick={() => handleAddItemFromCatalog(catItem)}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-800/90 p-2.5 text-left text-xs font-medium text-[#241F1C] dark:text-stone-200 hover:border-[#B72E35] hover:bg-[#F3E7D3] dark:hover:bg-stone-700 transition active:scale-[0.98] cursor-pointer group"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs shrink-0">{catItem.isBeverage ? "☕" : "🍳"}</span>
+                          <span className="font-bold text-[#241F1C] dark:text-white truncate">
+                            {catItem.name}
+                          </span>
+                        </div>
+                        <span className="font-mono text-[10px] text-[#8C6D53] dark:text-stone-400 block truncate">
+                          {catItem.category}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="font-mono text-xs font-bold text-[#B72E35] dark:text-[#F6AD55]">
+                          ₹{Math.round(catItem.pricePaise / 100)}
+                        </span>
+                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#B72E35]/10 group-hover:bg-[#B72E35] text-[#B72E35] group-hover:text-white transition">
+                          <Plus className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 

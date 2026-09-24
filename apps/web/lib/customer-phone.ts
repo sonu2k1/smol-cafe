@@ -58,41 +58,46 @@ export function getOrderPhoneRecord(orderId: string): { phone: string; cleanDigi
 
 /**
  * Checks if an order belongs to a specific customer's phone number.
- * Returns:
- * - true if order is verified to belong to this phone,
- * - false if order belongs to a DIFFERENT phone number,
- * - fallback true if order has no phone attached AND customer has no phone (anonymous table session).
+ * Strict Isolation Rules:
+ * 1. If customer has an identified phone number (>= 10 digits):
+ *    - MUST match in-memory phone registry, OR
+ *    - MUST match order.idempotency_key containing the 10-digit phone number.
+ *    - If no match, strictly return false (hides other customers' orders and legacy unassigned orders like #5585).
+ * 2. If customer is anonymous (no phone):
+ *    - Only show orders that have no phone attached in memory or idempotency_key.
  */
 export function doesOrderMatchCustomerPhone(
-  order: { id: string; customer_id?: string | null; notes?: string | null },
-  customerPhone?: string | null
+  order: { id: string; customer_id?: string | null; idempotency_key?: string | null; notes?: string | null; table_session_id?: string | null },
+  customerPhone?: string | null,
+  currentSessionId?: string | null
 ): boolean {
   const customerClean = normalizePhoneNumber(customerPhone);
   const recorded = getOrderPhoneRecord(order.id);
 
-  // 1. If order is tagged in memory phone map
-  if (recorded) {
-    if (!customerClean) return false;
-    return recorded.cleanDigits === customerClean;
-  }
-
-  // 2. If customer has a phone number
-  if (customerClean) {
-    const expectedUuid = getPhoneUuid(customerClean);
-    if (order.customer_id) {
-      return order.customer_id === expectedUuid;
+  // 1. If this customer has a specific phone number
+  if (customerClean && customerClean.length >= 10) {
+    // A. Check in-memory phone record
+    if (recorded && recorded.cleanDigits) {
+      return recorded.cleanDigits === customerClean;
     }
-    // Check if phone digits appear in notes
-    if (order.notes && order.notes.includes(customerClean)) {
+
+    // B. Check idempotency_key for exact phone number (e.g., "smol_ord_9876543210_...")
+    if (order.idempotency_key && order.idempotency_key.includes(customerClean)) {
       return true;
     }
-    // If order has no phone record and no customer_id, check if notes belong to another phone
-    if (order.notes && /\b\d{10}\b/.test(order.notes)) {
-      return false; // Belongs to a different phone
+
+    // Strictly return false: do NOT show order belonging to other or legacy phone numbers
+    return false;
+  }
+
+  // 2. If customer has no phone (anonymous guest on table session)
+  if (currentSessionId && order.table_session_id === currentSessionId) {
+    // If order is explicitly tagged to an identified phone, don't show to anonymous
+    if (recorded || (order.idempotency_key && /smol_ord_\d{10}/.test(order.idempotency_key))) {
+      return false;
     }
     return true;
   }
 
-  // 3. Anonymous fallback: order with no customer_id and no phone record
-  return !order.customer_id;
+  return false;
 }

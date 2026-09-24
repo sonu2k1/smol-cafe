@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { ActiveCashierTable } from "@/app/bill/actions";
@@ -13,6 +13,7 @@ import {
   fetchPendingCashierOrdersAction,
   confirmCashierOrderAction,
   rejectCashierOrderAction,
+  clearAllPendingCashierOrdersAction,
   fetchPaidCashierHistoryAction,
   type PendingOrderVerification,
   type PaidHistoryRecord,
@@ -31,6 +32,7 @@ import {
   Coffee,
   UtensilsCrossed,
   Layers,
+  Trash2,
 } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
@@ -70,6 +72,8 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
   const [amountTendered, setAmountTendered] = useState("");
   const [staffName, setStaffName] = useState("Cashier");
   const [submittingOrderIds, setSubmittingOrderIds] = useState<Set<string>>(new Set());
+  const submittingOrderIdsRef = useRef<Set<string>>(new Set());
+  const confirmedOrderIdsRef = useRef<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{
     type: "success" | "error";
@@ -91,7 +95,13 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
       ]);
       setTables(tableData);
       if (pendingData.success) {
-        setPendingOrders(pendingData.orders);
+        setPendingOrders(
+          pendingData.orders.filter(
+            (o) =>
+              !submittingOrderIdsRef.current.has(o.id) &&
+              !confirmedOrderIdsRef.current.has(o.id)
+          )
+        );
       }
       if (paidData.success) {
         setPaidHistory(paidData.records);
@@ -149,10 +159,12 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
     orderId: string,
     stationTarget: "KITCHEN" | "BARISTA" | "ALL" = "ALL"
   ) => {
-    if (submittingOrderIds.has(orderId)) return;
+    if (submittingOrderIdsRef.current.has(orderId)) return;
 
     // 1. Instant Optimistic UI Update (0ms instant feedback)
     const targetOrder = pendingOrders.find((o) => o.id === orderId);
+    submittingOrderIdsRef.current.add(orderId);
+    confirmedOrderIdsRef.current.add(orderId);
     setSubmittingOrderIds((prev) => new Set(prev).add(orderId));
     setPendingOrders((prev) => prev.filter((o) => o.id !== orderId));
 
@@ -189,13 +201,16 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
     try {
       const res = await confirmCashierOrderAction(orderId, stationTarget, staffName);
       if (!res.success) {
+        confirmedOrderIdsRef.current.delete(orderId);
         setActionFeedback({ type: "error", text: res.message || "Failed to confirm order." });
         refreshData();
       }
     } catch {
+      confirmedOrderIdsRef.current.delete(orderId);
       setActionFeedback({ type: "error", text: "Network error confirming order." });
       refreshData();
     } finally {
+      submittingOrderIdsRef.current.delete(orderId);
       setSubmittingOrderIds((prev) => {
         const next = new Set(prev);
         next.delete(orderId);
@@ -205,11 +220,13 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
   };
 
   const handleRejectOrder = async (orderId: string) => {
-    if (submittingOrderIds.has(orderId)) return;
+    if (submittingOrderIdsRef.current.has(orderId)) return;
     const reason = prompt("Enter reason for order rejection/cancellation:", "Customer requested cancellation");
     if (!reason) return;
 
     // Instant Optimistic Removal
+    submittingOrderIdsRef.current.add(orderId);
+    confirmedOrderIdsRef.current.add(orderId);
     setSubmittingOrderIds((prev) => new Set(prev).add(orderId));
     setPendingOrders((prev) => prev.filter((o) => o.id !== orderId));
     setActionFeedback({ type: "success", text: "Order cancelled." });
@@ -217,18 +234,64 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
     try {
       const res = await rejectCashierOrderAction(orderId, reason, staffName);
       if (!res.success) {
+        confirmedOrderIdsRef.current.delete(orderId);
         setActionFeedback({ type: "error", text: res.message || "Failed to reject order." });
         refreshData();
       }
     } catch {
+      confirmedOrderIdsRef.current.delete(orderId);
       setActionFeedback({ type: "error", text: "Network error rejecting order." });
       refreshData();
     } finally {
+      submittingOrderIdsRef.current.delete(orderId);
       setSubmittingOrderIds((prev) => {
         const next = new Set(prev);
         next.delete(orderId);
         return next;
       });
+    }
+  };
+
+  const [isClearingAll, setIsClearingAll] = useState(false);
+
+  const handleClearAllPendingOrders = async () => {
+    if (pendingOrders.length === 0 || isClearingAll) return;
+    const confirmClear = window.confirm(
+      `Are you sure you want to clear all ${pendingOrders.length} pending orders from the cashier queue?`
+    );
+    if (!confirmClear) return;
+
+    setIsClearingAll(true);
+    const orderIds = pendingOrders.map((o) => o.id);
+    orderIds.forEach((id) => {
+      submittingOrderIdsRef.current.add(id);
+      confirmedOrderIdsRef.current.add(id);
+    });
+    setPendingOrders([]);
+
+    try {
+      const res = await clearAllPendingCashierOrdersAction("CANCEL", staffName);
+      if (res.success) {
+        setActionFeedback({
+          type: "success",
+          text: res.message || `Cleared ${orderIds.length} orders from queue.`,
+        });
+      } else {
+        setActionFeedback({
+          type: "error",
+          text: res.message || "Failed to clear all orders.",
+        });
+        refreshData();
+      }
+    } catch {
+      setActionFeedback({
+        type: "error",
+        text: "Network error clearing orders.",
+      });
+      refreshData();
+    } finally {
+      setIsClearingAll(false);
+      orderIds.forEach((id) => submittingOrderIdsRef.current.delete(id));
     }
   };
 
@@ -427,9 +490,23 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                   Review &amp; Edit orders placed via &quot;Pay at Cashier&quot; before dispatching to Kitchen / Barista KDS
                 </p>
               </div>
-              <span className="rounded-full bg-[#B72E35]/10 dark:bg-[#B72E35]/20 border border-[#B72E35]/30 dark:border-[#B72E35]/50 px-3 py-1 font-mono text-xs font-bold text-[#B72E35] dark:text-[#F2C84B]">
-                {pendingOrders.length} Awaiting Approval
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-[#B72E35]/10 dark:bg-[#B72E35]/20 border border-[#B72E35]/30 dark:border-[#B72E35]/50 px-3 py-1 font-mono text-xs font-bold text-[#B72E35] dark:text-[#F2C84B]">
+                  {pendingOrders.length} Awaiting Approval
+                </span>
+                {pendingOrders.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllPendingOrders}
+                    disabled={isClearingAll}
+                    className="flex items-center gap-1.5 rounded-full border border-rose-300 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 px-3 py-1 text-xs font-bold text-rose-700 dark:text-rose-300 shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
+                    title="Clear all pending orders from queue"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>{isClearingAll ? "Clearing..." : "Clear All"}</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {pendingOrders.length === 0 ? (
@@ -464,7 +541,7 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                           </span>
                         </div>
 
-                        {/* Table, Order # & PIN */}
+                        {/* Table and Order # */}
                         <div className="flex items-start justify-between pt-2.5 pb-2">
                           <div>
                             <h2 className="font-mono text-2xl font-black text-[#241F1C] dark:text-white">
@@ -481,15 +558,6 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
                                   : "Recently"}
                               </span>
                             </p>
-                          </div>
-
-                          <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-[#F3E7D3]/70 dark:bg-stone-800/80 px-3 py-1 text-right">
-                            <span className="block font-mono text-[8.5px] uppercase font-bold text-[#725039] dark:text-stone-400 tracking-wider">
-                              PIN
-                            </span>
-                            <span className="font-mono text-lg font-black text-[#241F1C] dark:text-white">
-                              {order.verificationCode}
-                            </span>
                           </div>
                         </div>
 

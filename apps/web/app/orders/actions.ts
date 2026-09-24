@@ -78,9 +78,9 @@ export async function fetchActiveOrdersAction(overridePhone?: string): Promise<F
       .select("*")
       .order("order_no", { ascending: false });
 
-    if (phoneUuid) {
-      // Fetch orders belonging to this table session OR matching customer profile UUID
-      ordersQuery = ordersQuery.or(`table_session_id.eq.${session.sessionId},customer_id.eq.${phoneUuid}`);
+    if (cleanPhone && cleanPhone.length >= 10) {
+      // Fetch orders belonging to this table session OR matching customer profile UUID OR matching phone idempotency key
+      ordersQuery = ordersQuery.or(`table_session_id.eq.${session.sessionId},customer_id.eq.${phoneUuid},idempotency_key.ilike.%${cleanPhone}%`);
     } else {
       ordersQuery = ordersQuery.eq("table_session_id", session.sessionId);
     }
@@ -102,7 +102,7 @@ export async function fetchActiveOrdersAction(overridePhone?: string): Promise<F
     // 2. Strict Customer Phone Isolation:
     // Filter out any orders that were placed by a DIFFERENT phone number
     const filteredOrders = (rawOrders || []).filter((order) =>
-      doesOrderMatchCustomerPhone(order, cleanPhone)
+      doesOrderMatchCustomerPhone(order, cleanPhone, session.sessionId)
     );
 
     if (filteredOrders.length === 0) {
@@ -129,10 +129,27 @@ export async function fetchActiveOrdersAction(overridePhone?: string): Promise<F
       console.error("Error fetching order items:", itemsError);
     }
 
+    // Resolve real names for any items with generic name snapshots
+    const missingNameIds = (orderItems || [])
+      .filter((it: any) => (!it.name_snapshot || it.name_snapshot === "Smol Item" || it.name_snapshot === "Artisanal Item") && it.menu_item_id)
+      .map((it: any) => it.menu_item_id);
+
+    const nameLookup = new Map<string, string>();
+    if (missingNameIds.length > 0) {
+      const { data: dbMenuItems } = await supabase
+        .from("menu_items")
+        .select("id, name")
+        .in("id", missingNameIds);
+      for (const m of dbMenuItems || []) {
+        nameLookup.set(m.id, m.name);
+      }
+    }
+
     const itemsByOrder = new Map<string, OrderItemSnapshot[]>();
     for (const item of (orderItems as Array<{
       id: string;
       order_id: string;
+      menu_item_id?: string;
       name_snapshot: string;
       unit_price_snapshot: number;
       qty: number;
@@ -142,9 +159,14 @@ export async function fetchActiveOrdersAction(overridePhone?: string): Promise<F
       if (!itemsByOrder.has(item.order_id)) {
         itemsByOrder.set(item.order_id, []);
       }
+      const resolvedName =
+        item.name_snapshot && item.name_snapshot !== "Smol Item" && item.name_snapshot !== "Artisanal Item"
+          ? item.name_snapshot
+          : (item.menu_item_id && nameLookup.get(item.menu_item_id)) || item.name_snapshot || "Artisanal Item";
+
       itemsByOrder.get(item.order_id)!.push({
         id: item.id,
-        name: item.name_snapshot,
+        name: resolvedName,
         unitPricePaise: item.unit_price_snapshot,
         qty: item.qty,
         lineSubtotal: item.line_subtotal,
