@@ -229,6 +229,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
 
     const orderPayload = items.map((cartItem) => ({
       menu_item_id: cartItem.item.id,
+      name: cartItem.item.name,
       expected_unit_price_paise: cartItem.item.pricePaise,
       qty: cartItem.qty,
     }));

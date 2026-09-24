@@ -13,6 +13,7 @@ export interface PlaceOrderItemInput {
   menu_item_id: string;
   expected_unit_price_paise: number;
   qty: number;
+  name?: string;
 }
 
 export interface ChangedItemDiff {
@@ -285,11 +286,13 @@ export async function placeOrderAction(
           recordOrderForPhone(fallbackOrderId, cleanPhone, session.guestName);
         }
 
+        const isUuid = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
         const orderItemsPayload = items.map((it) => ({
           id: crypto.randomUUID(),
           order_id: fallbackOrderId,
-          menu_item_id: it.menu_item_id,
-          name_snapshot: "Smol Item",
+          menu_item_id: isUuid(it.menu_item_id) ? it.menu_item_id : null,
+          name_snapshot: it.name || "Artisanal Item",
           unit_price_snapshot: it.expected_unit_price_paise,
           qty: it.qty,
           line_subtotal: it.expected_unit_price_paise * it.qty,

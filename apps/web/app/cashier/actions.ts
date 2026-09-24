@@ -47,6 +47,8 @@ export interface ConfirmOrderResult {
   message?: string;
 }
 
+import { getMenuCatalog } from "@/lib/queries/menu";
+
 export interface MenuCatalogItem {
   id: string;
   name: string;
@@ -59,38 +61,31 @@ export interface MenuCatalogItem {
  * Server Action: Fetches all available menu catalog items for Cashier to add during Order Editing.
  */
 export async function fetchAllMenuItemsForCashierAction(): Promise<{ success: boolean; items: MenuCatalogItem[] }> {
-  const supabase = createAdminClient();
   try {
-    const { data: menuItems, error } = await supabase
-      .from("menu_items")
-      .select("id, name, is_available")
-      .order("name", { ascending: true });
+    const categories = await getMenuCatalog();
+    const catalog: MenuCatalogItem[] = [];
 
-    if (error || !menuItems) {
-      return { success: true, items: [] };
+    for (const cat of categories) {
+      for (const it of cat.items) {
+        if (it.status !== "SOLD_OUT" && it.status !== "ARCHIVED") {
+          const isBev =
+            isBeverageItem(it.name) ||
+            cat.name.toLowerCase().includes("drink") ||
+            cat.name.toLowerCase().includes("brew") ||
+            cat.name.toLowerCase().includes("coffee") ||
+            cat.name.toLowerCase().includes("tea") ||
+            cat.name.toLowerCase().includes("beverage");
+
+          catalog.push({
+            id: it.id,
+            name: it.name,
+            category: cat.name,
+            pricePaise: it.pricePaise || 12000,
+            isBeverage: isBev,
+          });
+        }
+      }
     }
-
-    const itemIds = menuItems.map((m) => m.id);
-    const { data: prices } = await supabase
-      .from("menu_prices")
-      .select("menu_item_id, amount_paise")
-      .in("menu_item_id", itemIds);
-
-    const priceMap = new Map<string, number>();
-    for (const p of prices || []) {
-      priceMap.set(p.menu_item_id, p.amount_paise);
-    }
-
-    const catalog: MenuCatalogItem[] = menuItems.map((m) => {
-      const isBev = isBeverageItem(m.name);
-      return {
-        id: m.id,
-        name: m.name,
-        category: isBev ? "Drinks & Brews" : "Kitchen & Food",
-        pricePaise: priceMap.get(m.id) || 12000,
-        isBeverage: isBev,
-      };
-    });
 
     return { success: true, items: catalog };
   } catch (err) {
@@ -177,6 +172,22 @@ export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrd
       .select("*")
       .in("order_id", orderIds);
 
+    // Resolve real names for any items with generic name snapshots
+    const missingNameIds = (orderItems || [])
+      .filter((it: any) => (!it.name_snapshot || it.name_snapshot === "Smol Item" || it.name_snapshot === "Artisanal Item") && it.menu_item_id)
+      .map((it: any) => it.menu_item_id);
+
+    const nameLookup = new Map<string, string>();
+    if (missingNameIds.length > 0) {
+      const { data: dbMenuItems } = await supabase
+        .from("menu_items")
+        .select("id, name")
+        .in("id", missingNameIds);
+      for (const m of dbMenuItems || []) {
+        nameLookup.set(m.id, m.name);
+      }
+    }
+
     const itemsByOrder = new Map<string, PendingOrderItem[]>();
     for (const item of (orderItems as Array<{
       id: string;
@@ -190,11 +201,16 @@ export async function fetchPendingCashierOrdersAction(): Promise<FetchPendingOrd
       if (!itemsByOrder.has(item.order_id)) {
         itemsByOrder.set(item.order_id, []);
       }
-      const isBev = isBeverageItem(item.name_snapshot);
+      const resolvedName =
+        item.name_snapshot && item.name_snapshot !== "Smol Item" && item.name_snapshot !== "Artisanal Item"
+          ? item.name_snapshot
+          : (item.menu_item_id && nameLookup.get(item.menu_item_id)) || item.name_snapshot || "Artisanal Item";
+
+      const isBev = isBeverageItem(resolvedName);
       itemsByOrder.get(item.order_id)!.push({
         id: item.id,
         menuItemId: item.menu_item_id,
-        name: item.name_snapshot,
+        name: resolvedName,
         qty: item.qty,
         unitPricePaise: item.unit_price_snapshot,
         lineSubtotal: item.line_subtotal,
@@ -513,6 +529,66 @@ export async function rejectCashierOrderAction(
   }
 }
 
+/**
+ * Server Action: Clears all pending orders awaiting cashier approval (marks them as CANCELLED).
+ */
+export async function clearAllPendingCashierOrdersAction(
+  action: "CANCEL" | "CONFIRM" = "CANCEL",
+  staffName = "Cashier"
+): Promise<{ success: boolean; count: number; message: string }> {
+  const supabase = createAdminClient();
+  const nowIso = new Date().toISOString();
+
+  try {
+    const { data: pendingOrders, error: fetchErr } = await supabase
+      .from("orders")
+      .select("id, order_no")
+      .in("status", ["PENDING_CONFIRMATION", "SUBMITTED", "DRAFT"]);
+
+    if (fetchErr || !pendingOrders || pendingOrders.length === 0) {
+      return { success: true, count: 0, message: "Queue is already empty." };
+    }
+
+    const targetStatus = action === "CONFIRM" ? "ACCEPTED" : "CANCELLED";
+    const orderIds = pendingOrders.map((o) => o.id);
+
+    const { error: updateErr } = await supabase
+      .from("orders")
+      .update({
+        status: targetStatus,
+        accepted_at: action === "CONFIRM" ? nowIso : null,
+        updated_at: nowIso,
+      })
+      .in("id", orderIds);
+
+    if (updateErr) {
+      return { success: false, count: 0, message: `Failed to clear orders: ${updateErr.message}` };
+    }
+
+    broadcastSyncEvent({
+      type: "STATUS_CHANGED",
+      timestamp: Date.now(),
+      metadata: {
+        clearedCount: orderIds.length,
+        status: targetStatus,
+        staffName,
+      },
+    });
+
+    return {
+      success: true,
+      count: orderIds.length,
+      message:
+        action === "CONFIRM"
+          ? `All ${orderIds.length} orders confirmed and dispatched!`
+          : `All ${orderIds.length} pending orders cleared from queue.`,
+    };
+  } catch (err) {
+    console.error("Error clearing all pending orders:", err);
+    return { success: false, count: 0, message: "Unexpected error clearing queue." };
+  }
+}
+
 export interface PaidHistoryItem {
   name: string;
   qty: number;
@@ -607,9 +683,26 @@ export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryR
         .select("*")
         .in("order_id", orderIds);
 
+      // Resolve real names for generic name snapshots
+      const missingNameIds = (orderItems || [])
+        .filter((it: any) => (!it.name_snapshot || it.name_snapshot === "Smol Item" || it.name_snapshot === "Artisanal Item") && it.menu_item_id)
+        .map((it: any) => it.menu_item_id);
+
+      const nameLookup = new Map<string, string>();
+      if (missingNameIds.length > 0) {
+        const { data: dbMenuItems } = await supabase
+          .from("menu_items")
+          .select("id, name")
+          .in("id", missingNameIds);
+        for (const m of dbMenuItems || []) {
+          nameLookup.set(m.id, m.name);
+        }
+      }
+
       for (const item of (orderItems as Array<{
         id: string;
         order_id: string;
+        menu_item_id?: string;
         name_snapshot: string;
         unit_price_snapshot: number;
         qty: number;
@@ -618,8 +711,13 @@ export async function fetchPaidCashierHistoryAction(): Promise<FetchPaidHistoryR
         if (!itemsByOrder.has(item.order_id)) {
           itemsByOrder.set(item.order_id, []);
         }
+        const resolvedName =
+          item.name_snapshot && item.name_snapshot !== "Smol Item" && item.name_snapshot !== "Artisanal Item"
+            ? item.name_snapshot
+            : (item.menu_item_id && nameLookup.get(item.menu_item_id)) || item.name_snapshot || "Artisanal Item";
+
         itemsByOrder.get(item.order_id)!.push({
-          name: item.name_snapshot,
+          name: resolvedName,
           qty: item.qty,
           priceRupees: Math.round(item.unit_price_snapshot / 100),
           subtotalRupees: Math.round(item.line_subtotal / 100),
