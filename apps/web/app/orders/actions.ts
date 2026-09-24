@@ -42,10 +42,12 @@ export interface FetchOrdersResult {
   message?: string;
 }
 
+import { getPhoneUuid, normalizePhoneNumber, doesOrderMatchCustomerPhone } from "@/lib/customer-phone";
+
 /**
- * Server Action: Fetches active orders for the current table session.
+ * Server Action: Fetches active orders for the current table session, strictly isolated by customer phone.
  */
-export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
+export async function fetchActiveOrdersAction(overridePhone?: string): Promise<FetchOrdersResult> {
   let session = await getTableSessionCookie();
 
   if (!session || !session.sessionId || !isValidUuid(session.sessionId)) {
@@ -65,15 +67,25 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
     };
   }
 
+  const cleanPhone = normalizePhoneNumber(overridePhone || session.guestPhone);
+  const phoneUuid = cleanPhone ? getPhoneUuid(cleanPhone) : null;
   const supabase = createAdminClient();
 
   try {
-    // 1. Fetch Orders strictly for this active table session
-    const { data: orders, error: ordersError } = await supabase
+    // 1. Fetch Orders for this table session AND customer profile
+    let ordersQuery = supabase
       .from("orders")
       .select("*")
-      .eq("table_session_id", session.sessionId)
       .order("order_no", { ascending: false });
+
+    if (phoneUuid) {
+      // Fetch orders belonging to this table session OR matching customer profile UUID
+      ordersQuery = ordersQuery.or(`table_session_id.eq.${session.sessionId},customer_id.eq.${phoneUuid}`);
+    } else {
+      ordersQuery = ordersQuery.eq("table_session_id", session.sessionId);
+    }
+
+    const { data: rawOrders, error: ordersError } = await ordersQuery;
 
     if (ordersError) {
       console.error("Error fetching orders:", ordersError);
@@ -87,19 +99,27 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
       };
     }
 
-    if (!orders || orders.length === 0) {
+    // 2. Strict Customer Phone Isolation:
+    // Filter out any orders that were placed by a DIFFERENT phone number
+    const filteredOrders = (rawOrders || []).filter((order) =>
+      doesOrderMatchCustomerPhone(order, cleanPhone)
+    );
+
+    if (filteredOrders.length === 0) {
       return {
         success: true,
         hasSession: true,
         orders: [],
         tableLabel: session.tableLabel,
         locationName: session.locationName,
+        guestName: session.guestName,
+        guestPhone: cleanPhone || undefined,
       };
     }
 
-    const orderIds = orders.map((o) => o.id);
+    const orderIds = filteredOrders.map((o) => o.id);
 
-    // 2. Fetch Order Items for these orders
+    // 3. Fetch Order Items for these filtered orders
     const { data: orderItems, error: itemsError } = await supabase
       .from("order_items")
       .select("*")
@@ -134,7 +154,7 @@ export async function fetchActiveOrdersAction(): Promise<FetchOrdersResult> {
 
     // 3. Assemble structured orders
     const structuredOrders: CustomerOrderDetails[] = (
-      orders as Array<{
+      filteredOrders as Array<{
         id: string;
         order_no: number;
         status: OrderStatus;
