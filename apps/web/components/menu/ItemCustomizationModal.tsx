@@ -229,13 +229,15 @@ export const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
             </button>
           </div>
 
-          {/* Add to Cart CTA */}
+          {/* Add to Cart CTA: Liquid Ruby (Light) / Amethyst Purple (Dark) */}
           <button
             onClick={handleAdd}
-            className="flex-1 rounded-2xl bg-[#B72E35] py-3.5 px-4 font-serif text-sm font-bold text-white shadow-md shadow-[#B72E35]/20 hover:bg-[#9E242B] active:scale-[0.98] transition flex items-center justify-between"
+            className="group relative overflow-hidden flex-1 rounded-2xl bg-gradient-to-b from-[#E03A43]/70 via-[#B72E35]/80 to-[#7D1217]/90 dark:from-[#A855F7]/70 dark:via-[#7E22CE]/80 dark:to-[#4C1D95]/90 py-3.5 px-4 font-serif text-sm font-bold text-white backdrop-blur-[16px] border border-white/55 dark:border-purple-300/40 shadow-[0_6px_22px_rgba(183,46,53,0.4),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.4),inset_0_0_12px_rgba(255,140,140,0.35)] dark:shadow-[0_6px_24px_rgba(126,34,206,0.5),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.5),inset_0_0_14px_rgba(192,132,252,0.45)] active:scale-[0.98] transition flex items-center justify-between cursor-pointer"
           >
-            <span>Add to Order</span>
-            <span className="font-mono">₹{totalPriceRupees}</span>
+            {/* Curved Specular Glass Gloss Reflection */}
+            <span className="absolute inset-x-3 top-0.5 h-[42%] rounded-full bg-gradient-to-b from-white/50 via-white/15 to-transparent pointer-events-none opacity-90" />
+            <span className="relative z-10 drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">Add to Order</span>
+            <span className="relative z-10 font-mono drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">₹{totalPriceRupees}</span>
           </button>
         </div>
       </div>
