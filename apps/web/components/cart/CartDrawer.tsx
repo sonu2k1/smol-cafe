@@ -33,6 +33,7 @@ import {
   Sparkles,
   Gift,
   Award,
+  Loader2,
 } from "lucide-react";
 
 interface CartDrawerProps {
@@ -841,27 +842,71 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ tableLabel = "07", guest
                   type="button"
                   onClick={handleTestBypassPayment}
                   disabled={isBypassing}
-                  className="w-full rounded-[1.25rem] border border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3.5 flex items-center justify-between hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99] transition shadow-xs cursor-pointer text-left group"
+                  className={`relative overflow-hidden w-full rounded-[1.25rem] border p-3.5 flex items-center justify-between transition-all duration-300 shadow-xs cursor-pointer text-left group ${
+                    isBypassing
+                      ? "border-[#B72E35] dark:border-[#F2C84B] bg-[#FDF2F0] dark:bg-[#2A1D1A] ring-2 ring-[#B72E35]/20 dark:ring-[#F2C84B]/20 scale-[0.99] cursor-wait"
+                      : "border-[#C9AE8B] dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] hover:bg-[#F3E7D3] dark:hover:bg-[#2C2420] active:scale-[0.99]"
+                  }`}
                 >
+                  {/* Subtle top shimmer bar while loading */}
+                  {isBypassing && (
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-[#B72E35] to-amber-500 animate-pulse" />
+                  )}
+
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl bg-[#B72E35]/15 dark:bg-[#B72E35]/25 border border-[#B72E35]/30">
-                      <Receipt className="w-5 h-5 text-[#B72E35] dark:text-[#F2C84B]" />
+                    <div
+                      className={`w-10 h-10 flex items-center justify-center shrink-0 rounded-xl border transition-all duration-300 ${
+                        isBypassing
+                          ? "bg-[#B72E35] dark:bg-[#F2C84B] border-[#B72E35] dark:border-[#F2C84B] shadow-md"
+                          : "bg-[#B72E35]/15 dark:bg-[#B72E35]/25 border-[#B72E35]/30"
+                      }`}
+                    >
+                      {isBypassing ? (
+                        <Loader2 className="w-5 h-5 text-white dark:text-[#241F1C] animate-spin" />
+                      ) : (
+                        <Receipt className="w-5 h-5 text-[#B72E35] dark:text-[#F2C84B]" />
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-sans font-bold text-[15.5px] text-[#241F1C] dark:text-[#FAF4EB] leading-tight">
-                          Pay at Cashier
+                          {isBypassing ? "Connecting to Cashier..." : "Pay at Cashier"}
                         </h3>
-                        <span className="rounded-full bg-[#B72E35]/15 text-[#B72E35] dark:bg-[#B72E35]/30 dark:text-[#FF5B52] font-mono text-[9px] font-extrabold px-2 py-0.5 uppercase tracking-wide">
-                          Cash / Counter
+                        <span
+                          className={`rounded-full font-mono text-[9px] font-extrabold px-2 py-0.5 uppercase tracking-wide transition ${
+                            isBypassing
+                              ? "bg-amber-500/25 text-amber-800 dark:text-amber-200 border border-amber-500/40 animate-pulse"
+                              : "bg-[#B72E35]/15 text-[#B72E35] dark:bg-[#B72E35]/30 dark:text-[#FF5B52]"
+                          }`}
+                        >
+                          {isBypassing ? "Sending Order" : "Cash / Counter"}
                         </span>
                       </div>
-                      <p className="font-sans text-[12px] text-[#725039] dark:text-[#C9AE8B] mt-0.5">
-                        {isBypassing ? "Sending order to Cashier Desk..." : "Send order to Cashier • Settle bill at counter"}
+                      <p className="font-sans text-[12px] text-[#725039] dark:text-[#C9AE8B] mt-0.5 flex items-center gap-1.5">
+                        {isBypassing ? (
+                          <>
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-600 dark:bg-amber-400 animate-ping" />
+                            <span className="font-medium text-[#B72E35] dark:text-[#F2C84B]">
+                              Dispatching order to Cashier Desk...
+                            </span>
+                          </>
+                        ) : (
+                          "Send order to Cashier • Settle bill at counter"
+                        )}
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B] group-hover:translate-x-0.5 transition" />
+
+                  <div className="shrink-0 flex items-center justify-center pl-2">
+                    {isBypassing ? (
+                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#B72E35]/10 dark:bg-white/10 text-[#B72E35] dark:text-[#F2C84B]">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span className="text-[10px] font-mono font-bold hidden sm:inline">Sending</span>
+                      </div>
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-[#725039] dark:text-[#C9AE8B] group-hover:translate-x-0.5 transition" />
+                    )}
+                  </div>
                 </button>
               </div>
 

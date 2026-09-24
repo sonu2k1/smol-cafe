@@ -492,34 +492,44 @@ export const KitchenCookbookView: React.FC = () => {
       {/* LEFT SIDEBAR: Search, Station Filters, Recipe List */}
       <div className="w-full xl:w-80 shrink-0 flex flex-col gap-3">
         {/* Header Title Card */}
-        <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1E1A17] p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-[#B72E35] dark:text-[#A78BFA]" />
-              <h2 className="font-serif text-lg font-bold text-[#241F1C] dark:text-white">
+        <div className="rounded-3xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1E1A17] p-4 shadow-sm space-y-2">
+          <div className="flex items-start justify-between gap-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <BookOpen className="h-5 w-5 text-[#B72E35] dark:text-[#A78BFA] shrink-0" />
+              <h2 className="font-serif text-base sm:text-lg font-bold text-[#241F1C] dark:text-white leading-tight">
                 Chef&apos;s Cookbook &amp; SOP
               </h2>
             </div>
-            <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-800 dark:text-emerald-300">
+            <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-800 dark:text-emerald-300 whitespace-nowrap">
               Staff Backup Manual
             </span>
           </div>
-          <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B]">
+          <p className="font-serif italic text-xs text-[#725039] dark:text-[#C9AE8B] leading-relaxed">
             Exact gram measurements, heat levels, sauté timings, and emergency substitution guides so any team member can step in and cook.
           </p>
         </div>
 
         {/* Search & Station Pills */}
         <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-stone-800 bg-[#FAF4EB] dark:bg-[#1E1A17] p-3 space-y-2.5 shadow-2xs">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8C7E72]" />
+          <div className="relative flex items-center">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8C7E72] dark:text-stone-400 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search dish or beverage recipe..."
-              className="w-full pl-8.5 pr-3 py-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-medium text-[#241F1C] dark:text-stone-200 placeholder-[#8C7E72] focus:outline-none focus:border-[#B72E35]"
+              className="w-full pl-10 pr-8 py-2 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-medium text-[#241F1C] dark:text-stone-200 placeholder-[#8C7E72] dark:placeholder-stone-500 focus:outline-none focus:border-[#B72E35] focus:ring-1 focus:ring-[#B72E35]/30 transition shadow-2xs"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 p-0.5"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* Station selector */}

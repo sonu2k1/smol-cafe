@@ -432,7 +432,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         </div>
 
         {/* Floating / Sticky Bottom Action Button: Liquid Ruby Glass (Light) / Amethyst Purple Glass (Dark) */}
-        <div className="absolute bottom-0 left-0 right-0 z-30 px-5 pt-3 pb-6 bg-gradient-to-t from-[#F3E7D3] via-[#F3E7D3]/95 to-transparent dark:from-[#241F1C] dark:via-[#241F1C]/95">
+        <div className="absolute bottom-0 left-0 right-0 z-30 px-5 pt-3 pb-7 sm:pb-8 bg-gradient-to-t from-[#F3E7D3] via-[#F3E7D3]/98 to-transparent dark:from-[#241F1C] dark:via-[#241F1C]/98">
           {(() => {
             const isSoldOut = isItemSoldOut;
 
@@ -441,7 +441,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 type="button"
                 disabled={isSoldOut}
                 onClick={handleAddToCart}
-                className={`group relative overflow-hidden w-full h-13 sm:h-14 rounded-full font-serif text-lg tracking-wide flex items-center justify-center gap-4 transition-all duration-300 active:scale-[0.98] cursor-pointer ${
+                className={`group relative overflow-hidden w-full min-h-[54px] sm:min-h-[58px] py-4 px-6 rounded-full font-serif text-lg tracking-wide flex items-center justify-center gap-4 transition-all duration-300 active:scale-[0.98] cursor-pointer ${
                   isSoldOut
                     ? "bg-stone-300 dark:bg-stone-800 text-stone-500 cursor-not-allowed"
                     : "bg-gradient-to-b from-[#E03A43]/70 via-[#B72E35]/80 to-[#7D1217]/90 dark:from-[#A855F7]/70 dark:via-[#7E22CE]/80 dark:to-[#4C1D95]/90 text-white backdrop-blur-[16px] border border-white/55 dark:border-purple-300/40 shadow-[0_8px_26px_rgba(183,46,53,0.42),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.4),inset_0_0_14px_rgba(255,140,140,0.35)] dark:shadow-[0_8px_28px_rgba(126,34,206,0.5),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.5),inset_0_0_16px_rgba(192,132,252,0.45)]"
@@ -453,12 +453,12 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 )}
 
                 {isSoldOut ? (
-                  <span className="relative z-10">86 / Sold Out Today</span>
+                  <span className="relative z-10 font-bold">86 / Sold Out Today</span>
                 ) : (
                   <div className="relative z-10 flex items-center gap-4 drop-shadow-[0_1.5px_2.5px_rgba(0,0,0,0.35)]">
-                    <span className="font-medium">Add to Table</span>
+                    <span className="font-semibold text-lg sm:text-xl">Add to Table</span>
                     <span className="opacity-50 font-light text-base">|</span>
-                    <span className="font-mono font-bold">₹{totalPriceRupees}</span>
+                    <span className="font-mono font-bold text-lg sm:text-xl">₹{totalPriceRupees}</span>
                   </div>
                 )}
               </button>
