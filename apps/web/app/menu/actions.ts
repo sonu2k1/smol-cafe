@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateRequestId, logger } from "@/lib/observability/logger";
 import { recordOrderAttempt } from "@/lib/observability/alerts";
 import { captureAppException } from "@/lib/observability/sentry";
+import { getPhoneUuid, normalizePhoneNumber, recordOrderForPhone } from "@/lib/customer-phone";
 
 export interface PlaceOrderItemInput {
   menu_item_id: string;
@@ -128,6 +129,8 @@ export async function placeOrderAction(
 
   const supabase = createAdminClient();
   let profileId: string | null = null;
+  const cleanPhone = normalizePhoneNumber(session.guestPhone);
+
   try {
     const userClient = await createClient();
     const authPromise = userClient.auth.getUser();
@@ -140,12 +143,32 @@ export async function placeOrderAction(
     profileId = null;
   }
 
+  // If no Supabase Auth user is logged in, use the verified customer Phone UUID as profile identifier
+  if (!profileId && cleanPhone) {
+    profileId = getPhoneUuid(cleanPhone);
+    // Ensure profile row exists in database for this phone
+    try {
+      const formattedPhone = cleanPhone.startsWith("+") ? cleanPhone : `+91${cleanPhone}`;
+      await supabase.from("profiles").upsert(
+        {
+          id: profileId,
+          display_name: session.guestName || `Guest (${cleanPhone.slice(-4)})`,
+          phone: formattedPhone,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "phone" }
+      );
+    } catch (profErr) {
+      console.warn("Could not upsert profile during order creation:", profErr);
+    }
+  }
+
   try {
-    logger.info(`Placing order for table session ${session.sessionId} with ${items.length} items`, {
+    logger.info(`Placing order for table session ${session.sessionId} with ${items.length} items (Guest: ${session.guestName || "Guest"}, Phone: ${cleanPhone || "None"})`, {
       requestId,
       tableSessionId: session.sessionId,
       action: "placeOrder",
-      data: { itemCount: items.length, rewardId, profileId },
+      data: { itemCount: items.length, rewardId, profileId, guestPhone: cleanPhone },
     });
 
     // 3. Call submit_order PostgreSQL function with transient error retry
@@ -191,7 +214,7 @@ export async function placeOrderAction(
 
     // If session was closed, automatically start a fresh open round for this table
     if (result && !result.success && result.error === "SESSION_NOT_OPEN") {
-      const freshRes = await resolveQrToken(`table-${session.tableLabel || "01"}`, true);
+      const freshRes = await resolveQrToken(`table-${session.tableLabel || "01"}`, true, session.guestName, cleanPhone);
       if (freshRes.success && freshRes.session) {
         session = freshRes.session;
         const retry = await supabase.rpc("submit_order", {
@@ -205,6 +228,22 @@ export async function placeOrderAction(
         rpcResult = retry.data;
         rpcError = retry.error;
         result = rpcResult as typeof result;
+      }
+    }
+
+    if (result && result.success && result.order_id && cleanPhone) {
+      // Record order strictly to customer phone
+      recordOrderForPhone(result.order_id, cleanPhone, session.guestName);
+      if (profileId) {
+        // Tag customer_id and notes on the order for persistence
+        await supabase
+          .from("orders")
+          .update({
+            customer_id: profileId,
+            notes: `Guest: ${session.guestName || "Guest"} (${cleanPhone})`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", result.order_id);
       }
     }
 
@@ -234,8 +273,10 @@ export async function placeOrderAction(
           location_id: session.locationId,
           table_session_id: session.sessionId,
           order_no: fallbackOrderNo,
+          customer_id: profileId || null,
           status: "DRAFT",
           service_mode: "DINE_IN",
+          notes: cleanPhone ? `Guest: ${session.guestName || "Guest"} (${cleanPhone})` : null,
           submitted_at: now,
           subtotal_snapshot: subtotalPaise,
           tax_snapshot: taxPaise,
@@ -244,6 +285,10 @@ export async function placeOrderAction(
           created_at: now,
           updated_at: now,
         });
+
+        if (cleanPhone) {
+          recordOrderForPhone(fallbackOrderId, cleanPhone, session.guestName);
+        }
 
         const orderItemsPayload = items.map((it) => ({
           id: crypto.randomUUID(),
