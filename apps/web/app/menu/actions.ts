@@ -164,21 +164,26 @@ export async function placeOrderAction(
   }
 
   try {
+    const effectiveIdempotencyKey =
+      cleanPhone && !idempotencyKey.includes(cleanPhone)
+        ? `smol_ord_${cleanPhone}_${idempotencyKey}`
+        : idempotencyKey;
+
     logger.info(`Placing order for table session ${session.sessionId} with ${items.length} items (Guest: ${session.guestName || "Guest"}, Phone: ${cleanPhone || "None"})`, {
       requestId,
       tableSessionId: session.sessionId,
       action: "placeOrder",
-      data: { itemCount: items.length, rewardId, profileId, guestPhone: cleanPhone },
+      data: { itemCount: items.length, rewardId, guestPhone: cleanPhone },
     });
 
-    // 3. Call submit_order PostgreSQL function with transient error retry
+    // 3. Call submit_order PostgreSQL function (with 6 parameters to resolve ambiguity)
     let { data: rpcResult, error: rpcError } = await supabase.rpc("submit_order", {
       p_location_id: session.locationId,
       p_table_session_id: session.sessionId,
-      p_idempotency_key: idempotencyKey,
+      p_idempotency_key: effectiveIdempotencyKey,
       p_items: items,
       p_reward_id: rewardId || null,
-      p_profile_id: profileId,
+      p_profile_id: profileId || null,
     });
 
     if (rpcError) {
@@ -187,10 +192,10 @@ export async function placeOrderAction(
       const retryCall = await supabase.rpc("submit_order", {
         p_location_id: session.locationId,
         p_table_session_id: session.sessionId,
-        p_idempotency_key: idempotencyKey,
+        p_idempotency_key: effectiveIdempotencyKey,
         p_items: items,
         p_reward_id: rewardId || null,
-        p_profile_id: profileId,
+        p_profile_id: profileId || null,
       });
       if (!retryCall.error && retryCall.data) {
         rpcResult = retryCall.data;
@@ -220,10 +225,10 @@ export async function placeOrderAction(
         const retry = await supabase.rpc("submit_order", {
           p_location_id: session.locationId,
           p_table_session_id: session.sessionId,
-          p_idempotency_key: idempotencyKey,
+          p_idempotency_key: effectiveIdempotencyKey,
           p_items: items,
           p_reward_id: rewardId || null,
-          p_profile_id: profileId,
+          p_profile_id: profileId || null,
         });
         rpcResult = retry.data;
         rpcError = retry.error;
@@ -231,19 +236,9 @@ export async function placeOrderAction(
       }
     }
 
-    if (result && result.success && result.order_id && cleanPhone) {
-      // Record order strictly to customer phone
-      recordOrderForPhone(result.order_id, cleanPhone, session.guestName);
-      if (profileId) {
-        // Tag customer_id and notes on the order for persistence
-        await supabase
-          .from("orders")
-          .update({
-            customer_id: profileId,
-            notes: `Guest: ${session.guestName || "Guest"} (${cleanPhone})`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", result.order_id);
+    if (result && result.success && result.order_id) {
+      if (cleanPhone) {
+        recordOrderForPhone(result.order_id, cleanPhone, session.guestName);
       }
     }
 
@@ -273,10 +268,10 @@ export async function placeOrderAction(
           location_id: session.locationId,
           table_session_id: session.sessionId,
           order_no: fallbackOrderNo,
-          customer_id: profileId || null,
+          customer_id: null,
           status: "DRAFT",
           service_mode: "DINE_IN",
-          notes: cleanPhone ? `Guest: ${session.guestName || "Guest"} (${cleanPhone})` : null,
+          idempotency_key: effectiveIdempotencyKey,
           submitted_at: now,
           subtotal_snapshot: subtotalPaise,
           tax_snapshot: taxPaise,
@@ -294,9 +289,11 @@ export async function placeOrderAction(
           id: crypto.randomUUID(),
           order_id: fallbackOrderId,
           menu_item_id: it.menu_item_id,
+          name_snapshot: "Smol Item",
           unit_price_snapshot: it.expected_unit_price_paise,
           qty: it.qty,
-          status: "SUBMITTED",
+          line_subtotal: it.expected_unit_price_paise * it.qty,
+          item_status: "SUBMITTED",
           created_at: now,
         }));
 
@@ -389,6 +386,8 @@ export interface PlacePaidOrderOptions {
   instructions?: string;
   paymentMethod?: string;
   tableLabel?: string;
+  guestName?: string;
+  guestPhone?: string;
 }
 
 /**
@@ -400,12 +399,16 @@ export async function placePaidOrderAction(
   idempotencyKey: string,
   options: PlacePaidOrderOptions = {}
 ): Promise<PlaceOrderResult> {
-  const { rewardId, instructions, paymentMethod = "UPI", tableLabel } = options;
+  const { rewardId, instructions, paymentMethod = "UPI", tableLabel, guestName, guestPhone } = options;
+
+  const currentCookieSession = await getTableSessionCookie().catch(() => null);
+  const finalGuestName = guestName || currentCookieSession?.guestName;
+  const finalGuestPhone = guestPhone || currentCookieSession?.guestPhone;
 
   let sessionOverride: TableSessionData | undefined;
   if (tableLabel) {
     const targetToken = `table-${tableLabel.toString().padStart(2, "0")}`;
-    const res = await resolveQrToken(targetToken, true);
+    const res = await resolveQrToken(targetToken, true, finalGuestName, finalGuestPhone);
     if (res.success && res.session) {
       sessionOverride = res.session;
     }

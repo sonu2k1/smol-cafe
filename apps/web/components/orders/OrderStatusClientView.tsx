@@ -64,7 +64,11 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
 
   const refreshOrders = useCallback(async () => {
     try {
-      const res = await fetchActiveOrdersAction();
+      let clientPhone: string | undefined = undefined;
+      if (typeof window !== "undefined") {
+        clientPhone = localStorage.getItem("smol_guest_phone") || undefined;
+      }
+      const res = await fetchActiveOrdersAction(clientPhone);
       if (res.success) {
         // Detect if any order transitioned to READY or COMPLETED
         res.orders.forEach((ord) => {
@@ -88,11 +92,14 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
         });
 
         setOrders(res.orders);
+        if (res.guestName && !currentGuestName) {
+          setCurrentGuestName(res.guestName);
+        }
       }
     } catch (err) {
       console.error("Failed to refresh active orders:", err);
     }
-  }, [tableLabel]);
+  }, [tableLabel, currentGuestName]);
 
   // 1. Cross-Interface & Cross-Port Supabase Broadcast Subscription
   useEffect(() => {

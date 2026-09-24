@@ -78,9 +78,9 @@ export async function fetchActiveOrdersAction(overridePhone?: string): Promise<F
       .select("*")
       .order("order_no", { ascending: false });
 
-    if (phoneUuid) {
-      // Fetch orders belonging to this table session OR matching customer profile UUID
-      ordersQuery = ordersQuery.or(`table_session_id.eq.${session.sessionId},customer_id.eq.${phoneUuid}`);
+    if (cleanPhone && cleanPhone.length >= 10) {
+      // Fetch orders belonging to this table session OR matching customer profile UUID OR matching phone idempotency key
+      ordersQuery = ordersQuery.or(`table_session_id.eq.${session.sessionId},customer_id.eq.${phoneUuid},idempotency_key.ilike.%${cleanPhone}%`);
     } else {
       ordersQuery = ordersQuery.eq("table_session_id", session.sessionId);
     }
@@ -102,7 +102,7 @@ export async function fetchActiveOrdersAction(overridePhone?: string): Promise<F
     // 2. Strict Customer Phone Isolation:
     // Filter out any orders that were placed by a DIFFERENT phone number
     const filteredOrders = (rawOrders || []).filter((order) =>
-      doesOrderMatchCustomerPhone(order, cleanPhone)
+      doesOrderMatchCustomerPhone(order, cleanPhone, session.sessionId)
     );
 
     if (filteredOrders.length === 0) {
