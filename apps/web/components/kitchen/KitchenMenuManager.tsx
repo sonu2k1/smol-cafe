@@ -10,6 +10,8 @@ import {
   Sparkles,
   Layers,
   Edit3,
+  Edit2,
+  Trash2,
   X,
   Plus,
   Minus,
@@ -29,7 +31,9 @@ import {
   updateIngredientStockAction,
   bulkSetCategoryStockAction,
 } from "@/app/kitchen/menu-actions";
+import { saveMenuItemAction, deleteMenuItemAction } from "@/app/admin/menu-actions";
 import { broadcastSyncEvent, subscribeToSyncEvents } from "@/lib/sync-events";
+import { getFoodImage, FOOD_PRESET_OPTIONS } from "@/lib/food-images";
 
 interface KitchenMenuManagerProps {
   onClose?: () => void;
@@ -51,6 +55,18 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
   const [noteText, setNoteText] = useState<string>("");
   const [isSpecial, setIsSpecial] = useState<boolean>(false);
   const [isSavingNote, setIsSavingNote] = useState<boolean>(false);
+
+  // Dish Add / Edit Modal state for Kitchen Chefs
+  const [isDishModalOpen, setIsDishModalOpen] = useState<boolean>(false);
+  const [editingDish, setEditingDish] = useState<KitchenMenuItem | null>(null);
+  const [dishName, setDishName] = useState<string>("");
+  const [dishCategory, setDishCategory] = useState<string>("");
+  const [dishPrice, setDishPrice] = useState<number | "">("");
+  const [dishDescription, setDishDescription] = useState<string>("");
+  const [dishDietary, setDishDietary] = useState<"veg" | "non-veg" | "vegan" | "egg" | "beverage">("veg");
+  const [dishStatus, setDishStatus] = useState<"AVAILABLE" | "SOLD_OUT">("AVAILABLE");
+  const [dishImageUrl, setDishImageUrl] = useState<string>("");
+  const [isSavingDish, setIsSavingDish] = useState<boolean>(false);
 
   // Load menu items on mount
   const loadData = useCallback(async () => {
@@ -210,6 +226,72 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
     }
   };
 
+  // Open Add Dish modal
+  const handleOpenAddDish = () => {
+    setEditingDish(null);
+    setDishName("");
+    setDishCategory(items[0]?.category || "Slow Mornings");
+    setDishPrice("");
+    setDishDescription("");
+    setDishDietary("veg");
+    setDishStatus("AVAILABLE");
+    setDishImageUrl("");
+    setIsDishModalOpen(true);
+  };
+
+  // Open Edit Dish modal
+  const handleOpenEditDish = (item: KitchenMenuItem) => {
+    setEditingDish(item);
+    setDishName(item.name);
+    setDishCategory(item.category);
+    setDishPrice(item.priceRupees);
+    setDishDescription(item.coreIngredients || "");
+    setDishDietary((item.dietary as any) || "veg");
+    setDishStatus(item.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : "AVAILABLE");
+    setDishImageUrl(item.imageUrl || "");
+    setIsDishModalOpen(true);
+  };
+
+  // Save Dish (Add or Edit)
+  const handleSaveDish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dishName.trim()) {
+      setFeedback({ type: "error", text: "Dish name is required." });
+      return;
+    }
+    if (dishPrice === "" || Number(dishPrice) < 0) {
+      setFeedback({ type: "error", text: "Valid price is required." });
+      return;
+    }
+
+    setIsSavingDish(true);
+    try {
+      const res = await saveMenuItemAction({
+        id: editingDish?.id,
+        name: dishName.trim(),
+        categoryId: dishCategory,
+        priceRupees: Number(dishPrice),
+        description: dishDescription.trim(),
+        dietary: dishDietary,
+        status: dishStatus,
+        imageUrl: dishImageUrl.trim() || null,
+      });
+
+      if (res.success) {
+        setFeedback({ type: "success", text: res.message });
+        setIsDishModalOpen(false);
+        await loadData();
+        broadcastSyncEvent({ type: "ITEM_AVAILABILITY_CHANGED", itemId: res.itemId });
+      } else {
+        setFeedback({ type: "error", text: res.message });
+      }
+    } catch {
+      setFeedback({ type: "error", text: "Failed to save dish." });
+    } finally {
+      setIsSavingDish(false);
+    }
+  };
+
   // Toggle Ingredient Stock
   const handleToggleIngredient = async (name: string, current: boolean) => {
     const nextState = !current;
@@ -272,6 +354,14 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+          <button
+            onClick={handleOpenAddDish}
+            className="flex items-center gap-1.5 rounded-2xl bg-[#B72E35] hover:bg-[#9E2329] px-3.5 py-1.5 sm:py-2 text-xs font-mono font-bold text-white transition shadow-xs cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add Dish</span>
+          </button>
+
           <button
             onClick={loadData}
             className="flex items-center gap-1.5 rounded-2xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-stone-900 px-3.5 py-1.5 sm:py-2 text-xs font-mono font-bold text-[#241F1C] dark:text-white hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition shadow-xs cursor-pointer"
@@ -406,6 +496,7 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
           {filteredItems.map((item) => {
             const is86 = item.stockStatus === "SOLD_OUT";
             const isLow = item.stockStatus === "LOW_STOCK";
+            const imgUrl = item.imageUrl ? getFoodImage(item.name, item.imageUrl) : "";
 
             return (
               <div
@@ -420,34 +511,56 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
               >
                 {/* Item Card Header */}
                 <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-mono uppercase text-[#725039] dark:text-stone-400 font-bold">
-                          {item.station}
-                        </span>
-                        {item.isChefSpecial && (
-                          <span className="flex items-center gap-0.5 text-[9.5px] font-mono font-bold bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 px-1.5 py-0.5 rounded-md">
-                            <Sparkles className="h-2.5 w-2.5" /> Special
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      {imgUrl && (
+                        <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 border border-[#C9AE8B]/30 dark:border-stone-800 bg-[#EFE7DC] dark:bg-stone-800">
+                          <img
+                            src={imgUrl}
+                            alt={item.name}
+                            className={`h-full w-full object-cover ${
+                              is86 ? "grayscale contrast-125" : ""
+                            }`}
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-mono uppercase text-[#725039] dark:text-stone-400 font-bold">
+                            {item.station}
                           </span>
-                        )}
+                          {item.isChefSpecial && (
+                            <span className="flex items-center gap-0.5 text-[9.5px] font-mono font-bold bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 px-1.5 py-0.5 rounded-md">
+                              <Sparkles className="h-2.5 w-2.5" /> Special
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white leading-tight mt-0.5 line-clamp-1">
+                          {item.name}
+                        </h3>
+                        <p className="text-[11px] font-mono text-[#725039] dark:text-stone-400">
+                          {item.category} • ₹{item.priceRupees}
+                        </p>
                       </div>
-                      <h3 className="font-serif text-base font-bold text-[#241F1C] dark:text-white leading-tight mt-0.5 line-clamp-1">
-                        {item.name}
-                      </h3>
-                      <p className="text-[11px] font-mono text-[#725039] dark:text-stone-400">
-                        {item.category} • ₹{item.priceRupees}
-                      </p>
                     </div>
 
-                    {/* Quick Chef Note Edit Icon */}
-                    <button
-                      onClick={() => handleOpenNoteModal(item)}
-                      className="p-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition text-[#725039] dark:text-stone-300 cursor-pointer"
-                      title="Chef note / recommendation"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                    </button>
+                    {/* Action Buttons: Edit Dish & Chef Note */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEditDish(item)}
+                        className="p-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition text-[#725039] dark:text-stone-300 cursor-pointer"
+                        title="Edit dish name, price & details"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleOpenNoteModal(item)}
+                        className="p-1.5 rounded-xl border border-[#C9AE8B]/40 dark:border-stone-700 hover:bg-[#F3E7D3] dark:hover:bg-stone-800 transition text-[#725039] dark:text-stone-300 cursor-pointer"
+                        title="Chef note / recommendation"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Chef Daily Note Display if present */}
@@ -597,6 +710,208 @@ export const KitchenMenuManager: React.FC<KitchenMenuManagerProps> = () => {
                   className="rounded-xl bg-[#B72E35] hover:bg-[#9B252B] px-5 py-2 text-xs font-mono font-bold text-white shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
                   {isSavingNote ? "Saving..." : "Save Note"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* CHEF ADD / EDIT DISH MODAL                                               */}
+      {/* ========================================================================= */}
+      {isDishModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="relative w-full max-w-md rounded-3xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-[#FAF4EB] dark:bg-[#1A1715] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#C9AE8B]/30 dark:border-stone-800 pb-3">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-[#241F1C] dark:text-white">
+                  {editingDish ? `Edit Dish: ${editingDish.name}` : "Add New Kitchen Dish"}
+                </h3>
+                <p className="text-[11px] font-mono text-stone-500">
+                  Updates price and details live across Customer Menu &amp; Kitchen Board
+                </p>
+              </div>
+              <button
+                onClick={() => setIsDishModalOpen(false)}
+                className="text-stone-400 hover:text-stone-600 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDish} className="space-y-4">
+              {/* Dish Name */}
+              <div>
+                <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1">
+                  Dish Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Masala French Toast"
+                  value={dishName}
+                  onChange={(e) => setDishName(e.target.value)}
+                  className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-3 text-xs font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+                />
+              </div>
+
+              {/* Category & Price */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={dishCategory}
+                    onChange={(e) => setDishCategory(e.target.value)}
+                    className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-xs font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+                  >
+                    {Array.from(new Set(items.map((i) => i.category))).map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1">
+                    Price (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step={1}
+                    placeholder="240"
+                    value={dishPrice}
+                    onChange={(e) =>
+                      setDishPrice(e.target.value === "" ? "" : Number(e.target.value))
+                    }
+                    className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-xs font-mono font-bold text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+                  />
+                </div>
+              </div>
+
+              {/* Dietary & Stock Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1">
+                    Dietary
+                  </label>
+                  <select
+                    value={dishDietary}
+                    onChange={(e) => setDishDietary(e.target.value as any)}
+                    className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-xs font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+                  >
+                    <option value="veg">Vegetarian</option>
+                    <option value="vegan">Vegan</option>
+                    <option value="egg">Contains Egg</option>
+                    <option value="beverage">Beverage</option>
+                    <option value="non-veg">Non-Veg</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1">
+                    Stock Status
+                  </label>
+                  <select
+                    value={dishStatus}
+                    onChange={(e) => setDishStatus(e.target.value as any)}
+                    className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-xs font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+                  >
+                    <option value="AVAILABLE">In Stock</option>
+                    <option value="SOLD_OUT">86 / Sold Out</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300 mb-1">
+                  Description / Core Ingredients
+                </label>
+                <textarea
+                  rows={2}
+                  value={dishDescription}
+                  onChange={(e) => setDishDescription(e.target.value)}
+                  placeholder="Brioche bread, cinnamon, whipped vanilla mascarpone, maple drizzle"
+                  className="w-full rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-xs font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+                />
+              </div>
+
+              {/* Photo / Image Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-mono font-bold text-[#241F1C] dark:text-stone-300">
+                    Dish Photo (URL / Preset)
+                  </label>
+                  {dishImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setDishImageUrl("")}
+                      className="text-[10.5px] font-mono text-red-600 hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://images.unsplash.com/... or pick below"
+                    value={dishImageUrl}
+                    onChange={(e) => setDishImageUrl(e.target.value)}
+                    className="flex-1 rounded-xl border border-[#C9AE8B]/50 dark:border-stone-700 bg-white dark:bg-stone-900 p-2.5 text-xs font-mono text-[#241F1C] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#B72E35]"
+                  />
+                  {dishImageUrl && (
+                    <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0 border border-[#C9AE8B]/40 dark:border-stone-700 bg-stone-100 dark:bg-stone-800">
+                      <img src={dishImageUrl} alt="Preview" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Preset Chips */}
+                <div>
+                  <span className="text-[10px] font-mono text-stone-500 block mb-1">
+                    Presets:
+                  </span>
+                  <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                    {FOOD_PRESET_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => setDishImageUrl(opt.url)}
+                        className={`text-[9.5px] px-2 py-0.5 rounded-lg border transition font-mono ${
+                          dishImageUrl === opt.url
+                            ? "bg-[#B72E35] text-white border-[#B72E35]"
+                            : "bg-white dark:bg-stone-900 border-[#C9AE8B]/40 dark:border-stone-700 text-[#725039] dark:text-stone-300 hover:bg-[#F3E7D3]"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#C9AE8B]/20 dark:border-stone-800">
+                <button
+                  type="button"
+                  onClick={() => setIsDishModalOpen(false)}
+                  className="rounded-xl px-4 py-2 text-xs font-mono text-stone-600 dark:text-stone-400 hover:bg-black/5 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingDish}
+                  className="rounded-xl bg-[#B72E35] hover:bg-[#9B252B] px-5 py-2 text-xs font-mono font-bold text-white shadow-md transition disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingDish ? "Saving..." : editingDish ? "Save Dish" : "Create Dish"}
                 </button>
               </div>
             </form>

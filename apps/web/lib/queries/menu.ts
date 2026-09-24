@@ -40,6 +40,33 @@ export interface CategoryWithItems {
   items: MenuItemWithDetails[];
 }
 
+declare global {
+  var __SMOL_CUSTOM_MENU_ITEMS__: MenuItemWithDetails[] | undefined;
+  var __SMOL_MENU_OVERRIDES__: Record<string, Partial<MenuItemWithDetails>> | undefined;
+  var __SMOL_DELETED_ITEM_IDS__: Set<string> | undefined;
+}
+
+export function getCustomItemsStore(): MenuItemWithDetails[] {
+  if (!globalThis.__SMOL_CUSTOM_MENU_ITEMS__) {
+    globalThis.__SMOL_CUSTOM_MENU_ITEMS__ = [];
+  }
+  return globalThis.__SMOL_CUSTOM_MENU_ITEMS__;
+}
+
+export function getMenuOverridesStore(): Record<string, Partial<MenuItemWithDetails>> {
+  if (!globalThis.__SMOL_MENU_OVERRIDES__) {
+    globalThis.__SMOL_MENU_OVERRIDES__ = {};
+  }
+  return globalThis.__SMOL_MENU_OVERRIDES__;
+}
+
+export function getDeletedItemsStore(): Set<string> {
+  if (!globalThis.__SMOL_DELETED_ITEM_IDS__) {
+    globalThis.__SMOL_DELETED_ITEM_IDS__ = new Set<string>();
+  }
+  return globalThis.__SMOL_DELETED_ITEM_IDS__;
+}
+
 /**
  * Fallback menu catalog builder from master seed data (59 artisanal items).
  */
@@ -70,36 +97,70 @@ function getFallbackCatalog(): CategoryWithItems[] {
   }
 
   const stockStore = (globalThis as any).__SMOL_KITCHEN_MENU_STOCK__ || {};
+  const overrides = getMenuOverridesStore();
+  const deletedIds = getDeletedItemsStore();
 
   for (const item of MOCK_MENU_ITEMS) {
+    if (deletedIds.has(item.id)) continue;
+
     const cat = categoryMap.get(item.category_id);
     if (!cat) continue;
 
     const ver = versionMap.get(item.id);
-    const pricePaise = priceMap.get(item.id) || 18000;
+    const rawPricePaise = priceMap.get(item.id) || 18000;
     const baseMeta = (ver?.metadata || item.metadata || {}) as MenuItemWithDetails["metadata"];
     const liveStock = stockStore[item.id];
+    const override = overrides[item.id];
 
-    const effectiveStatus = liveStock
+    let effectiveStatus = override?.status || (liveStock
       ? (liveStock.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : item.status)
-      : item.status;
+      : item.status);
 
     const metadata: MenuItemWithDetails["metadata"] = {
       ...baseMeta,
-      availability: liveStock ? liveStock.stockStatus : baseMeta.availability,
-      low_stock_portions: liveStock?.lowStockCount ?? (baseMeta as any)?.low_stock_portions,
+      ...(override?.metadata || {}),
+      availability: liveStock ? liveStock.stockStatus : (override?.metadata?.availability || baseMeta.availability),
+      low_stock_portions: liveStock?.lowStockCount ?? (override?.metadata?.low_stock_portions ?? (baseMeta as any)?.low_stock_portions),
     };
 
     cat.items.push({
       id: item.id,
-      categoryId: item.category_id,
-      name: item.name,
+      categoryId: override?.categoryId || item.category_id,
+      name: override?.name || item.name,
       status: effectiveStatus,
-      description: ver?.description || "",
-      pricePaise,
-      imageUrl: ver?.image_url || null,
+      description: override?.description ?? (ver?.description || ""),
+      pricePaise: override?.pricePaise !== undefined ? override.pricePaise : rawPricePaise,
+      imageUrl: override?.imageUrl !== undefined ? override.imageUrl : (ver?.image_url || null),
       metadata,
     });
+  }
+
+  // Include dynamic custom items
+  const customItems = getCustomItemsStore();
+  for (const custom of customItems) {
+    if (deletedIds.has(custom.id)) continue;
+    const override = overrides[custom.id];
+    const catId = override?.categoryId || custom.categoryId;
+    let cat = categoryMap.get(catId);
+    if (!cat) {
+      // Find category by name or fallback to first
+      const foundCat = Array.from(categoryMap.values()).find((c) => c.name.toLowerCase() === catId.toLowerCase() || c.id === catId);
+      if (foundCat) {
+        cat = foundCat;
+      } else {
+        cat = categoryMap.values().next().value;
+      }
+    }
+    if (cat) {
+      cat.items.push({
+        ...custom,
+        ...(override || {}),
+        metadata: {
+          ...custom.metadata,
+          ...(override?.metadata || {}),
+        },
+      });
+    }
   }
 
   return Array.from(categoryMap.values())
@@ -114,7 +175,7 @@ async function fetchMenuCatalogDirectly(): Promise<CategoryWithItems[]> {
     const supabase = createAdminClient();
     const nowIso = new Date().toISOString();
 
-    // Run all 4 queries in parallel rather than serial waterfalls
+    // Run queries in parallel
     const [categoriesRes, itemsRes, pricesRes, versionsRes] = await Promise.all([
       supabase
         .from("menu_categories")
@@ -161,6 +222,8 @@ async function fetchMenuCatalogDirectly(): Promise<CategoryWithItems[]> {
     }
 
     const stockStore = (globalThis as any).__SMOL_KITCHEN_MENU_STOCK__ || {};
+    const overrides = getMenuOverridesStore();
+    const deletedIds = getDeletedItemsStore();
 
     // Combine into CategoryWithItems
     const categoryMap = new Map<string, CategoryWithItems>();
@@ -175,34 +238,61 @@ async function fetchMenuCatalogDirectly(): Promise<CategoryWithItems[]> {
     }
 
     for (const item of items as MenuItem[]) {
+      if (deletedIds.has(item.id)) continue;
       const cat = categoryMap.get(item.category_id);
       if (!cat) continue;
 
       const ver = versionMap.get(item.id);
-      const pricePaise = priceMap.get(item.id) || 0;
+      const rawPricePaise = priceMap.get(item.id) || 0;
       const baseMeta = (ver?.metadata || item.metadata || {}) as MenuItemWithDetails["metadata"];
       const liveStock = stockStore[item.id];
+      const override = overrides[item.id];
 
-      const effectiveStatus = liveStock
+      const effectiveStatus = override?.status || (liveStock
         ? (liveStock.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : item.status)
-        : item.status;
+        : item.status);
 
       const metadata: MenuItemWithDetails["metadata"] = {
         ...baseMeta,
-        availability: liveStock ? liveStock.stockStatus : baseMeta.availability,
-        low_stock_portions: liveStock?.lowStockCount ?? (baseMeta as any)?.low_stock_portions,
+        ...(override?.metadata || {}),
+        availability: liveStock ? liveStock.stockStatus : (override?.metadata?.availability || baseMeta.availability),
+        low_stock_portions: liveStock?.lowStockCount ?? (override?.metadata?.low_stock_portions ?? (baseMeta as any)?.low_stock_portions),
       };
 
       cat.items.push({
         id: item.id,
-        categoryId: item.category_id,
-        name: item.name,
+        categoryId: override?.categoryId || item.category_id,
+        name: override?.name || item.name,
         status: effectiveStatus,
-        description: ver?.description || "",
-        pricePaise,
-        imageUrl: ver?.image_url || null,
+        description: override?.description ?? (ver?.description || ""),
+        pricePaise: override?.pricePaise !== undefined ? override.pricePaise : rawPricePaise,
+        imageUrl: override?.imageUrl !== undefined ? override.imageUrl : (ver?.image_url || null),
         metadata,
       });
+    }
+
+    // Include dynamic custom items
+    const customItems = getCustomItemsStore();
+    for (const custom of customItems) {
+      if (deletedIds.has(custom.id)) continue;
+      const override = overrides[custom.id];
+      const catId = override?.categoryId || custom.categoryId;
+      let cat = categoryMap.get(catId);
+      if (!cat) {
+        const foundCat = Array.from(categoryMap.values()).find((c) => c.name.toLowerCase() === catId.toLowerCase() || c.id === catId);
+        if (foundCat) cat = foundCat;
+        else cat = categoryMap.values().next().value;
+      }
+      if (cat) {
+        cat.items.push({
+          ...custom,
+          ...(override || {}),
+          metadata: {
+            ...custom.metadata,
+            ...(override?.metadata || {}),
+          },
+        });
+      }
     }
 
     const result = Array.from(categoryMap.values())
@@ -230,4 +320,5 @@ export const getMenuCatalog = unstable_cache(
     tags: ["menu-catalog"],
   }
 );
+
 

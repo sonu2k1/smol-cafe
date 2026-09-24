@@ -8,7 +8,7 @@ import { fetchActiveOrdersAction, type CustomerOrderDetails } from "@/app/orders
 import { OrderCard } from "./OrderCard";
 import { ConversationDeckModal } from "./ConversationDeckModal";
 import { BottomNavBar } from "@/components/navigation/BottomNavBar";
-import { Bell, CreditCard, Tag, Receipt, Star, ExternalLink, MapPin } from "lucide-react";
+import { Bell, BellRing, CheckCircle2, Sparkles, CreditCard, Tag, Receipt, Star, ExternalLink, MapPin } from "lucide-react";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { subscribeToSyncEvents } from "@/lib/sync-events";
 import { createTableJsonTag } from "@/lib/table-tag";
@@ -40,6 +40,8 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
   const [isJsonInspectorOpen, setIsJsonInspectorOpen] = useState(false);
   const [isUpiDrawerOpen, setIsUpiDrawerOpen] = useState(false);
   const [isPastBillsOpen, setIsPastBillsOpen] = useState(false);
+  const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
+  const [showNotifyToast, setShowNotifyToast] = useState(false);
 
   // Status tracker for audible chime on READY / COMPLETED transition
   const prevStatusesRef = useRef<Record<string, string>>({});
@@ -50,6 +52,10 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
       if (saved && !currentGuestName) {
         setCurrentGuestName(saved);
       }
+      const savedNotify = localStorage.getItem("smol_notify_order_enabled");
+      if (savedNotify === "true") {
+        setIsNotifyEnabled(true);
+      }
     }
   }, [currentGuestName]);
 
@@ -58,23 +64,42 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
 
   const refreshOrders = useCallback(async () => {
     try {
-      const res = await fetchActiveOrdersAction();
+      let clientPhone: string | undefined = undefined;
+      if (typeof window !== "undefined") {
+        clientPhone = localStorage.getItem("smol_guest_phone") || undefined;
+      }
+      const res = await fetchActiveOrdersAction(clientPhone);
       if (res.success) {
         // Detect if any order transitioned to READY or COMPLETED
         res.orders.forEach((ord) => {
           const prevStatus = prevStatusesRef.current[ord.id];
           if (prevStatus && prevStatus !== ord.status && (ord.status === "READY" || ord.status === "COMPLETED" || ord.status === "SERVED")) {
             soundManager.playOrderReadyChime();
+
+            // Native browser push notification if enabled
+            if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+              try {
+                new Notification(`Order #${ord.orderNo || ord.id.slice(-4)} is Ready! ☕`, {
+                  body: `Your order at Table ${tableLabel || "01"} is hot & ready to serve.`,
+                  icon: "/google-maps-icon.png",
+                });
+              } catch {
+                // Ignore notification constructor errors
+              }
+            }
           }
           prevStatusesRef.current[ord.id] = ord.status;
         });
 
         setOrders(res.orders);
+        if (res.guestName && !currentGuestName) {
+          setCurrentGuestName(res.guestName);
+        }
       }
     } catch (err) {
       console.error("Failed to refresh active orders:", err);
     }
-  }, []);
+  }, [tableLabel, currentGuestName]);
 
   // 1. Cross-Interface & Cross-Port Supabase Broadcast Subscription
   useEffect(() => {
@@ -247,12 +272,15 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
 
       {/* Main Content */}
       <main className="mx-auto max-w-md px-4 pt-4 space-y-5">
-        {/* Arched Hero Status Card (Light Mode Warm Cream / Dark Mode Obsidian) */}
-        <div className="relative overflow-hidden rounded-t-[5.5rem] rounded-b-3xl border-t-4 border-[#B72E35] dark:border-t-2 border-x border-b border-[#C9AE8B]/40 dark:border-x-0 dark:border-b-0 bg-[#FAF4EB] dark:bg-[#141517] p-6 text-center text-[#241F1C] dark:text-white shadow-[0_16px_36px_rgba(74,46,27,0.08)] dark:shadow-2xl animate-scale-in transition-colors duration-200">
-          {/* Top Red Ambient Glow */}
-          <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-20 bg-[#B72E35]/15 dark:bg-[#B72E35]/25 rounded-full blur-xl pointer-events-none animate-pulse-glow" />
+        {/* Arched Hero Status Card (Ultra-Frosted Glassmorphism) */}
+        <div className="relative overflow-hidden rounded-t-[5.5rem] rounded-b-3xl border border-white/80 dark:border-white/15 bg-white/60 dark:bg-[#1A1412]/80 backdrop-blur-[24px] backdrop-saturate-[180%] p-6 text-center text-[#241F1C] dark:text-white shadow-[0_20px_45px_rgba(74,46,27,0.09),0_4px_12px_rgba(0,0,0,0.03),inset_0_1.5px_1.5px_rgba(255,255,255,0.95)] dark:shadow-[0_24px_55px_rgba(0,0,0,0.7),inset_0_1.5px_1px_rgba(255,255,255,0.15)] animate-scale-in transition-all duration-300">
+          {/* Top Arch Luminous Accent Line */}
+          <div className="absolute top-0 inset-x-10 h-[2.5px] bg-gradient-to-r from-transparent via-[#B72E35] dark:via-purple-400 to-transparent opacity-85" />
 
-          {/* smol café Door Logo with Moving/Floating Animation */}
+          {/* Top Atmospheric Radial Halo */}
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-56 h-28 bg-gradient-to-b from-[#B72E35]/25 via-amber-500/10 to-transparent dark:from-purple-600/35 dark:via-purple-900/20 dark:to-transparent rounded-full blur-2xl pointer-events-none animate-pulse-glow" />
+
+          {/* smol café Door Logo with Moving/Floating Animation & Frosted Pedestal */}
           <div className="relative mx-auto mt-1 flex flex-col items-center justify-center">
             {/* Ambient Back Glow for Logo */}
             <div
@@ -267,7 +295,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
                 alt="smol café"
                 width={52}
                 height={78}
-                className="h-16 w-auto object-contain drop-shadow-[0_6px_14px_rgba(183,46,53,0.3)] transition-transform"
+                className="h-16 w-auto object-contain drop-shadow-[0_8px_18px_rgba(183,46,53,0.35)] transition-transform"
                 priority
               />
             </div>
@@ -279,7 +307,7 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
                 alt="smol café"
                 width={52}
                 height={78}
-                className="h-16 w-auto object-contain transition-transform"
+                className="h-16 w-auto object-contain drop-shadow-[0_8px_20px_rgba(168,85,247,0.4)] transition-transform"
                 priority
               />
             </div>
@@ -287,13 +315,13 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             {/* Dynamic Ground Shadow (shrinks as logo floats up) */}
             <div
               aria-hidden="true"
-              className="mt-1 h-1.5 w-10 rounded-full bg-[#725039]/20 dark:bg-black/40 blur-[2px] animate-logo-shadow pointer-events-none"
+              className="mt-1 h-1.5 w-10 rounded-full bg-[#725039]/20 dark:bg-purple-900/40 blur-[2px] animate-logo-shadow pointer-events-none"
             />
           </div>
 
           {/* Headline & Subtitle */}
           <div className="mt-4 space-y-1">
-            <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#241F1C] dark:text-[#F3E7D3] tracking-tight">
+            <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#241F1C] dark:text-[#FAF4EB] tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.05)]">
               {heroHeadline}
             </h2>
             <p className="font-serif italic text-xs text-[#7A583E] dark:text-[#C9AE8B]">
@@ -301,143 +329,183 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             </p>
           </div>
 
-          {/* 2 Metric Tiles */}
-          <div className="mt-5 grid grid-cols-2 gap-2.5">
-            {/* Order Number */}
-            <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#F4ECE1]/80 dark:bg-[#0C0D0E] p-3 text-center shadow-xs transition-colors">
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#7A583E] dark:text-[#C9AE8B]/70">
+          {/* 2 Glassmorphic Metric Tiles */}
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            {/* Order Number Tile */}
+            <div className="group relative overflow-hidden rounded-2xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-white/[0.06] backdrop-blur-md p-3 text-center shadow-[0_4px_12px_rgba(74,46,27,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.12)] transition-all hover:scale-[1.02]">
+              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#7A583E] dark:text-[#C9AE8B]/80">
                 YOUR ORDER NO.
               </span>
-              <span className="block font-mono text-sm font-bold text-[#8C5E1A] dark:text-[#F2C84B] mt-1 tracking-wider">
+              <span className="block font-mono text-sm font-extrabold text-[#8C5E1A] dark:text-[#F2C84B] mt-1 tracking-wider drop-shadow-2xs">
                 {orderNumberStr}
               </span>
             </div>
 
-            {/* Ready Time */}
-            <div className="rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#F4ECE1]/80 dark:bg-[#0C0D0E] p-3 text-center shadow-xs transition-colors">
-              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#7A583E] dark:text-[#C9AE8B]/70">
+            {/* Ready Time Tile */}
+            <div className="group relative overflow-hidden rounded-2xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-white/[0.06] backdrop-blur-md p-3 text-center shadow-[0_4px_12px_rgba(74,46,27,0.05),inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.12)] transition-all hover:scale-[1.02]">
+              <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-[#7A583E] dark:text-[#C9AE8B]/80">
                 EST. READY TIME
               </span>
-              <span className="block font-mono text-sm font-bold text-[#B72E35] dark:text-[#FF6B6B] mt-1 tracking-wider">
+              <span className="block font-mono text-sm font-extrabold text-[#B72E35] dark:text-[#C084FC] mt-1 tracking-wider drop-shadow-2xs">
                 {heroEta}
               </span>
             </div>
           </div>
-
-          {/* Table Zone Tag & Actions */}
-          <div className="mt-4 pt-3 border-t border-[#C9AE8B]/30 dark:border-white/10 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => setIsJsonInspectorOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#C9AE8B]/50 dark:border-white/15 bg-[#F4ECE1] dark:bg-white/5 px-2.5 py-1.5 text-[11px] font-mono text-[#5A3825] dark:text-[#F3E7D3]/80 hover:bg-[#EDE1D2] dark:hover:bg-white/10 shadow-xs transition"
-              title="Inspect JSON Table Tag"
-            >
-              <Tag className="h-3 w-3 text-[#8C5E1A] dark:text-[#F2C84B]" />
-              <span>{tableJsonTag.zone} • Tag</span>
-            </button>
-
-            {latestOrder && (
-              <button
-                type="button"
-                onClick={() => setIsUpiDrawerOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#B72E35] px-3.5 py-1.5 text-xs font-serif font-bold text-white shadow-sm hover:bg-[#91242C] transition active:scale-95"
-              >
-                <CreditCard className="h-3.5 w-3.5" />
-                <span>Pay via UPI • ₹{Math.round(latestOrder.totalPaise / 100)}</span>
-              </button>
-            )}
-          </div>
         </div>
 
-        {/* Another Round While You Wait */}
-        <div className="space-y-2.5 pt-1">
-          <div className="flex items-center justify-between">
-            <h3 className="font-serif text-sm font-bold text-[#241F1C] dark:text-[#FAF4EB]">
-              another round? <span className="font-normal text-[#725039] dark:text-[#C9AE8B]">while you wait</span>
-            </h3>
-            <span className="text-[#F2C84B] text-xs">✧</span>
-          </div>
-
-          {/* Horizontal Scroller Cards */}
-          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
-            {/* Card 1: Smol Espresso */}
-            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3 shadow-xs flex flex-col justify-between h-24">
-              <p className="font-serif font-bold text-xs text-[#241F1C] dark:text-[#FAF4EB] truncate">
-                smol espresso
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-xs text-[#B72E35] dark:text-[#FF5B52]">₹120</span>
-                <Link
-                  href="/smol-menu"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#B72E35] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
-                >
-                  +
-                </Link>
-              </div>
-            </div>
-
-            {/* Card 2: Jaggery Latte */}
-            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3 shadow-xs flex flex-col justify-between h-24">
-              <p className="font-serif font-bold text-xs text-[#241F1C] dark:text-[#FAF4EB] truncate">
-                jaggery latte
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-xs text-[#B72E35] dark:text-[#FF5B52]">₹150</span>
-                <Link
-                  href="/smol-menu"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#B72E35] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
-                >
-                  +
-                </Link>
-              </div>
-            </div>
-
-            {/* Card 3: Triple Decker */}
-            <div className="w-36 shrink-0 rounded-2xl border border-[#C9AE8B]/40 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] p-3 shadow-xs flex flex-col justify-between h-24">
-              <p className="font-serif font-bold text-xs text-[#241F1C] dark:text-[#FAF4EB] truncate">
-                triple decker
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-xs text-[#B72E35] dark:text-[#FF5B52]">₹140</span>
-                <Link
-                  href="/smol-menu"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#B72E35] text-white text-sm font-bold shadow-xs hover:bg-[#91242C] active:scale-95"
-                >
-                  +
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Notify Me When Ready Button */}
+        {/* Modern Interactive Order Notification Pill */}
         <div className="pt-2">
           <button
             type="button"
-            onClick={() => {
-              if (typeof window !== "undefined" && "Notification" in window) {
-                Notification.requestPermission();
+            onClick={async () => {
+              if (!isNotifyEnabled) {
+                if (typeof window !== "undefined" && "Notification" in window) {
+                  try {
+                    const permission = await Notification.requestPermission();
+                    if (permission === "granted") {
+                      try {
+                        new Notification("smol café alerts active ☕", {
+                          body: "We'll chime and notify you the second your order is ready!",
+                          icon: "/google-maps-icon.png",
+                        });
+                      } catch {
+                        // ignore constructor error
+                      }
+                    }
+                  } catch (err) {
+                    console.warn("Notification permission error:", err);
+                  }
+                }
+                soundManager.playOrderPlacedChime();
+                setIsNotifyEnabled(true);
+                setShowNotifyToast(true);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("smol_notify_order_enabled", "true");
+                }
+                setTimeout(() => setShowNotifyToast(false), 3500);
+              } else {
+                setIsNotifyEnabled(false);
+                if (typeof window !== "undefined") {
+                  localStorage.removeItem("smol_notify_order_enabled");
+                }
               }
-              soundManager.playOrderPlacedChime();
-              alert("You will be notified as soon as your order is ready!");
             }}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#B72E35] py-3.5 font-serif text-sm font-semibold text-[#F3E7D3] shadow-md transition hover:bg-[#91242C] active:scale-[0.98] cursor-pointer"
+            className={`group relative w-full overflow-hidden rounded-2xl p-3.5 transition-all duration-300 active:scale-[0.98] text-left cursor-pointer border shadow-md ${
+              isNotifyEnabled
+                ? "bg-gradient-to-r from-[#173824] via-[#1d472e] to-[#122e1d] border-emerald-500/40 text-emerald-50 shadow-emerald-950/20"
+                : "bg-gradient-to-r from-[#B72E35] via-[#A0242B] to-[#7E161C] dark:from-[#9333EA] dark:via-[#7E22CE] dark:to-[#581C87] border-white/40 dark:border-purple-400/40 text-[#FAF4EB] shadow-[0_8px_20px_rgba(183,46,53,0.3)] dark:shadow-[0_8px_25px_rgba(126,34,206,0.45),inset_0_1.5px_1.5px_rgba(255,255,255,0.3)] hover:shadow-lg hover:shadow-[#B72E35]/35 dark:hover:shadow-purple-600/50"
+            }`}
           >
-            <Bell className="h-4 w-4 text-[#F3E7D3]" />
-            <span>notify me when ready</span>
+            {/* Top Specular Arc Gloss Highlight */}
+            <div className="absolute inset-x-3 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-white/50 dark:via-white/70 to-transparent pointer-events-none" />
+
+            {/* Ambient Shimmer Light Effect */}
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-white/15 dark:via-white/25 to-transparent transition-transform duration-1000 ease-in-out pointer-events-none" />
+
+            <div className="relative flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                {/* Floating Icon Container with Ping Badge */}
+                <div
+                  className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all duration-200 ${
+                    isNotifyEnabled
+                      ? "bg-emerald-400/20 text-emerald-300 ring-1 ring-emerald-400/30"
+                      : "bg-white/15 text-[#FAF4EB] ring-1 ring-white/20 dark:ring-purple-300/30 group-hover:bg-white/25 dark:group-hover:bg-white/20"
+                  }`}
+                >
+                  {isNotifyEnabled ? (
+                    <>
+                      <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+                      </span>
+                      <BellRing className="h-5 w-5 text-emerald-300" />
+                    </>
+                  ) : (
+                    <Bell className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110 text-[#FAF4EB]" />
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-serif font-bold text-sm tracking-wide">
+                      {isNotifyEnabled ? "Order Buzz Active" : "notify me when ready"}
+                    </span>
+                    {isNotifyEnabled && (
+                      <span className="inline-flex items-center rounded-full bg-emerald-400/20 px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-300 border border-emerald-400/30">
+                        Live
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className={`text-[11px] font-sans font-normal leading-tight ${
+                      isNotifyEnabled ? "text-emerald-200/80" : "text-[#F3E7D3]/90 dark:text-purple-100/90"
+                    }`}
+                  >
+                    {isNotifyEnabled
+                      ? "Instant push alert + audio chime will ring when served"
+                      : "Instant audio chime & push alert when order is prepared"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Pill Badge */}
+              <div
+                className={`shrink-0 flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-serif font-bold transition-all shadow-xs ${
+                  isNotifyEnabled
+                    ? "bg-emerald-400/25 text-emerald-200 border border-emerald-400/30"
+                    : "bg-white/20 hover:bg-white/30 text-white border border-white/25 dark:border-purple-300/40 dark:bg-white/15 dark:hover:bg-white/25"
+                }`}
+              >
+                {isNotifyEnabled ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />
+                    <span>Active</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5 text-amber-200 dark:text-purple-200" />
+                    <span>Enable</span>
+                  </>
+                )}
+              </div>
+            </div>
           </button>
+
+          {/* Quick Toast Animation */}
+          {showNotifyToast && (
+            <div className="mt-2 flex items-center justify-between rounded-xl bg-emerald-900/90 dark:bg-emerald-950/90 border border-emerald-500/40 px-3 py-2 text-xs text-emerald-100 shadow-md animate-in fade-in slide-in-from-top-1 duration-200">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span>We will ring a chime &amp; buzz your phone the moment your order is plated!</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNotifyToast(false)}
+                className="text-emerald-300 hover:text-white text-xs font-bold pl-2 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Google Maps & Cafe Review Card */}
-        <div className="rounded-2xl border border-amber-300/80 dark:border-amber-900/50 bg-amber-50/90 dark:bg-amber-950/20 p-4 shadow-xs space-y-2">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white">
-                <Star className="h-4 w-4 fill-white" />
+        <div className="rounded-2xl border border-amber-300/80 dark:border-amber-900/50 bg-amber-50/90 dark:bg-amber-950/20 p-3.5 shadow-xs">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl shadow-xs border border-amber-200/60 dark:border-amber-900/40">
+                <Image
+                  src="/google-maps-icon.png"
+                  alt="Google Maps"
+                  width={40}
+                  height={40}
+                  className="h-full w-full object-cover"
+                />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-sm text-[#241F1C] dark:text-amber-100">
+                <h4 className="font-serif font-bold text-sm text-[#241F1C] dark:text-amber-100 flex items-center gap-1.5">
                   Enjoying smol café?
+                  <span className="flex text-amber-500 text-xs">★★★★★</span>
                 </h4>
                 <p className="text-[11px] text-[#725039] dark:text-amber-300/80 font-sans">
                   Tapovan, Rishikesh • Artisanal Coffee &amp; Slow Bakes
@@ -446,13 +514,13 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
             </div>
 
             <a
-              href="https://maps.google.com/?q=smol+cafe+tapovan+rishikesh"
+              href="https://www.google.com/maps/place/smol+caf%C3%A9/@30.1328541,78.3205732,17z/data=!3m1!4b1!4m6!3m5!1s0x3909179f8e14f5d9:0x14fb0bd1b84078dd!8m2!3d30.1328541!4d78.3205732!16s%2Fg%2F11zytk5sgj!18m1!1e1?entry=ttu&g_ep=EgoyMDI2MDkyMS4wIKXMDSoASAFQAw%3D%3D"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-xl bg-[#241F1C] dark:bg-amber-400 text-white dark:text-[#241F1C] px-3 py-1.5 text-xs font-serif font-bold shadow-xs hover:opacity-90 transition active:scale-95"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#241F1C] dark:bg-amber-400 text-white dark:text-[#241F1C] px-3 py-2 text-xs font-serif font-bold shadow-xs hover:opacity-90 transition active:scale-95 shrink-0"
             >
-              <span>Review on Google</span>
-              <ExternalLink className="h-3 w-3" />
+              <span>Review</span>
+              <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
         </div>
@@ -503,23 +571,6 @@ export const OrderStatusClientView: React.FC<OrderStatusClientViewProps> = ({
                 >
                   <span>Browse Menu &amp; Order →</span>
                 </Link>
-              </div>
-
-              <div className="pt-2 flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-mono text-[#7A583E] dark:text-[#C9AE8B]">
-                <span>Testing another table?</span>
-                {["01", "02", "03", "04"].map((num) => (
-                  <a
-                    key={num}
-                    href={`/t/table-${num}`}
-                    className={`rounded-lg px-2.5 py-1 border text-xs font-bold transition ${
-                      tableLabel === num
-                        ? "bg-[#B72E35] text-white border-[#B72E35]"
-                        : "bg-white/80 dark:bg-stone-800 border-[#C9AE8B]/50 hover:bg-[#F3E7D3] text-[#241F1C] dark:text-white"
-                    }`}
-                  >
-                    Table {num}
-                  </a>
-                ))}
               </div>
             </div>
           </div>

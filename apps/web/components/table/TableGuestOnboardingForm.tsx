@@ -137,14 +137,22 @@ export function TableGuestOnboardingForm({
       </div>
 
       {/* Primary CTA: Continue to Café (Navigating to /home) */}
-      <div className="pt-1">
+      <div className="pt-2">
         <button
           type="submit"
           disabled={isPending}
-          className="w-full flex items-center justify-center gap-2 rounded-full bg-[#B72E35] hover:bg-[#9B242A] py-3.5 px-6 text-sm sm:text-base font-serif font-bold text-white shadow-md shadow-[#B72E35]/25 transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+          className="group relative w-full overflow-hidden flex items-center justify-center gap-2.5 rounded-full bg-gradient-to-b from-[#E03A43]/85 via-[#B72E35]/90 to-[#7D1217]/95 dark:from-[#A855F7]/85 dark:via-[#7E22CE]/90 dark:to-[#4C1D95]/95 backdrop-blur-[16px] border border-white/55 dark:border-purple-300/45 py-3.5 px-6 text-sm sm:text-base font-serif font-bold text-white shadow-[0_8px_24px_rgba(183,46,53,0.38),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-2px_4px_rgba(0,0,0,0.25)] dark:shadow-[0_8px_28px_rgba(126,34,206,0.5),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-2px_4px_rgba(0,0,0,0.35)] transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_10px_28px_rgba(183,46,53,0.5)] dark:hover:shadow-[0_10px_32px_rgba(168,85,247,0.65)] active:scale-[0.98] disabled:opacity-60 cursor-pointer"
         >
-          <span>{isPending ? "Entering Café..." : "Continue to Café"}</span>
-          <ArrowRight className="h-4 w-4" />
+          {/* Top Curved Specular Glass Arc Highlight */}
+          <span className="absolute inset-x-4 top-0.5 h-[38%] rounded-full bg-gradient-to-b from-white/60 via-white/15 to-transparent pointer-events-none opacity-90" />
+
+          {/* Ambient Shimmer Sweep on Hover */}
+          <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-white/20 dark:via-white/30 to-transparent transition-transform duration-1000 ease-in-out pointer-events-none" />
+
+          <span className="relative z-10 drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
+            {isPending ? "Entering Café..." : "Continue to Café"}
+          </span>
+          <ArrowRight className="relative z-10 h-4 w-4 stroke-[2.5] transition-transform duration-300 group-hover:translate-x-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]" />
         </button>
       </div>
     </form>

@@ -7,11 +7,13 @@ import { createClient } from "@/lib/supabase/server";
 import { generateRequestId, logger } from "@/lib/observability/logger";
 import { recordOrderAttempt } from "@/lib/observability/alerts";
 import { captureAppException } from "@/lib/observability/sentry";
+import { getPhoneUuid, normalizePhoneNumber, recordOrderForPhone } from "@/lib/customer-phone";
 
 export interface PlaceOrderItemInput {
   menu_item_id: string;
   expected_unit_price_paise: number;
   qty: number;
+  name?: string;
 }
 
 export interface ChangedItemDiff {
@@ -128,6 +130,8 @@ export async function placeOrderAction(
 
   const supabase = createAdminClient();
   let profileId: string | null = null;
+  const cleanPhone = normalizePhoneNumber(session.guestPhone);
+
   try {
     const userClient = await createClient();
     const authPromise = userClient.auth.getUser();
@@ -140,22 +144,47 @@ export async function placeOrderAction(
     profileId = null;
   }
 
+  // If no Supabase Auth user is logged in, use the verified customer Phone UUID as profile identifier
+  if (!profileId && cleanPhone) {
+    profileId = getPhoneUuid(cleanPhone);
+    // Ensure profile row exists in database for this phone
+    try {
+      const formattedPhone = cleanPhone.startsWith("+") ? cleanPhone : `+91${cleanPhone}`;
+      await supabase.from("profiles").upsert(
+        {
+          id: profileId,
+          display_name: session.guestName || `Guest (${cleanPhone.slice(-4)})`,
+          phone: formattedPhone,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "phone" }
+      );
+    } catch (profErr) {
+      console.warn("Could not upsert profile during order creation:", profErr);
+    }
+  }
+
   try {
-    logger.info(`Placing order for table session ${session.sessionId} with ${items.length} items`, {
+    const effectiveIdempotencyKey =
+      cleanPhone && !idempotencyKey.includes(cleanPhone)
+        ? `smol_ord_${cleanPhone}_${idempotencyKey}`
+        : idempotencyKey;
+
+    logger.info(`Placing order for table session ${session.sessionId} with ${items.length} items (Guest: ${session.guestName || "Guest"}, Phone: ${cleanPhone || "None"})`, {
       requestId,
       tableSessionId: session.sessionId,
       action: "placeOrder",
-      data: { itemCount: items.length, rewardId, profileId },
+      data: { itemCount: items.length, rewardId, guestPhone: cleanPhone },
     });
 
-    // 3. Call submit_order PostgreSQL function with transient error retry
+    // 3. Call submit_order PostgreSQL function (with 6 parameters to resolve ambiguity)
     let { data: rpcResult, error: rpcError } = await supabase.rpc("submit_order", {
       p_location_id: session.locationId,
       p_table_session_id: session.sessionId,
-      p_idempotency_key: idempotencyKey,
+      p_idempotency_key: effectiveIdempotencyKey,
       p_items: items,
       p_reward_id: rewardId || null,
-      p_profile_id: profileId,
+      p_profile_id: profileId || null,
     });
 
     if (rpcError) {
@@ -164,10 +193,10 @@ export async function placeOrderAction(
       const retryCall = await supabase.rpc("submit_order", {
         p_location_id: session.locationId,
         p_table_session_id: session.sessionId,
-        p_idempotency_key: idempotencyKey,
+        p_idempotency_key: effectiveIdempotencyKey,
         p_items: items,
         p_reward_id: rewardId || null,
-        p_profile_id: profileId,
+        p_profile_id: profileId || null,
       });
       if (!retryCall.error && retryCall.data) {
         rpcResult = retryCall.data;
@@ -191,20 +220,26 @@ export async function placeOrderAction(
 
     // If session was closed, automatically start a fresh open round for this table
     if (result && !result.success && result.error === "SESSION_NOT_OPEN") {
-      const freshRes = await resolveQrToken(`table-${session.tableLabel || "01"}`, true);
+      const freshRes = await resolveQrToken(`table-${session.tableLabel || "01"}`, true, session.guestName, cleanPhone);
       if (freshRes.success && freshRes.session) {
         session = freshRes.session;
         const retry = await supabase.rpc("submit_order", {
           p_location_id: session.locationId,
           p_table_session_id: session.sessionId,
-          p_idempotency_key: idempotencyKey,
+          p_idempotency_key: effectiveIdempotencyKey,
           p_items: items,
           p_reward_id: rewardId || null,
-          p_profile_id: profileId,
+          p_profile_id: profileId || null,
         });
         rpcResult = retry.data;
         rpcError = retry.error;
         result = rpcResult as typeof result;
+      }
+    }
+
+    if (result && result.success && result.order_id) {
+      if (cleanPhone) {
+        recordOrderForPhone(result.order_id, cleanPhone, session.guestName);
       }
     }
 
@@ -234,33 +269,34 @@ export async function placeOrderAction(
           location_id: session.locationId,
           table_session_id: session.sessionId,
           order_no: fallbackOrderNo,
-          status: "CONFIRMED",
+          customer_id: null,
+          status: "DRAFT",
           service_mode: "DINE_IN",
-          instructions: instructions || null,
+          idempotency_key: effectiveIdempotencyKey,
           submitted_at: now,
-          confirmed_at: now,
-          confirmed_by: "AUTOMATED_RESILIENT_GATEWAY",
           subtotal_snapshot: subtotalPaise,
           tax_snapshot: taxPaise,
           total_snapshot: totalPaise,
-          idempotency_key: idempotencyKey,
-          verification_code: fallbackVerification,
-          customer_name: session.guestName || "Guest",
-          customer_phone: session.guestPhone || null,
-          payment_status: "PAID",
-          payment_method: "UPI",
           version: 1,
           created_at: now,
           updated_at: now,
         });
 
+        if (cleanPhone) {
+          recordOrderForPhone(fallbackOrderId, cleanPhone, session.guestName);
+        }
+
+        const isUuid = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
         const orderItemsPayload = items.map((it) => ({
           id: crypto.randomUUID(),
           order_id: fallbackOrderId,
-          menu_item_id: it.menu_item_id,
+          menu_item_id: isUuid(it.menu_item_id) ? it.menu_item_id : null,
+          name_snapshot: it.name || "Artisanal Item",
           unit_price_snapshot: it.expected_unit_price_paise,
           qty: it.qty,
-          status: "SUBMITTED",
+          line_subtotal: it.expected_unit_price_paise * it.qty,
+          item_status: "SUBMITTED",
           created_at: now,
         }));
 
@@ -353,6 +389,8 @@ export interface PlacePaidOrderOptions {
   instructions?: string;
   paymentMethod?: string;
   tableLabel?: string;
+  guestName?: string;
+  guestPhone?: string;
 }
 
 /**
@@ -364,18 +402,25 @@ export async function placePaidOrderAction(
   idempotencyKey: string,
   options: PlacePaidOrderOptions = {}
 ): Promise<PlaceOrderResult> {
-  const { rewardId, instructions, paymentMethod = "UPI", tableLabel } = options;
+  const { rewardId, instructions, paymentMethod = "UPI", tableLabel, guestName, guestPhone } = options;
+
+  const currentCookieSession = await getTableSessionCookie().catch(() => null);
+  const finalGuestName = guestName || currentCookieSession?.guestName;
+  const finalGuestPhone = guestPhone || currentCookieSession?.guestPhone;
 
   let sessionOverride: TableSessionData | undefined;
   if (tableLabel) {
     const targetToken = `table-${tableLabel.toString().padStart(2, "0")}`;
-    const res = await resolveQrToken(targetToken, true);
+    const res = await resolveQrToken(targetToken, true, finalGuestName, finalGuestPhone);
     if (res.success && res.session) {
       sessionOverride = res.session;
     }
   }
 
   const result = await placeOrderAction(items, idempotencyKey, rewardId, instructions, sessionOverride);
+
+  const isCashierPayment = paymentMethod === "CASHIER" || paymentMethod === "COUNTER";
+  const targetStatus = isCashierPayment ? "DRAFT" : "ACCEPTED";
 
   if (result.success && result.orderId) {
     try {
@@ -384,21 +429,20 @@ export async function placePaidOrderAction(
       await supabase
         .from("orders")
         .update({
-          payment_status: "PAID",
-          payment_method: paymentMethod,
-          status: "CONFIRMED",
-          confirmed_at: now,
-          confirmed_by: `${paymentMethod} (PAID)`,
+          status: targetStatus,
+          accepted_at: isCashierPayment ? null : now,
+          updated_at: now,
         })
         .eq("id", result.orderId);
     } catch (err) {
-      console.warn("Failed to mark payment status on order:", err);
+      console.warn("Failed to mark status on order:", err);
     }
   }
 
   return {
     ...result,
-    paymentStatus: "PAID",
+    status: isCashierPayment ? "PENDING_CONFIRMATION" : "CONFIRMED",
+    paymentStatus: isCashierPayment ? "PENDING" : "PAID",
     tableLabel: tableLabel || result.tableLabel || "01",
   };
 }

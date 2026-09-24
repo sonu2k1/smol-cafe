@@ -14,6 +14,7 @@ import { BottomNavBar } from "@/components/navigation/BottomNavBar";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { subscribeToSyncEvents } from "@/lib/sync-events";
 import { cacheMenuCatalog, getCachedMenuCatalog } from "@/lib/offline-cache";
+import { fetchLiveMenuCatalogAction } from "@/app/admin/menu-actions";
 import MenuLoading from "@/app/menu/loading";
 
 interface MenuClientViewProps {
@@ -53,29 +54,42 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
     }
   }, [initialCategories]);
 
-  // Listen for real-time 86'd / item stock availability sync across all tabs & devices
+  // Listen for real-time item stock, new items, and menu changes across all tabs & devices
   useEffect(() => {
-    const unsub = subscribeToSyncEvents((event) => {
-      if (event.type === "ITEM_AVAILABILITY_CHANGED" && event.itemId) {
-        setCategories((prev) =>
-          prev.map((cat) => ({
-            ...cat,
-            items: cat.items.map((item) => {
-              if (item.id === event.itemId) {
-                return {
-                  ...item,
-                  status: event.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : "ACTIVE",
-                  metadata: {
-                    ...item.metadata,
-                    availability: event.stockStatus,
-                    low_stock_portions: (event.metadata as any)?.lowStockCount,
-                  },
-                };
-              }
-              return item;
-            }),
-          }))
-        );
+    const unsub = subscribeToSyncEvents(async (event) => {
+      if (event.type === "ITEM_AVAILABILITY_CHANGED") {
+        if (event.itemId && event.stockStatus) {
+          setCategories((prev) =>
+            prev.map((cat) => ({
+              ...cat,
+              items: cat.items.map((item) => {
+                if (item.id === event.itemId) {
+                  return {
+                    ...item,
+                    status: event.stockStatus === "SOLD_OUT" ? "SOLD_OUT" : "ACTIVE",
+                    metadata: {
+                      ...item.metadata,
+                      availability: event.stockStatus,
+                      low_stock_portions: (event.metadata as any)?.lowStockCount,
+                    },
+                  };
+                }
+                return item;
+              }),
+            }))
+          );
+        }
+
+        // Fetch latest catalog to sync new items, price changes, or edits
+        try {
+          const res = await fetchLiveMenuCatalogAction();
+          if (res.success && res.categories && res.categories.length > 0) {
+            setCategories(res.categories);
+            cacheMenuCatalog(res.categories);
+          }
+        } catch {
+          // ignore
+        }
       }
     });
 
@@ -222,13 +236,19 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
           <button
             type="button"
             onClick={() => setActiveCategoryId("")}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-serif transition-all duration-300 ease-[cubic-bezier(0.25,1,0.35,1)] active:scale-90 touch-manipulation cursor-pointer ${
+            className={`group relative shrink-0 rounded-full px-4 py-1.5 text-xs font-serif transition-all duration-300 ease-[cubic-bezier(0.25,1,0.35,1)] active:scale-95 touch-manipulation cursor-pointer ${
               activeCategoryId === ""
-                ? "bg-gradient-to-r from-[#C22830] to-[#B72E35] text-white font-bold shadow-[0_4px_14px_rgba(183,46,53,0.32),inset_0_1px_1px_rgba(255,255,255,0.3)] ring-1 ring-white/20 scale-[1.03]"
-                : "border border-[#C9AE8B]/60 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB] hover:bg-[#EFE7DC] dark:hover:bg-[#2C2420] scale-100 hover:scale-[1.02]"
+                ? "bg-gradient-to-b from-[#E03A43]/70 via-[#B72E35]/80 to-[#7D1217]/90 dark:from-[#A855F7]/70 dark:via-[#7E22CE]/80 dark:to-[#4C1D95]/90 text-white font-bold backdrop-blur-[16px] border border-white/55 dark:border-purple-300/40 shadow-[0_6px_20px_rgba(183,46,53,0.38),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.4),inset_0_0_12px_rgba(255,140,140,0.35)] dark:shadow-[0_6px_22px_rgba(126,34,206,0.5),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.5),inset_0_0_14px_rgba(192,132,252,0.45)] scale-[1.03]"
+                : "border border-[#C9AE8B]/50 dark:border-white/10 bg-white/45 dark:bg-white/[0.05] backdrop-blur-md text-[#241F1C] dark:text-[#FAF4EB] hover:bg-white/70 dark:hover:bg-white/10 hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] scale-100 hover:scale-[1.02]"
             }`}
           >
-            all items
+            {/* Curved Specular Glass Gloss Reflection */}
+            {activeCategoryId === "" && (
+              <span className="absolute inset-x-2 top-0.5 h-[42%] rounded-full bg-gradient-to-b from-white/55 via-white/15 to-transparent pointer-events-none opacity-90" />
+            )}
+            <span className="relative z-10 drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
+              all items
+            </span>
           </button>
 
           {categories.map((cat) => {
@@ -238,13 +258,19 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
                 key={cat.id}
                 type="button"
                 onClick={() => handleSelectCategory(cat.id)}
-                className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-serif lowercase transition-all duration-300 ease-[cubic-bezier(0.25,1,0.35,1)] active:scale-90 touch-manipulation cursor-pointer ${
+                className={`group relative shrink-0 rounded-full px-4 py-1.5 text-xs font-serif lowercase transition-all duration-300 ease-[cubic-bezier(0.25,1,0.35,1)] active:scale-95 touch-manipulation cursor-pointer ${
                   isActive
-                    ? "bg-gradient-to-r from-[#C22830] to-[#B72E35] text-white font-bold shadow-[0_4px_14px_rgba(183,46,53,0.32),inset_0_1px_1px_rgba(255,255,255,0.3)] ring-1 ring-white/20 scale-[1.03]"
-                    : "border border-[#C9AE8B]/60 dark:border-white/10 bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB] hover:bg-[#EFE7DC] dark:hover:bg-[#2C2420] scale-100 hover:scale-[1.02]"
+                    ? "bg-gradient-to-b from-[#E03A43]/70 via-[#B72E35]/80 to-[#7D1217]/90 dark:from-[#A855F7]/70 dark:via-[#7E22CE]/80 dark:to-[#4C1D95]/90 text-white font-bold backdrop-blur-[16px] border border-white/55 dark:border-purple-300/40 shadow-[0_6px_20px_rgba(183,46,53,0.38),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.4),inset_0_0_12px_rgba(255,140,140,0.35)] dark:shadow-[0_6px_22px_rgba(126,34,206,0.5),inset_0_1.5px_1.5px_rgba(255,255,255,0.85),inset_0_-1.5px_2px_rgba(0,0,0,0.5),inset_0_0_14px_rgba(192,132,252,0.45)] scale-[1.03]"
+                    : "border border-[#C9AE8B]/50 dark:border-white/10 bg-white/45 dark:bg-white/[0.05] backdrop-blur-md text-[#241F1C] dark:text-[#FAF4EB] hover:bg-white/70 dark:hover:bg-white/10 hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] scale-100 hover:scale-[1.02]"
                 }`}
               >
-                {cat.name}
+                {/* Curved Specular Glass Gloss Reflection */}
+                {isActive && (
+                  <span className="absolute inset-x-2 top-0.5 h-[42%] rounded-full bg-gradient-to-b from-white/55 via-white/15 to-transparent pointer-events-none opacity-90" />
+                )}
+                <span className={`relative z-10 ${isActive ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]" : ""}`}>
+                  {cat.name}
+                </span>
               </button>
             );
           })}
@@ -253,10 +279,10 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
           <button
             type="button"
             onClick={() => setFilterVegOnly(!filterVegOnly)}
-            className={`shrink-0 flex items-center justify-center h-8 w-8 rounded-full border border-[#C9AE8B]/60 dark:border-white/10 ${
+            className={`shrink-0 flex items-center justify-center h-8 w-8 rounded-full border transition-all duration-200 active:scale-90 cursor-pointer ${
               filterVegOnly
-                ? "bg-[#75AFA7] dark:bg-[#5E9B93] text-white border-transparent"
-                : "bg-[#FAF4EB] dark:bg-[#201A17] text-[#241F1C] dark:text-[#FAF4EB]"
+                ? "bg-gradient-to-b from-[#75AFA7] to-[#4F8B83] text-white border-white/40 shadow-[0_4px_12px_rgba(79,139,131,0.4),inset_0_1px_1px_rgba(255,255,255,0.7)]"
+                : "border-[#C9AE8B]/50 dark:border-white/10 bg-white/45 dark:bg-white/[0.05] backdrop-blur-md text-[#241F1C] dark:text-[#FAF4EB] hover:bg-white/70 dark:hover:bg-white/10 hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)]"
             }`}
             title="Filter Veg only"
           >

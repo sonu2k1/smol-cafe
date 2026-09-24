@@ -183,16 +183,27 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({ receipt, o
           {/* Google Maps Review & Rating CTA */}
           <div className="pt-2">
             <a
-              href="https://maps.google.com/?q=smol+cafe+tapovan+rishikesh"
+              href="https://www.google.com/maps/place/smol+caf%C3%A9/@30.1328541,78.3205732,17z/data=!3m1!4b1!4m6!3m5!1s0x3909179f8e14f5d9:0x14fb0bd1b84078dd!8m2!3d30.1328541!4d78.3205732!16s%2Fg%2F11zytk5sgj!18m1!1e1?entry=ttu&g_ep=EgoyMDI2MDkyMS4wIKXMDSoASAFQAw%3D%3D"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between rounded-2xl border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 p-2.5 text-xs text-amber-900 dark:text-amber-200 hover:bg-amber-100 transition shadow-2xs"
+              className="flex items-center justify-between rounded-2xl border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 p-2.5 text-xs text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition shadow-2xs group"
             >
-              <div className="flex items-center gap-1.5 font-medium">
-                <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                <span>Loved your experience? Rate smol café</span>
+              <div className="flex items-center gap-2 font-medium">
+                <Image
+                  src="/google-maps-icon.png"
+                  alt="Google Maps"
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 rounded-md object-contain shadow-2xs shrink-0"
+                />
+                <span className="font-serif font-semibold text-[#241F1C] dark:text-amber-100">
+                  Loved your visit? Review on Google
+                </span>
               </div>
-              <ExternalLink className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
+              <div className="flex items-center gap-1 text-amber-700 dark:text-amber-400 shrink-0">
+                <span className="text-[11px] font-bold underline group-hover:no-underline">Rate Us</span>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </div>
             </a>
           </div>
 

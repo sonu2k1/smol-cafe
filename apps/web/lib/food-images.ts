@@ -6,10 +6,21 @@
 
 /**
  * Global Feature Flag: Controls whether menu item photo thumbnails are rendered in the UI.
- * - Set to `false` for a clean, minimalist artisanal bistro typographic layout.
- * - Set to `true` whenever a developer wants to enable full menu photography.
  */
-export const SHOW_MENU_IMAGES: boolean = false;
+export const SHOW_MENU_IMAGES: boolean = true;
+
+export const FOOD_PRESET_OPTIONS = [
+  { label: "Coffee / Latte", url: "https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=600&q=80" },
+  { label: "Bun / Breakfast", url: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80" },
+  { label: "Sandwich / Toast", url: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=80" },
+  { label: "Bowl / Khichdi / Rice", url: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600&q=80" },
+  { label: "Pasta / Italian", url: "https://images.unsplash.com/photo-1621996346565-e3adc6d7dd74?auto=format&fit=crop&w=600&q=80" },
+  { label: "Pizza", url: "https://images.unsplash.com/photo-1604382355076-af4b0eb60143?auto=format&fit=crop&w=600&q=80" },
+  { label: "Chai / Tea", url: "https://images.unsplash.com/photo-1561336313-0bd5e0b27ec8?auto=format&fit=crop&w=600&q=80" },
+  { label: "Salad / Healthy", url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80" },
+  { label: "Shake / Smoothie", url: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=600&q=80" },
+  { label: "Dessert / Cake", url: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80" },
+];
 
 export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   // Breakfast & Buns
@@ -161,58 +172,12 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
 };
 
 /**
- * Returns a high-definition real food photograph for any menu item.
- * If SHOW_MENU_IMAGES is false, returns empty string unless a custom image URL is provided.
+ * Returns a custom food image URL if explicitly set by Admin or Kitchen KDS.
+ * If no custom image is assigned, returns empty string (no automatic stock photos).
  */
-export function getFoodImage(name: string, fallbackUrl?: string | null): string {
-  if (fallbackUrl && fallbackUrl.startsWith("http")) {
-    return fallbackUrl;
+export function getFoodImage(name: string, customUrl?: string | null): string {
+  if (customUrl && typeof customUrl === "string" && customUrl.trim().startsWith("http")) {
+    return customUrl.trim();
   }
-
-  if (!SHOW_MENU_IMAGES) {
-    return "";
-  }
-
-  const cleanName = name.toLowerCase().trim();
-  if (FOOD_IMAGE_CATALOG[cleanName]) {
-    return FOOD_IMAGE_CATALOG[cleanName];
-  }
-
-  // Keyword Matching
-  if (cleanName.includes("bun") || cleanName.includes("makkhan")) {
-    return "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("pizza") || cleanName.includes("margherita")) {
-    return "https://images.unsplash.com/photo-1604382355076-af4b0eb60143?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("pasta") || cleanName.includes("aglio")) {
-    return "https://images.unsplash.com/photo-1621996346565-e3adc6d7dd74?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("sandwich") || cleanName.includes("decker") || cleanName.includes("toast")) {
-    return "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("chai") || cleanName.includes("tea")) {
-    return "https://images.unsplash.com/photo-1561336313-0bd5e0b27ec8?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("latte") || cleanName.includes("cappuccino") || cleanName.includes("coffee") || cleanName.includes("espresso")) {
-    return "https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("khichdi") || cleanName.includes("dal") || cleanName.includes("rice") || cleanName.includes("bowl")) {
-    return "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("salad")) {
-    return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("brownie") || cleanName.includes("affogato") || cleanName.includes("dessert")) {
-    return "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("shake")) {
-    return "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=600&q=80";
-  }
-  if (cleanName.includes("soda") || cleanName.includes("lemonade") || cleanName.includes("juice") || cleanName.includes("fizz")) {
-    return "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80";
-  }
-
-  // Default artisanal coffee & cafe aesthetic
-  return "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=600&q=80";
+  return "";
 }

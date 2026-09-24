@@ -179,12 +179,25 @@ export async function resolveQrToken(
     const locationName = (location as { name: string } | null)?.name || "Smol Café";
 
     // 3. Find existing OPEN table session
-    const { data: existingSession } = await supabase
+    let { data: existingSession } = await supabase
       .from("table_sessions")
       .select("*")
       .eq("table_id", diningTable.id)
       .eq("status", "OPEN")
       .maybeSingle();
+
+    // Auto-close stale sessions (> 3 hours inactive)
+    if (existingSession) {
+      const MAX_INACTIVITY_MS = 3 * 60 * 60 * 1000;
+      const lastActive = new Date(existingSession.last_activity_at || existingSession.opened_at).getTime();
+      if (Date.now() - lastActive > MAX_INACTIVITY_MS) {
+        await supabase
+          .from("table_sessions")
+          .update({ status: "CLOSED", closed_at: new Date().toISOString() })
+          .eq("id", existingSession.id);
+        existingSession = null;
+      }
+    }
 
     let sessionId: string;
     let openedAt: string;
@@ -267,6 +280,8 @@ export async function resolveQrToken(
   }
 }
 
+import { getPhoneUuid, normalizePhoneNumber } from "@/lib/customer-phone";
+
 /**
  * Server Action: Onboards guest with Name & Phone number, updates table session,
  * and enables redirecting to /home instead of menu.
@@ -279,7 +294,7 @@ export async function onboardGuestAndRedirectAction(formData: FormData): Promise
   if (!guestName || guestName.length < 2) {
     return { success: false, error: "Please enter your name." };
   }
-  const cleanDigits = guestPhone.replace(/\D/g, "");
+  const cleanDigits = normalizePhoneNumber(guestPhone);
   if (!cleanDigits || cleanDigits.length < 10) {
     return { success: false, error: "Please enter a valid 10-digit mobile number." };
   }
@@ -290,13 +305,14 @@ export async function onboardGuestAndRedirectAction(formData: FormData): Promise
     return { success: false, error: result.message || "Failed to start table session." };
   }
 
-  // Upsert profile record so order history & loyalty rewards immediately associate with this phone
+  // Upsert profile record with deterministic phone UUID so order history & loyalty rewards immediately associate with this phone
   try {
     const supabase = createAdminClient();
+    const phoneUuid = getPhoneUuid(cleanDigits);
     const formattedPhone = cleanDigits.startsWith("+") ? cleanDigits : `+91${cleanDigits}`;
     await supabase.from("profiles").upsert(
       {
-        id: `prof_${cleanDigits}`,
+        id: phoneUuid,
         display_name: guestName,
         phone: formattedPhone,
         updated_at: new Date().toISOString(),
