@@ -47,7 +47,7 @@ export const AppDrawer: React.FC<AppDrawerProps> = ({
       title: "Dine & Experience",
       items: [
         { name: "Home", href: "/", icon: Home, desc: "Daily specials & bento cards" },
-        { name: "Smol Menu", href: "/menu", icon: BookOpen, desc: "All 59 artisanal items & pairings" },
+        { name: "Smol Menu", href: "/menu", icon: BookOpen, desc: "Artisanal comfort items & pairings" },
         { name: "Your Table", href: "/table", icon: Armchair, desc: `Table ${tableLabel || "01"} seated round` },
         { name: "Live Order Status", href: "/orders", icon: Package, desc: "Live kitchen brewing tracker" },
         { name: "Settle Up / Bill", href: "/bill", icon: Receipt, desc: "UPI, Cards, Wallets & digital receipt" },

@@ -314,9 +314,9 @@ export const getMenuCatalog = unstable_cache(
   async (): Promise<CategoryWithItems[]> => {
     return fetchMenuCatalogDirectly();
   },
-  ["smol_menu_catalog_v2"],
+  ["smol_menu_catalog_v3"],
   {
-    revalidate: 60,
+    revalidate: 1,
     tags: ["menu-catalog"],
   }
 );

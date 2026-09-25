@@ -225,7 +225,7 @@ const MenuContentInner: React.FC<MenuClientViewProps> = ({
             what are we brewing &amp; baking today?
           </p>
           <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#B72E35] dark:text-[#FF5B52]">
-            59 ITEMS
+            {categories.reduce((acc, cat) => acc + (cat.items?.length || 0), 0)} ITEMS
           </span>
         </div>
 

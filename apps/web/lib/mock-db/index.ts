@@ -318,10 +318,20 @@ declare global {
   var __SMOL_MOCK_DB__: MockDatabaseStore | undefined;
 }
 
-export const mockStore =
-  (globalThis as unknown as { __SMOL_MOCK_DB__?: MockDatabaseStore }).__SMOL_MOCK_DB__ ||
-  new MockDatabaseStore();
-(globalThis as unknown as { __SMOL_MOCK_DB__?: MockDatabaseStore }).__SMOL_MOCK_DB__ = mockStore;
+export const mockStore: MockDatabaseStore = (() => {
+  const store =
+    (globalThis as unknown as { __SMOL_MOCK_DB__?: MockDatabaseStore }).__SMOL_MOCK_DB__ ||
+    new MockDatabaseStore();
+
+  // Always keep master menu items, versions and prices in sync with seedData
+  store.menu_categories = [...MOCK_CATEGORIES];
+  store.menu_items = [...MOCK_MENU_ITEMS];
+  store.menu_item_versions = [...MOCK_MENU_VERSIONS];
+  store.menu_prices = [...MOCK_MENU_PRICES];
+
+  (globalThis as unknown as { __SMOL_MOCK_DB__?: MockDatabaseStore }).__SMOL_MOCK_DB__ = store;
+  return store;
+})();
 
 
 type FilterFn = (row: Record<string, unknown>) => boolean;

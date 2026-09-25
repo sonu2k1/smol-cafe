@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
+import { resolveEffectiveTheme, applyThemeToDOM, isISTNightTime } from "@/lib/theme-utils";
 
 interface ThemeToggleProps {
   variant?: "pill" | "icon" | "minimal";
@@ -17,14 +18,20 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
 
   useEffect(() => {
     setMounted(true);
-    const saved = localStorage.getItem("smol_theme");
-    const active =
-      saved === "night" ||
-      saved === "dark" ||
-      (!saved && document.documentElement.classList.contains("dark"));
+    const effective = resolveEffectiveTheme();
+    setIsDark(effective);
+    applyThemeToDOM(effective);
 
-    setIsDark(active);
-    applyTheme(active);
+    // Periodic check every 60 seconds to auto-transition at 6:00 PM and 4:00 AM IST
+    const interval = setInterval(() => {
+      const saved = localStorage.getItem("smol_theme");
+      // If user hasn't explicitly set manual permanent override, follow IST auto
+      if (!saved || saved === "auto") {
+        const istDark = isISTNightTime();
+        setIsDark(istDark);
+        applyThemeToDOM(istDark);
+      }
+    }, 60000);
 
     const handleCustomChange = (e: Event) => {
       const customEvent = e as CustomEvent<boolean>;
@@ -34,27 +41,16 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
     };
 
     window.addEventListener("smol_theme_changed", handleCustomChange);
-    return () => window.removeEventListener("smol_theme_changed", handleCustomChange);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("smol_theme_changed", handleCustomChange);
+    };
   }, []);
-
-  const applyTheme = (dark: boolean) => {
-    if (dark) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.setAttribute("data-theme", "night");
-      document.body.style.backgroundColor = "#241F1C";
-      document.body.style.color = "#F3E7D3";
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.setAttribute("data-theme", "day");
-      document.body.style.backgroundColor = "#F3E7D3";
-      document.body.style.color = "#241F1C";
-    }
-  };
 
   const toggleTheme = () => {
     const next = !isDark;
     setIsDark(next);
-    applyTheme(next);
+    applyThemeToDOM(next);
     localStorage.setItem("smol_theme", next ? "night" : "day");
     window.dispatchEvent(new CustomEvent("smol_theme_changed", { detail: next }));
   };

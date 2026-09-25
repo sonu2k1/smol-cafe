@@ -62,7 +62,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
       {/* Details */}
       <div className="flex-1 min-w-0 pr-2">
         {/* Title & Dietary Dot */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
               isEgg
@@ -71,10 +71,10 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
             }`}
             title={isEgg ? "Egg" : "Veg"}
           />
-          <h3 className={`font-serif text-base font-bold transition-colors tracking-tight lowercase truncate ${
+          <h3 className={`text-[17px] sm:text-[18px] font-bold tracking-tight leading-snug transition-colors capitalize ${
             isSoldOut
-              ? "text-stone-700 dark:text-stone-300"
-              : "text-[#241F1C] dark:text-[#FAF4EB] group-hover:text-[#B72E35] dark:group-hover:text-[#FF5B52]"
+              ? "text-stone-600 dark:text-stone-400"
+              : "text-[#1C1917] dark:text-[#FAF4EB] group-hover:text-[#B72E35] dark:group-hover:text-[#FF5B52]"
           }`}>
             {item.name}
           </h3>
@@ -100,9 +100,9 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
           )}
         </div>
 
-        {/* Description */}
+        {/* Description / Ingredients */}
         {item.description && (
-          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#241F1C]/80 dark:text-[#FAF4EB]/70 font-sans">
+          <p className="mt-1.5 line-clamp-2 text-xs font-normal leading-relaxed text-[#5C534B] dark:text-[#C5BAAF] font-sans">
             {item.description}
           </p>
         )}
@@ -116,7 +116,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
 
         {/* Pairing info */}
         {pairing && (
-          <p className="mt-0.5 font-serif italic text-[11px] text-[#725039] dark:text-[#C9AE8B] truncate">
+          <p className="mt-1 font-serif italic text-[11px] font-normal text-[#8A7868] dark:text-[#A89888] truncate">
             pairs with: {pairing}
           </p>
         )}
@@ -125,8 +125,8 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onOpenDetail }
       {/* Right: Price */}
       <div className="shrink-0 text-right pt-0.5">
         <span
-          className={`font-mono text-sm sm:text-base font-bold ${
-            isSoldOut ? "text-stone-400 dark:text-stone-500" : "text-[#241F1C] dark:text-[#FAF4EB]"
+          className={`font-mono text-base sm:text-[17px] font-bold ${
+            isSoldOut ? "text-stone-400 dark:text-stone-500" : "text-[#1C1917] dark:text-[#FAF4EB]"
           }`}
         >
           ₹{priceRupees}

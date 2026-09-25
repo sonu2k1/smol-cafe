@@ -48,6 +48,10 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
     "https://images.unsplash.com/photo-1539252554453-80ab65ce3586?auto=format&fit=crop&w=600&q=80",
   "bombay toastie":
     "https://images.unsplash.com/photo-1619860860774-1e2e17343432?auto=format&fit=crop&w=600&q=80",
+  "bombay style sandwich":
+    "https://images.unsplash.com/photo-1619860860774-1e2e17343432?auto=format&fit=crop&w=600&q=80",
+  "paneer veg sandwich":
+    "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=80",
 
   // Bowls & Comfort
   "ghar wali dal khichdi":
@@ -56,11 +60,19 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
     "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=600&q=80",
   "rajma chawal bowl":
     "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=600&q=80",
+  "rajma rice bowl":
+    "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=600&q=80",
+  "kadai paneer rice bowl":
+    "https://images.unsplash.com/photo-1567337710282-00832b415979?auto=format&fit=crop&w=600&q=80",
+  "jeera rice bowl":
+    "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600&q=80",
   "chana crunch bowl":
     "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80",
   "smoky paneer rice bowl":
     "https://images.unsplash.com/photo-1567337710282-00832b415979?auto=format&fit=crop&w=600&q=80",
   "creamy mushroom & herb rice":
+    "https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?auto=format&fit=crop&w=600&q=80",
+  "creamy mushroom rice bowl":
     "https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?auto=format&fit=crop&w=600&q=80",
 
   // Salads
@@ -73,7 +85,6 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
   "smol pink pasta":
     "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80",
   "garlic chilli aglio olio":
-
     "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=600&q=80",
   "classic margherita":
     "https://images.unsplash.com/photo-1604382355076-af4b0eb60143?auto=format&fit=crop&w=600&q=80",
@@ -91,7 +102,15 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
     "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=600&q=80",
   "crispy corn":
     "https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=600&q=80",
+  "crispy corn chaat":
+    "https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=600&q=80",
+  "french fries":
+    "https://images.unsplash.com/photo-1576107232684-1279f3908594?auto=format&fit=crop&w=600&q=80",
   "chilli cheese toast fingers":
+    "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=600&q=80",
+  "chilli cheese toasts":
+    "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=600&q=80",
+  "chilli cheese toast":
     "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=600&q=80",
   "loaded papad nachos":
     "https://images.unsplash.com/photo-1513456852971-30c0b8199d4d?auto=format&fit=crop&w=600&q=80",
@@ -103,6 +122,8 @@ export const FOOD_IMAGE_CATALOG: Record<string, string> = {
     "https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?auto=format&fit=crop&w=600&q=80",
   "warm chocolate brownie":
     "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80",
+  "cake for dessert":
+    "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=600&q=80",
 
   // Coffee, Cold Brews & Signature Drinks
   "tapovan pour over":

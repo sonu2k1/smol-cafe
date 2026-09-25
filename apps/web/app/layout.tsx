@@ -78,8 +78,23 @@ export default function RootLayout({
               (function() {
                 try {
                   var saved = localStorage.getItem('smol_theme');
-                  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  var isDark = saved ? (saved === 'night' || saved === 'dark') : prefersDark;
+                  var isDark;
+                  if (saved === 'night' || saved === 'dark') {
+                    isDark = true;
+                  } else if (saved === 'day' || saved === 'light') {
+                    isDark = false;
+                  } else {
+                    // Default Auto: 6:00 PM (18:00) to 4:00 AM (04:00) Indian Standard Time (IST)
+                    try {
+                      var istHour = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false }).format(new Date()), 10);
+                      isDark = (istHour >= 18 || istHour < 4);
+                    } catch (err) {
+                      var utc = Date.now() + (new Date().getTimezoneOffset() * 60000);
+                      var istDate = new Date(utc + (3600000 * 5.5));
+                      var h = istDate.getHours();
+                      isDark = (h >= 18 || h < 4);
+                    }
+                  }
                   var targetColor = isDark ? '#151110' : '#F3E7D3';
                   if (isDark) {
                     document.documentElement.classList.add('dark');
