@@ -115,13 +115,13 @@ export const BottomNavBar: React.FC = () => {
       icon: (
         <svg className="h-[25px] w-[25px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
           {/* Steam waves */}
-          <path d="M6 2v2M10 2v2M14 2v2" strokeWidth="1.6" />
+          <path d="M7.5 2.5v2.5M11 2v3M14.5 2.5v2.5" strokeWidth="1.6" />
           {/* Coffee cup */}
-          <path d="M3 8h14v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z" strokeWidth="1.8" fill="currentColor" fillOpacity="0.15" />
+          <path d="M4 8h12v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8z" strokeWidth="1.8" fill="currentColor" fillOpacity="0.15" />
           {/* Handle */}
-          <path d="M17 9h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2" strokeWidth="1.8" />
+          <path d="M16 9h2.5a2 2 0 0 1 2 2v1.5a2 2 0 0 1-2 2H16" strokeWidth="1.8" />
           {/* Saucer */}
-          <line x1="2" y1="21" x2="18" y2="21" strokeWidth="1.8" />
+          <line x1="3" y1="21" x2="21" y2="21" strokeWidth="1.8" />
         </svg>
       ),
     },
@@ -207,7 +207,7 @@ export const BottomNavBar: React.FC = () => {
                   <span className="absolute inset-x-2 top-1 h-[42%] rounded-full bg-gradient-to-b from-white/50 via-white/15 to-transparent pointer-events-none opacity-90" />
                 )}
 
-                <div className="relative z-10 flex items-center overflow-hidden">
+                <div className="relative z-10 flex items-center justify-center">
                   <div
                     className={`shrink-0 flex items-center justify-center transition-all duration-[550ms] ease-[cubic-bezier(0.25,1,0.35,1)] ${
                       active
@@ -217,19 +217,13 @@ export const BottomNavBar: React.FC = () => {
                   >
                     {item.icon}
                   </div>
-                  <div
-                    className={`grid transition-all duration-[650ms] ease-[cubic-bezier(0.25,1,0.35,1)] ${
-                      active
-                        ? "grid-rows-[1fr] opacity-100 ml-2 translate-x-0"
-                        : "grid-rows-[0fr] opacity-0 ml-0 -translate-x-1"
-                    }`}
-                  >
-                    <div className="overflow-hidden">
+                  {active && (
+                    <div className="overflow-hidden ml-2 animate-fade-in">
                       <span className="text-[13.5px] font-sans font-bold tracking-tight text-white whitespace-nowrap block drop-shadow-[0_1.5px_2.5px_rgba(0,0,0,0.35)]">
                         {item.label}
                       </span>
                     </div>
-                  </div>
+                  )}
                 </div>
               </Link>
             );
